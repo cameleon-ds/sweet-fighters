@@ -3,13 +3,15 @@ html,body{
   touch-action:none;user-select:none;-webkit-user-select:none;
   -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
 }
+#app{position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:hidden}
+body.rot #app{transform-origin:0 0;transform:rotate(90deg)}
 #game{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   image-rendering:pixelated;image-rendering:crisp-edges;
 }
 
 /* ---------- Contrôles tactiles ---------- */
-#touch{position:fixed;inset:0;display:none;pointer-events:none;z-index:5}
+#touch{position:absolute;inset:0;display:none;pointer-events:none;z-index:5}
 body.touch #touch{display:block}
 #stickZone{position:absolute;left:0;top:18%;bottom:0;width:45%;pointer-events:auto}
 #btnZone{position:absolute;right:0;top:18%;bottom:0;width:45%;pointer-events:auto}
@@ -43,10 +45,10 @@ body.touch #touch{display:block}
 }
 .b small{font-size:calc(var(--b) * .1);margin-top:5px;opacity:.75;letter-spacing:-.5px}
 .b.on{transform:scale(.92);background:rgba(255,255,255,.3)}
-.by{left:calc(var(--b) * .95);top:0;border-color:rgba(255,214,60,.6)}
-.bx{left:0;top:calc(var(--b) * .95);border-color:rgba(70,150,255,.6)}
-.bb{left:calc(var(--b) * 1.9);top:calc(var(--b) * .95);border-color:rgba(255,80,80,.6)}
-.ba{left:calc(var(--b) * .95);top:calc(var(--b) * 1.9);border-color:rgba(90,220,110,.6)}
+.bx{left:calc(var(--b) * .95);top:0;border-color:rgba(70,150,255,.6)}
+.by{left:0;top:calc(var(--b) * .95);border-color:rgba(255,214,60,.6)}
+.ba{left:calc(var(--b) * 1.9);top:calc(var(--b) * .95);border-color:rgba(90,220,110,.6)}
+.bb{left:calc(var(--b) * .95);top:calc(var(--b) * 1.9);border-color:rgba(255,80,80,.6)}
 
 /* ---------- Mode portrait ---------- */
 #rotate{
@@ -55,8 +57,11 @@ body.touch #touch{display:block}
   background:#0b0710;color:#ffd23a;text-align:center;
   font:12px/1.8 'Press Start 2P',monospace;
 }
+#rotate button{margin-top:28px;padding:14px 22px;font:11px 'Press Start 2P',monospace;color:#1a0f00;background:#ffd23a;border:0;border-radius:6px;box-shadow:0 4px 0 #a8780a}
+#rotate button:active{transform:translateY(3px);box-shadow:0 1px 0 #a8780a}
 #rotate svg{margin-bottom:24px;animation:tilt 1.6s ease-in-out infinite}
 @keyframes tilt{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+
 @media (orientation:portrait){
-  body.touch #rotate{display:flex}
+  body.touch:not(.rotok) #rotate{display:flex}
 }

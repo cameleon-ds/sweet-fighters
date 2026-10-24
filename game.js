@@ -5,18 +5,36 @@
 'use strict';
 (() => {
 
-const W = 384, H = 216, GROUND = 190, GRAV = 0.34;
+let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
+let CX = 192; // centre horizontal
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+// Portrait sur mobile (ex. rotation verrouillée) : on pivote tout le jeu de 90°
+let ROT = false;
+const app = document.getElementById('app');
 function resize() {
-  const s = Math.min(innerWidth / W, innerHeight / H);
-  cv.style.width = Math.floor(W * s) + 'px';
-  cv.style.height = Math.floor(H * s) + 'px';
+  const touchDev = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || /[?&]touch/.test(location.search);
+  ROT = touchDev && innerHeight > innerWidth;
+  document.body.classList.toggle('rot', ROT);
+  const aw = ROT ? innerHeight : innerWidth, ah = ROT ? innerWidth : innerHeight;
+  app.style.width = aw + 'px'; app.style.height = ah + 'px';
+  app.style.left = ROT ? innerWidth + 'px' : '0px';
+  // Plein écran : la largeur interne s'adapte au format de l'écran (16:9 → 21:9)
+  const nw = Math.max(384, Math.min(520, Math.round(H * aw / ah)));
+  if (nw !== W) {
+    const old = W; W = nw; CX = W / 2;
+    cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false;
+    if (typeof makeBG === 'function') BG = makeBG();
+    if (typeof G !== 'undefined' && G.f) G.f.forEach(f => { f.x += (W - old) / 2; });
+  }
+  const s = Math.min(aw / W, ah / H);
+  cv.style.width = Math.round(W * s) + 'px';
+  cv.style.height = Math.round(H * s) + 'px';
 }
 addEventListener('resize', resize);
-resize();
+addEventListener('orientationchange', () => setTimeout(resize, 150));
 
 /* ---------------- Utilitaires de dessin ---------------- */
 const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
@@ -56,7 +74,9 @@ let seed = 1337;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
 /* ---------------- Décor : dojo + plateau en bois ---------------- */
-const BG = (() => {
+function makeBG() {
+  seed = 1337;
+  const off = Math.round((W - 384) / 2);
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -80,8 +100,9 @@ const BG = (() => {
     for (let y = 25 + 15; y < 119; y += 16) F(x0 + 3, y, w - 6, 2, '#7a4e2c');
     F(x0 + 3, 25, w - 6, 1, '#fffaea');
   };
-  shoji(18, 82);
-  shoji(284, 82);
+  g.save(); g.translate(off, 0);
+  shoji(-80, 82); shoji(18, 82);
+  shoji(284, 82); shoji(382, 82);
 
   // Alcôve centrale (tokonoma)
   F(140, 24, 104, 98, '#4a2c18');
@@ -103,6 +124,7 @@ const BG = (() => {
   F(160, 112, 64, 4, '#3a2010'); F(162, 116, 4, 6, '#3a2010'); F(218, 116, 4, 6, '#3a2010');
   F(186, 102, 12, 10, '#26323e'); F(188, 100, 8, 2, '#26323e'); F(187, 103, 2, 7, '#3e5266');
   F(191, 90, 1, 10, '#3e5a2a'); F(188, 92, 4, 1, '#5c7e3a'); F(192, 88, 5, 1, '#5c7e3a');
+  g.restore();
 
   // Poutres et piliers
   F(0, 0, W, 16, '#4a2c18'); F(0, 2, W, 2, '#6c4428'); F(0, 14, W, 3, '#2c180a');
@@ -111,7 +133,9 @@ const BG = (() => {
     F(x, 16, 14, 108, '#5c3a1e'); F(x + 2, 16, 3, 108, '#7c522c'); F(x + 11, 16, 3, 108, '#3e2410');
     for (let y = 20; y < 122; y += 6 + (rnd() * 6 | 0)) F(x + 6, y, 1, 3, '#4a2c16');
   };
-  [4, 102, 126, 244, 268, 366].forEach(pillar);
+  g.save(); g.translate(off, 0);
+  [-94, 4, 102, 126, 244, 268, 366, 464].forEach(pillar);
+  g.restore();
 
   // Lanternes en papier
   const lantern = x => {
@@ -128,7 +152,9 @@ const BG = (() => {
       F(x + Math.cos(a) * d, 43 + Math.sin(a) * d, 1, 1, 'rgba(255,190,90,.35)');
     }
   };
+  g.save(); g.translate(off, 0);
   lantern(115); lantern(257);
+  g.restore();
 
   // Plinthe
   F(0, 122, W, 10, '#3a2210'); F(0, 122, W, 1, '#6a4224'); F(0, 131, W, 1, '#20120a');
@@ -170,7 +196,8 @@ const BG = (() => {
   for (let x = 0; x < W; x += 32) { F(x, 206, 2, 10, '#2a160a'); F(x + 2, 206, 1, 10, '#6a3e1c'); }
   F(0, 213, W, 3, '#1e0f06');
   return c;
-})();
+}
+let BG = null;
 
 /* ---------------- Personnages (originaux) ---------------- */
 const HEAD_K = [
@@ -346,7 +373,7 @@ const keys = new Set();
 const latched = new Set(); // appuis très brefs (entre deux frames)
 const KEYMAP = {
   ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd',
-  KeyJ: 'p', KeyK: 'k', KeyL: 's', Space: 'j', Enter: 'start',
+  KeyJ: 'p', KeyK: 'k', KeyL: 's', Space: 'j', Enter: 'start', Escape: 'back', Backspace: 'back',
 };
 addEventListener('keydown', e => {
   initAudio();
@@ -366,8 +393,10 @@ let tap = null; // dernier tap en coordonnées canvas
   const zone = document.getElementById('stickZone'), stick = document.getElementById('stick'), knob = document.getElementById('knob');
   let id = null;
   const upd = e => {
-    const r = stick.getBoundingClientRect(), rad = r.width / 2;
-    let dx = e.clientX - (r.left + rad), dy = e.clientY - (r.top + rad);
+    const r = stick.getBoundingClientRect();
+    const rad = (ROT ? r.height : r.width) / 2;
+    let sx = e.clientX - (r.left + r.width / 2), sy = e.clientY - (r.top + r.height / 2);
+    let dx = ROT ? sy : sx, dy = ROT ? -sx : sy;
     const l = Math.hypot(dx, dy);
     if (l > rad) { dx *= rad / l; dy *= rad / l; }
     knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
@@ -397,11 +426,16 @@ let tap = null; // dernier tap en coordonnées canvas
   bz.addEventListener('pointercancel', bend);
 })();
 
+// Bouton « Continuer » de l'écran portrait (rotation verrouillée)
+document.getElementById('rotateOk').addEventListener('click', () => { document.body.classList.add('rotok'); resize(); });
+
 let fsTried = false;
 addEventListener('pointerdown', e => {
   initAudio();
   const r = cv.getBoundingClientRect();
-  tap = { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  tap = e.target !== cv ? null : ROT
+    ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H }
+    : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
   if (isTouch && !fsTried) {
     fsTried = true;
     const el = document.documentElement;
@@ -429,6 +463,7 @@ function readPlayer() {
     s: K('s') || touch.btn.has('s'),
     j: K('j') || touch.btn.has('j'),
     start: K('start'),
+    back: K('back'),
   };
   latched.clear();
   return r;
@@ -437,13 +472,16 @@ function readPlayer() {
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
 function ctlUpdate(c, held) {
   c.prev = c.held; c.held = held;
-  for (const b of [...BTNS, 'start', 'l', 'r', 'u', 'd']) {
+  for (const b of [...BTNS, 'start', 'back', 'l', 'r', 'u', 'd']) {
     if (held[b] && !c.prev[b]) c.buf[b] = 8;
     else if (c.buf[b] > 0) c.buf[b]--;
   }
 }
 function take(c, b) { if (c.buf[b] > 0) { c.buf[b] = 0; return true; } return false; }
-const anyPress = c => BTNS.some(b => c.held[b] && !c.prev[b]) || (c.held.start && !c.prev.start);
+const edge = (c, b) => !!(c.held[b] && !c.prev[b]);
+// Menus : A (ou Entrée) valide, B (ou Échap) revient en arrière
+const okPress = c => edge(c, 's') || edge(c, 'start');
+const backPress = c => edge(c, 'j') || edge(c, 'back');
 
 /* ---------------- Données d'attaque ---------------- */
 const ATK = {
@@ -679,14 +717,14 @@ function aiInput(f, o) {
 
 /* ---------------- Déroulé des rounds ---------------- */
 function startMatch(pick) {
-  G.f = [makeFighter(DEFS[pick], 0, 120, 1, false), makeFighter(DEFS[1 - pick], 1, 264, -1, true)];
+  G.f = [makeFighter(DEFS[pick], 0, CX - 72, 1, false), makeFighter(DEFS[1 - pick], 1, CX + 72, -1, true)];
   G.f[0].ctl = pctl;
   G.round = 1;
   startRound();
 }
 function startRound() {
   const [a, b] = G.f;
-  [[a, 120, 1], [b, 264, -1]].forEach(([f, x, d]) => {
+  [[a, CX - 72, 1], [b, CX + 72, -1]].forEach(([f, x, d]) => {
     Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
@@ -708,15 +746,13 @@ function step() {
 
   switch (G.scene) {
     case 'title':
-      if (anyPress(pctl) || tap) { G.scene = 'select'; G.t = 0; sfx('select'); }
+      if (okPress(pctl) || tap) { G.scene = 'select'; G.t = 0; sfx('select'); }
       break;
     case 'select': {
       G.t++;
       if (pctl.buf.l === 8 || pctl.buf.r === 8) { G.pick = 1 - G.pick; sfx('beep'); }
-      if (tap && G.t > 10) {
-        if (tap.x > 96 && tap.x < 186 && tap.y > 44 && tap.y < 180) { if (G.pick === 0) { startMatch(0); sfx('select'); } else { G.pick = 0; sfx('beep'); } }
-        else if (tap.x > 198 && tap.x < 288 && tap.y > 44 && tap.y < 180) { if (G.pick === 1) { startMatch(1); sfx('select'); } else { G.pick = 1; sfx('beep'); } }
-      } else if (G.t > 10 && anyPress(pctl)) { startMatch(G.pick); sfx('select'); }
+      if (G.t > 10 && okPress(pctl)) { startMatch(G.pick); sfx('select'); }
+      else if (G.t > 10 && backPress(pctl)) { G.scene = 'title'; G.t = 0; sfx('beep'); }
       break;
     }
     case 'intro': case 'fight': case 'ko': case 'timeup':
@@ -724,7 +760,8 @@ function step() {
       break;
     case 'over':
       G.t++;
-      if (G.t > 60 && (anyPress(pctl) || tap)) { G.scene = 'select'; G.t = 0; }
+      if (G.t > 60 && okPress(pctl)) { G.scene = 'select'; G.t = 0; sfx('select'); }
+      else if (G.t > 60 && backPress(pctl)) { G.scene = 'title'; G.t = 0; sfx('beep'); }
       break;
   }
   tap = null;
@@ -862,22 +899,23 @@ function drawBar(x, w, f, left) {
 
 function drawHUD() {
   const [a, b] = G.f;
-  drawBar(16, 150, a, true);
-  drawBar(218, 150, b, false);
+  const bw = Math.round(CX - 42);
+  drawBar(16, bw, a, true);
+  drawBar(W - 16 - bw, bw, b, false);
   // Badge K.O.
   const flash = (a.hp < 25 || b.hp < 25) && (G.frame >> 4) % 2;
-  R(170, 7, 44, 15, '#000');
-  R(171, 8, 42, 13, flash ? '#ffffff' : '#d8261c');
-  text('KO', 192, 11, 8, flash ? '#d8261c' : '#ffe14a', 'center', '#5a0a06');
+  R(CX - 22, 7, 44, 15, '#000');
+  R(CX - 21, 8, 42, 13, flash ? '#ffffff' : '#d8261c');
+  text('KO', CX, 11, 8, flash ? '#d8261c' : '#ffe14a', 'center', '#5a0a06');
   // Chrono
-  text(String(G.timer).padStart(2, '0'), 192, 26, 16, '#ffffff', 'center');
+  text(String(G.timer).padStart(2, '0'), CX, 26, 16, '#ffffff', 'center');
   // Noms + victoires
   text(a.def.name, 16, 24, 8, '#ffffff', 'left');
-  text(b.def.name, 368, 24, 8, '#ffffff', 'right');
+  text(b.def.name, W - 16, 24, 8, '#ffffff', 'right');
   if (a.cpu === false) text('1P', 16, 35, 8, '#5ac8ff', 'left');
-  text('CPU', 368, 35, 8, '#ff7a6a', 'right');
+  text('CPU', W - 16, 35, 8, '#ff7a6a', 'right');
   for (let i = 0; i < a.wins; i++) drawMedal(40 + i * 12, 38);
-  for (let i = 0; i < b.wins; i++) drawMedal(336 - i * 12, 38);
+  for (let i = 0; i < b.wins; i++) drawMedal(W - 48 - i * 12, 38);
 }
 function drawMedal(x, y) {
   disc(x, y, 4, OUT); disc(x, y, 3, '#e8a820'); R(x - 1, y - 2, 2, 2, '#fff2a8');
@@ -914,18 +952,18 @@ function drawTitle() {
   ctx.font = '24px "Press Start 2P", monospace';
   const gS = ctx.createLinearGradient(0, 40, 0, 64);
   gS.addColorStop(0, '#ffd6f0'); gS.addColorStop(.5, '#ff6ec4'); gS.addColorStop(1, '#c42a8a');
-  text('SWEET', 170, 40, 24, gS, 'center', '#3a0626');
+  text('SWEET', CX - 22, 40, 24, gS, 'center', '#3a0626');
   const gF = ctx.createLinearGradient(0, 72, 0, 88);
   gF.addColorStop(0, '#fff6b0'); gF.addColorStop(.5, '#ffd23a'); gF.addColorStop(1, '#ff8a1a');
-  text('FIGHTERS', 170, 72, 16, gF, 'center', '#4a1600');
+  text('FIGHTERS', CX - 22, 72, 16, gF, 'center', '#4a1600');
   const g2 = ctx.createLinearGradient(0, 38, 0, 88);
   g2.addColorStop(0, '#ffb0a0'); g2.addColorStop(.5, '#ff3a2a'); g2.addColorStop(1, '#a01010');
-  text('2', 268, 40, 48, g2, 'center', '#2a0404');
+  text('2', CX + 76, 40, 48, g2, 'center', '#2a0404');
   // Combattants
   const fa = { def: DEFS[0], dir: 1, state: 'idle', id: 0, flash: 0, t: 0, x: 0, y: 0 };
   const fb = { def: DEFS[1], dir: -1, state: 'idle', id: 1, flash: 0, t: 0, x: 0, y: 0 };
-  drawFighter(fa, 70, 190); drawFighter(fb, 314, 190);
-  if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'TOUCHE POUR COMMENCER' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
+  drawFighter(fa, CX - 122, 190); drawFighter(fb, CX + 122, 190);
+  if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'APPUIE SUR A' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
   if (!isTouch) {
     text('FLÈCHES : DÉPLACER', W / 2, 148, 8, '#d8c8a8', 'center');
     text('J POING   K PIED   ESPACE SAUT', W / 2, 160, 8, '#d8c8a8', 'center');
@@ -940,7 +978,7 @@ function drawSelect() {
   R(0, 0, W, H, 'rgba(10,4,16,.6)');
   text('CHOISIS TON COMBATTANT', W / 2, 18, 8, '#ffd23a', 'center');
   [0, 1].forEach(i => {
-    const x = i === 0 ? 96 : 198, sel = G.pick === i;
+    const x = i === 0 ? CX - 96 : CX + 6, sel = G.pick === i;
     R(x, 40, 90, 140, sel ? ((G.frame >> 3) % 2 ? '#ffd23a' : '#ff6a1a') : '#3a2a3a');
     R(x + 3, 43, 84, 134, '#1a1020');
     R(x + 3, 43, 84, 134, sel ? 'rgba(80,40,120,.6)' : 'rgba(30,20,40,.6)');
@@ -953,7 +991,7 @@ function drawSelect() {
     text(DEFS[i].name, x + 45, 186, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
     if (sel) text('1P', x + 45, 30, 8, '#5ac8ff', 'center');
   });
-  text(isTouch ? 'TOUCHE UN COMBATTANT' : 'GAUCHE / DROITE PUIS ENTRÉE', W / 2, 202, 8, '#d8c8a8', 'center');
+  text(isTouch ? 'A : VALIDER   B : RETOUR' : 'ENTRÉE : VALIDER   ÉCHAP : RETOUR', W / 2, 202, 8, '#d8c8a8', 'center');
 }
 
 function drawOver() {
@@ -962,7 +1000,7 @@ function drawOver() {
   const p = G.f.find(f => !f.cpu);
   const won = p ? p.wins >= 2 : true;
   bigMsg(won ? 'VICTOIRE !' : 'DÉFAITE...', 24, won ? '#ffd23a' : '#ff5a4a', 80);
-  if (G.t > 60 && (G.frame >> 5) % 2 === 0) text(isTouch ? 'TOUCHE POUR REJOUER' : 'ENTRÉE POUR REJOUER', W / 2, 124, 8, '#ffffff', 'center');
+  if (G.t > 60 && (G.frame >> 5) % 2 === 0) text(isTouch ? 'A : REJOUER   B : MENU' : 'ENTRÉE : REJOUER   ÉCHAP : MENU', W / 2, 124, 8, '#ffffff', 'center');
 }
 
 function render() {
@@ -976,6 +1014,9 @@ function render() {
   }
   ctx.restore();
 }
+
+resize();
+if (!BG) BG = makeBG();
 
 let last = performance.now(), acc = 0;
 function loop(now) {
