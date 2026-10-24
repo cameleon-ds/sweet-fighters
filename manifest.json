@@ -1,0 +1,9 @@
+{
+  "name": "Sweet Fighters 2",
+  "short_name": "Sweet Fighters",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000"
+}
