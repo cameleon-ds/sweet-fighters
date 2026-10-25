@@ -9,6 +9,8 @@ Double-clique sur `index.html` : le jeu s'ouvre dans ton navigateur.
 - Stick : se déplacer · haut = saut · bas = s'accroupir · bas + arrière = garde basse
 - Y : poing · B : pied · A : boule d'énergie · haut + A : uppercut
 - En l'air + A : coup de pied tournoyant
+- Accroupi + Y : uppercut montant (idéal contre un adversaire qui saute)
+- Saut vers l'avant : roulade en l'air
 - X : contre. Appuyé juste avant le coup adverse, l'adversaire est bloqué une demi-seconde.
   Pendant ce temps : Y = prise qui le renverse, B = prise qui le projette de l'autre côté.
 

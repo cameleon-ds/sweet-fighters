@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v14';
+const VERSION = 'v15';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -261,7 +261,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: true,
+  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -311,6 +311,8 @@ const POSES = {
   throw0:  [4,-55, 2,-47, 0,-29, 14,-46, 22,-48, 10,-44, 20,-44, 8,-15, 13,0, -9,-14, -14,0],
   throwS:  [6,-51, 4,-43, 1,-27, 12,-35, 19,-25, 10,-33, 17,-23, 10,-13, 14,0, -9,-12, -14,0],
   throwT:  [-2,-56, -2,-48, -1,-30, -6,-60, -12,-68, -4,-58, -10,-66, 7,-15, 11,0, -9,-14, -13,0],
+  tuck:    [2,-46, 1,-40, 0,-30, 8,-38, 10,-44, 4,-36, 8,-42, 9,-34, 5,-26, 4,-31, -1,-24],
+  rupper:  [3,-56, 2,-48, 0,-30, 6,-62, 8,-78, -4,-44, -2,-38, 8,-15, 12,0, -8,-14, -12,0],
   win:     [1,-57, 0,-49, 0,-30, 6,-58, 8,-71, -6,-40, -2,-32, 5,-15, 7,0, -6,-15, -8,0],
   fall:    [-14,-40, -9,-36, 2,-26, -6,-44, -12,-50, -14,-30, -18,-26, 10,-30, 18,-36, 12,-22, 20,-24],
   down:    [-24,-6, -17,-6, 0,-5, -14,-12, -8,-14, -20,-3, -26,-2, 9,-9, 18,-3, 10,-4, 20,-2],
@@ -322,6 +324,8 @@ const K = 0.7, UP = 2;
 const SPR = document.createElement('canvas');
 SPR.width = 120; SPR.height = 86;
 const sx = SPR.getContext('2d');
+const ROLLC = document.createElement('canvas'); ROLLC.width = SPR.width; ROLLC.height = SPR.height;
+const rx = ROLLC.getContext('2d');
 const OX = 60, OY = 76;
 
 const sR = (x, y, w, h, c) => { sx.fillStyle = c; sx.fillRect(Math.round(x), Math.round(y), w, h); };
@@ -397,10 +401,11 @@ function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = false;   // vue de dos 3/4 désactivée pour l'instant (design cohérent)
+  const backView = f.state === 'rupper' && f.t >= 4;   // seul l'uppercut montant est vu de dos
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
+  if (['idle', 'block', 'parry', 'punch', 'special', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; }   // jambe arrière légèrement pliée vers l'avant
   const footBefore = Math.max(Q[17], Q[21]);
   for (const i of [7, 8, 9, 10]) { Q[i * 2] = px0 + (Q[i * 2] - px0) * LF; Q[i * 2 + 1] = py0 + (Q[i * 2 + 1] - py0) * LF; }
   const lift = footBefore - Math.max(Q[17], Q[21]);
@@ -593,7 +598,17 @@ function drawFighter(f, x = f.x, y = f.y) {
     sx.putImageData(img, 0, 0);
   }
   const prev = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(SPR, Math.round(x) - OX * UP, Math.round(y) - OY * UP, SPR.width * UP, SPR.height * UP);
+  let src = SPR;
+  if (f.state === 'jump' && f.roll && f.t > 3) {
+    // roulade : rotation complète autour du centre du corps, en basse résolution
+    const ang = dir * Math.min(1, (f.t - 3) / 34) * Math.PI * 2;
+    const cx = OX, cy = OY - 30 * K;
+    rx.setTransform(1, 0, 0, 1, 0, 0); rx.clearRect(0, 0, ROLLC.width, ROLLC.height);
+    rx.imageSmoothingEnabled = false;
+    rx.translate(cx, cy); rx.rotate(ang); rx.drawImage(SPR, -cx, -cy);
+    src = ROLLC;
+  }
+  ctx.drawImage(src, Math.round(x) - OX * UP, Math.round(y) - OY * UP, SPR.width * UP, SPR.height * UP);
   ctx.imageSmoothingEnabled = prev;
 }
 
@@ -776,11 +791,12 @@ const ATK = {
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
   ckick:    { dur: 28, act: [6, 12], box: [14, -14, 49, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
+  rupper:   { dur: 30, act: [4, 13], box: [4, -112, 36, -48], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
-const ATTACKING = ['punch', 'kick', 'cpunch', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const ATTACKING = ['punch', 'kick', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -812,7 +828,8 @@ function poseOf(f) {
     case 'cpunch': return f.t < 3 || f.t >= 8 ? 'crouch' : 'cpunch';
     case 'ckick': return f.t < 6 || f.t >= 12 ? 'crouch' : 'ckick';
     case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
-    case 'jump': return 'jump';
+    case 'jump': return f.roll && f.t > 3 ? 'tuck' : 'jump';
+    case 'rupper': return f.t < 4 ? 'crouch' : 'rupper';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
@@ -874,14 +891,14 @@ function updFighter(f, o) {
         f.jumpQ = (f.jumpQ || 0) + 1;
         if (f.jumpQ >= 4) {
           f.jumpQ = 0;
-          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false;
+          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = !!fwd;
           f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir; break;
         }
       } else f.jumpQ = 0;
       // Accroupi : coups bas, garde basse avec bas + arrière
       if (h.d) {
         f.vx = 0;
-        if (take(c, 'p')) { setState(f, 'cpunch'); sfx('whoosh'); break; }
+        if (take(c, 'p')) { setState(f, 'rupper'); sfx('upper'); break; }   // accroupi + Y : uppercut montant (anti-aérien)
         if (take(c, 'k')) { setState(f, 'ckick'); sfx('whoosh'); break; }
         const want = back && threatened(f, o) ? 'cblock' : 'crouch';
         if (f.state !== want) { setState(f, want); f.bstun = 0; }
@@ -895,7 +912,7 @@ function updFighter(f, o) {
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
-    case 'punch': case 'kick': case 'cpunch': case 'ckick':
+    case 'punch': case 'kick': case 'cpunch': case 'ckick': case 'rupper':
       if (f.t >= ATK[f.state].dur) setState(f, h.d ? 'crouch' : 'idle');
       break;
     case 'special':
@@ -1050,6 +1067,7 @@ function aiInput(f, o) {
     else if (!f.fb) press(a, 's');
   }
   if (!fb) a.reacted = false;
+  if (neutral && o.air && dist < 90 && o.vy > -2 && Math.random() < .05) lowAttack(a, 'p');
   if (neutral && o.air && dist < 80 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 3 && dist < 95 && Math.random() < .07) press(a, 'x');
@@ -1173,7 +1191,7 @@ function stepFight() {
     if (!fb.alive) continue;
     const def = fb.owner === a ? b : a;
     const hb = hurtbox(def);
-    if (overlap([fb.x - 8, fb.y - 7, fb.x + 8, fb.y + 7], hb)) {
+    if (overlap([fb.x - 12, fb.y - 11, fb.x + 12, fb.y + 11], hb)) {
       fb.alive = false;
       applyHit(fb.owner, def, FB_HIT, fb.x + fb.dir * 4, fb.y, fb.x - fb.vx * 10, true);
     }
@@ -1234,15 +1252,34 @@ function stepFight() {
 
 /* ---------------- Rendu ---------------- */
 function drawFireball(fb) {
-  const pal = fb.owner.def.fb, x = Math.round(fb.x), y = Math.round(fb.y), d = fb.dir;
-  for (let i = 3; i >= 1; i--) disc(x - d * i * 6, y + (((fb.t >> 1) + i) % 2 ? -1 : 1), 7 - i * 1.5 | 0, pal[3]);
-  disc(x, y, 8, pal[3]);
-  disc(x, y, 7, pal[3]);
-  disc(x + d, y, 5, pal[2]);
-  disc(x + d * 2, y - 1, 3, pal[1]);
-  disc(x + d * 2, y - 1, 1, pal[0]);
-  if (fb.t % 4 < 2) { R(x + d * 7, y - 6, 2, 2, pal[1]); R(x - d * 3, y + 7, 2, 2, pal[1]); }
-  else { R(x + d * 5, y + 6, 2, 2, pal[1]); R(x - d * 1, y - 8, 2, 2, pal[0]); }
+  const pal = fb.owner.def.fb, x = Math.round(fb.x), y = Math.round(fb.y), d = fb.dir, t = fb.t;
+  const pulse = 1 + Math.sin(t * .5) * .08;
+  // halo lumineux (mélange additif)
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 2, x, y, 30 * pulse);
+  g.addColorStop(0, pal[1] + 'cc'); g.addColorStop(.35, pal[2] + '66'); g.addColorStop(1, pal[3] + '00');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 30 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // traînée d'énergie
+  for (let i = 5; i >= 1; i--) {
+    const wob = Math.sin(t * .6 + i) * 2;
+    disc(x - d * i * 6, y + wob, Math.max(2, 10 - i * 1.6) | 0, i > 3 ? pal[3] : pal[2]);
+  }
+  // corps de la boule
+  disc(x, y, 12, pal[3]);
+  disc(x + d, y, 10, pal[2]);
+  disc(x + d * 2, y - 1, 7, pal[1]);
+  disc(x + d * 3, y - 2, 4, pal[0]);
+  R(x + d * 2 - 1, y - 6, 3, 2, pal[0]);
+  // étincelles qui tournent autour
+  for (let i = 0; i < 6; i++) {
+    const a = t * .35 + i * Math.PI / 3, r = 13 + (i % 2) * 3;
+    R(x + Math.cos(a) * r - 1, y + Math.sin(a) * r * .8 - 1, 2, 2, i % 2 ? pal[0] : pal[1]);
+  }
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = pal[1] + '55'; ctx.beginPath(); ctx.arc(x + d * 2, y - 1, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 function drawSpark(s) {
