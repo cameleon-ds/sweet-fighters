@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v24';
+const VERSION = 'v25';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1285,7 +1285,7 @@ function endRound(winner) {
 }
 
 /* ---------------- Boucle principale ---------------- */
-function goTitle() { G.scene = 'title'; G.t = 100; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
+function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
 function stepMoves() {
   if (edge(pctl, 'l')) { G.mpage = ((G.mpage || 0) + MOVES.length - 1) % MOVES.length; sfx('beep'); }
   if (edge(pctl, 'r')) { G.mpage = ((G.mpage || 0) + 1) % MOVES.length; sfx('beep'); }
@@ -1319,10 +1319,12 @@ function step() {
       if (G.showMoves) { stepMoves(); break; }
       const any = BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap;
       if (G.tstate !== 1) {
-        if (G.t > 25 && any) { G.tstate = 1; G.tcur = 0; sfx('select'); }
+        if (G.t < SPLASH) { if (G.t > 10 && any) G.t = SPLASH; break; }          // passer le logo Super Rocket Games
+        if (G.t > SPLASH + 20 && any) { G.tstate = 1; G.tcur = 0; G.tmenu = 0; sfx('select'); }
       } else {
+        G.tmenu = (G.tmenu || 0) + 1;
         if (edge(pctl, 'u') || edge(pctl, 'd')) { G.tcur = 1 - (G.tcur || 0); sfx('beep'); }
-        if (tap) { if (tap.y > 150 && tap.y < 164) G.tcur = 0; else if (tap.y >= 164 && tap.y < 178) G.tcur = 1; else break; }
+        if (tap) { if (tap.y > 166 && tap.y < 180) G.tcur = 0; else if (tap.y >= 180 && tap.y < 194) G.tcur = 1; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
@@ -1685,36 +1687,50 @@ function drawPause() {
 }
 
 const LOGO = new Image();
-LOGO.src = 'logo.png?v=24';
+LOGO.src = 'logo.png?v=25';
+const SRG = new Image();
+SRG.src = 'srg.jpg?v=25';
+const SPLASH = 110;   // durée du logo Super Rocket Games (fondu, 1 s, fondu)
+function drawImg(img, cx, cy, w, al) {
+  if (!img.complete || !img.naturalWidth) return false;
+  const h = w * img.naturalHeight / img.naturalWidth;
+  ctx.save(); ctx.globalAlpha = al; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+  ctx.restore(); return true;
+}
 function drawTitle() {
-  ctx.drawImage(BG, 0, 0);
-  R(0, 0, W, H, 'rgba(10,4,16,.45)');
   const t = G.t;
-  const bk = Math.max(0, 1 - t / 45);           // le noir s'efface pour révéler le décor
-  if (bk > 0) R(0, 0, W, H, `rgba(0,0,0,${bk})`);
-  // logo : dézoom + fondu rapide
-  const k = Math.min(1, t / 30), ease = 1 - Math.pow(1 - k, 3);
-  const sc = 1.8 - .8 * ease, al = Math.min(1, t / 20);
-  if (LOGO.complete && LOGO.naturalWidth) {
-    const lw = 176 * sc, lh = lw * LOGO.naturalHeight / LOGO.naturalWidth;
-    ctx.save(); ctx.globalAlpha = al; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(LOGO, CX - lw / 2, 74 - lh / 2, lw, lh);
-    ctx.restore();
-  } else text('SWEET FIGHTERS', CX, 60, 16, '#ff7a3a', 'center');
+  R(0, 0, W, H, '#000');
+  // 1) logo Super Rocket Games : fondu entrant, 1 seconde, fondu sortant
+  if (t < SPLASH) {
+    const al = t < 20 ? t / 20 : t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 20);
+    drawImg(SRG, CX, H / 2, Math.min(300, W - 40), al);
+    return;
+  }
+  // 3) après appui : le décor apparaît derrière le menu
+  if (G.tstate === 1) {
+    const k = Math.min(1, (G.tmenu || 0) / 30);
+    ctx.save(); ctx.globalAlpha = k; ctx.drawImage(BG, 0, 0); R(0, 0, W, H, 'rgba(10,4,16,.5)'); ctx.restore();
+  }
+  // 2) logo Sweet Fighters : grand dézoom + fondu, sur fond noir
+  const L = t - SPLASH;
+  const k = Math.min(1, L / 30), ease = 1 - Math.pow(1 - k, 3);
+  const sc = 2.2 - 1.2 * ease, al = Math.min(1, L / 18);
+  if (!drawImg(LOGO, CX, 86, 244 * sc, al)) text('SWEET FIGHTERS', CX, 70, 16, '#ff7a3a', 'center');
   if (G.showMoves) { drawMoves(); return; }
   if (G.tstate !== 1) {
-    if (t > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 160, 8, '#ffffff', 'center');
+    if (L > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 176, 8, '#ffffff', 'center');
   } else {
     ['SELECT CHARACTER', 'VIEW COMMANDS'].forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 154 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 170 + i * 12, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
     });
   }
-  if (t > 30) {
-    text('POWERED BY SUPER ROCKET GAMES', CX, 188, 8, '#c8b8a0', 'center');
-    text('ALL RIGHTS RESERVED 2026', CX, 200, 8, '#9a8a70', 'center');
+  if (L > 30) {
+    text('POWERED BY SUPER ROCKET GAMES', CX, 196, 8, '#c8b8a0', 'center');
+    text('ALL RIGHTS RESERVED 2026', CX, 206, 8, '#9a8a70', 'center');
   }
-  text(VERSION, W - 4, 4, 8, '#7a6a58', 'right');
+  text(VERSION, W - 4, 4, 8, '#5a4a40', 'right');
 }
 
 function drawSelect() {
