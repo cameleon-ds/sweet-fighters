@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v15';
+const VERSION = 'v16';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -312,7 +312,7 @@ const POSES = {
   throwS:  [6,-51, 4,-43, 1,-27, 12,-35, 19,-25, 10,-33, 17,-23, 10,-13, 14,0, -9,-12, -14,0],
   throwT:  [-2,-56, -2,-48, -1,-30, -6,-60, -12,-68, -4,-58, -10,-66, 7,-15, 11,0, -9,-14, -13,0],
   tuck:    [2,-46, 1,-40, 0,-30, 8,-38, 10,-44, 4,-36, 8,-42, 9,-34, 5,-26, 4,-31, -1,-24],
-  rupper:  [3,-56, 2,-48, 0,-30, 6,-62, 8,-78, -4,-44, -2,-38, 8,-15, 12,0, -8,-14, -12,0],
+  rupper:  [5,-56, 3,-48, 1,-30, 12,-60, 19,-74, -4,-44, -2,-38, 8,-15, 12,0, -8,-14, -12,0],
   win:     [1,-57, 0,-49, 0,-30, 6,-58, 8,-71, -6,-40, -2,-32, 5,-15, 7,0, -6,-15, -8,0],
   fall:    [-14,-40, -9,-36, 2,-26, -6,-44, -12,-50, -14,-30, -18,-26, 10,-30, 18,-36, 12,-22, 20,-24],
   down:    [-24,-6, -17,-6, 0,-5, -14,-12, -8,-14, -20,-3, -26,-2, 9,-9, 18,-3, 10,-4, 20,-2],
@@ -401,11 +401,11 @@ function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = f.state === 'rupper' && f.t >= 4;   // seul l'uppercut montant est vu de dos
+  const backView = false;   // tout en vue 3/4 de face
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
-  if (['idle', 'block', 'parry', 'punch', 'special', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; }   // jambe arrière légèrement pliée vers l'avant
+  if (['idle', 'block', 'parry', 'punch', 'special', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; Q[14] += 4; Q[15] += 1; }   // jambes avant et arrière légèrement pliées vers l'avant
   const footBefore = Math.max(Q[17], Q[21]);
   for (const i of [7, 8, 9, 10]) { Q[i * 2] = px0 + (Q[i * 2] - px0) * LF; Q[i * 2 + 1] = py0 + (Q[i * 2 + 1] - py0) * LF; }
   const lift = footBefore - Math.max(Q[17], Q[21]);
@@ -791,7 +791,7 @@ const ATK = {
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
   ckick:    { dur: 28, act: [6, 12], box: [14, -14, 49, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
-  rupper:   { dur: 30, act: [4, 13], box: [4, -112, 36, -48], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
+  rupper:   { dur: 30, act: [4, 13], box: [8, -110, 50, -40], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
