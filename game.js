@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v19';
+const VERSION = 'v20';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -282,8 +282,8 @@ const DEFS = [
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
 const POSES = {
-  idle0:   [4,-52, 2,-44, 0,-26, 9,-40, 14,-48, 4,-38, 9,-45, 10,-14, 15,0, -7,-13, -14,0],
-  idle1:   [4,-51, 2,-43, 0,-25, 9,-39, 14,-47, 4,-37, 9,-44, 10,-13, 15,0, -7,-12, -14,0],
+  idle0:   [3,-55, 1,-47, -1,-29, 9,-40, 14,-48, 4,-38, 9,-45, 7,-15, 11,0, -8,-14, -12,0],
+  idle1:   [3,-54, 1,-46, -1,-28, 9,-39, 14,-47, 4,-37, 9,-44, 7,-14, 11,0, -8,-13, -12,0],
   walk0:   [5,-52, 3,-44, 1,-26, 10,-40, 15,-48, 5,-38, 10,-45, 6,-14, 7,0, -4,-14, -6,0],
   walk1:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, 12,-14, 17,0, -8,-13, -15,0],
   walk2:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, -2,-14, -7,0, 8,-14, 12,0],
@@ -413,7 +413,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
-  if (['parry', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; Q[14] += 4; Q[15] += 1; }   // jambes avant et arrière légèrement pliées vers l'avant
+  if (['idle', 'parry', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; Q[14] += 4; Q[15] += 1; }   // jambes avant et arrière légèrement pliées vers l'avant
   const footBefore = Math.max(Q[17], Q[21]);
   for (const i of [7, 8, 9, 10]) { Q[i * 2] = px0 + (Q[i * 2] - px0) * LF; Q[i * 2 + 1] = py0 + (Q[i * 2 + 1] - py0) * LF; }
   const lift = footBefore - Math.max(Q[17], Q[21]);
@@ -493,7 +493,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
   if (guard && f.state !== 'parry') {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
-    const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 3.5, -6]);   // bras avant plié, poing devant la poitrine
+    const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 4, -4]);   // bras avant plié, poing devant la poitrine
     arm(sdA, e1, h1, true);
   } else arm(sdA, fe, fh, !backView);
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
@@ -595,8 +595,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
     const guard2 = ['idle', 'walk', 'punch', 'kick', 'fkick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
     if (guard2) {
-      const e2 = add(sdB, [-dir * 2.5, 6 + bob]);
-      const h2 = add(e2, [dir * 4, -5]);
+      const e2 = add(sdB, [-dir * 3.5, 6 + bob]);
+      const h2 = add(e2, [dir * 3, -2.5]);
       arm(sdB, e2, h2, true);
     } else arm(sdB, be, bh, true);
   }
