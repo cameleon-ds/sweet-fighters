@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v8';
+const VERSION = 'v9';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -231,9 +231,37 @@ const HEAD_SORA = [
   "..eSSSSSe.",
 ];
 
+// Têtes vues de dos 3/4 (nuque, oreille et bord de la joue à l'avant)
+const HEAD_KAITO_BACK = [
+  "..aaaaaa..",
+  ".aHHLLHHa.",
+  "aHHHLLHHHa",
+  "aBBBBBBBBB",
+  "abbbnbbbbb",
+  "ahHHhHHhSs",
+  "ahhHHhHHSs",
+  "ahhhhhhhSs",
+  ".ahhhhhSSs",
+  "..ahhhSSs.",
+  "...eSSSSe.",
+];
+const HEAD_SORA_BACK = [
+  "..aaaaaa..",
+  ".aHHLLHHa.",
+  "aHHLLLLHHa",
+  "aHHHLLHHHa",
+  "aHHHHHHHHa",
+  "ahHHhHHhSs",
+  "ahhHHhHHSs",
+  "ahhhHHhhSs",
+  ".ahhhhhSSs",
+  "..ahhhSSs.",
+  "...eSSSSe.",
+];
+
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', style: 'tshirt', head: HEAD_KAITO, band: true, torn: true,
+  { name: 'KAITO', style: 'tshirt', head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -242,7 +270,7 @@ const DEFS = [
     belt:  ['#040406', '#121216', '#26262e', '#44444e'],
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],
     fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
-  { name: 'SORA', style: 'jacket', head: HEAD_SORA, braid: true,
+  { name: 'SORA', style: 'jacket', head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true,
     skin:  ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],
     hair:  { a: '#7a7e94', h: '#a8acc0', H: '#d8dcea', L: '#ffffff' },
     top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],
@@ -358,6 +386,8 @@ function footP(q, dir, skin) {
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
+  // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
+  const backView = dir < 0;
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
@@ -368,7 +398,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const pt = i => [OX + dir * Q[i * 2] * K, OY + Q[i * 2 + 1] * K];
   const [h, n, p, fe, fh, be, bh, fk, ff, bk, bf] = [0,1,2,3,4,5,6,7,8,9,10].map(pt);
   const sk = d.skin, top = d.top, legs = d.legs;
-  const dim = pal => [pal[0], pal[0], pal[1], pal[1]];   // membres arrière dans l'ombre
+  const dim = pal => [pal[0], pal[0], pal[1], pal[1]];   // membre éloigné de la caméra, dans l'ombre
   const tshirt = d.style === 'tshirt';
 
   let ux = p[0] - n[0], uy = p[1] - n[1]; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
@@ -376,9 +406,9 @@ function drawFighter(f, x = f.x, y = f.y) {
   const sh = add(n, [ux, uy], 1);
   const sdA = add(sh, fwd, 1), sdB = add(sh, fwd, -1.5);
 
-  // Bandeau / tresse (derrière)
-  if (d.band) {
-    const knot = [h[0] - dir * 4, h[1] - 2];
+  const drawBand = () => {
+    if (!d.band) return;
+    const knot = backView ? [h[0] - dir * 1, h[1] - 2] : [h[0] - dir * 4, h[1] - 2];
     const speed = Math.min(1, Math.abs(f.vx) / 2.5 + (f.air ? .6 : 0));
     [0, 1].forEach(r => {
       let prev = knot;
@@ -389,83 +419,106 @@ function drawFighter(f, x = f.x, y = f.y) {
         prev = q;
       }
     });
-  }
-  if (d.braid) {
-    const hp = d.hair, base = [h[0] - dir * 4, h[1]];
+  };
+  const drawBraid = () => {
+    if (!d.braid) return;
+    const hp = d.hair, base = backView ? [h[0] - dir * 1, h[1] + 2] : [h[0] - dir * 4, h[1]];
     const swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
+    const slant = backView ? .6 : 1.4;
     for (let i = 0; i < 7; i++) {
-      const q = [base[0] - dir * (1.4 * i - .07 * i * i) + swing * i * .25, base[1] + 2.2 * i];
+      const q = [base[0] - dir * (slant * i - .07 * i * i) + swing * i * .25, base[1] + 2.2 * i];
       sR(q[0] - 1, q[1] - 1, 3, 3, hp.a);
       sR(q[0] - 1, q[1] - 1, 2, 2, i % 2 ? hp.h : hp.H);
       if (i % 2 === 0) sR(q[0] - 1, q[1] - 1, 1, 1, hp.L);
       if (i === 6) { sR(q[0] - 1, q[1] + 2, 3, 1, top[2]); sR(q[0], q[1] + 3, 1, 3, hp.H); }
     }
-  }
+  };
+  // Bras : lead = bras avant (celui qui frappe), rear = bras arrière
+  const arm = (s0, e, hd, near) => {
+    const S = near ? sk : dim(sk), T = near ? top : dim(top), Gl = near ? d.glove : dim(d.glove);
+    limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
+    limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, T);
+    limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, S);
+    if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
+    fist(hd, dir, Gl, S);
+  };
+  const leg = (k, ft, near) => {
+    const Lg = near ? legs : dim(legs), S = near ? sk : dim(sk);
+    limbT(p, k, 7, 5, .8, Lg);
+    if (d.torn) {
+      limbT(k, ft, 4, 3, 1, S);
+      const cut = mix(k, ft, .45);
+      limbT(k, cut, 6, 5.5, 0, Lg);
+      if (near) {
+        sR(cut[0] - 2, cut[1] + 2, 1, 1, Lg[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, Lg[1]);
+        const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
+      }
+    } else limbT(k, ft, 5.5, 4.5, .8, Lg);
+    footP(ft, dir, S);
+  };
 
-  // Bras arrière
-  limbT(sdB, be, 4.5, 4, 1, dim(sk));
-  limbT(sdB, mix(sdB, be, tshirt ? .4 : 1), 5.5, 5, 0, dim(top));
-  limbT(be, bh, 4, 3, 1, dim(sk));
-  if (!tshirt) limbT(be, mix(be, bh, .25), 5, 5, 0, dim(top));
-  fist(bh, dir, dim(d.glove), dim(sk));
+  // ---- Plan arrière ----
+  if (!backView) { drawBand(); drawBraid(); }
+  if (backView) { arm(sdA, fe, fh, false); leg(fk, ff, false); }
+  else { arm(sdB, be, bh, false); leg(bk, bf, false); }
 
-  // Jambe arrière
-  limbT(p, bk, 7, 5, .8, dim(legs));
-  if (d.torn) { limbT(bk, bf, 4, 3, 1, dim(sk)); limbT(bk, mix(bk, bf, .45), 6, 5.5, 0, dim(legs)); }
-  else limbT(bk, bf, 5.5, 4.5, .8, dim(legs));
-  footP(bf, dir, dim(sk));
-
-  // Torse musclé
+  // ---- Torse ----
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
   const torso = [add(sh, fwd, 6), add(at(.3), fwd, 6.5), add(at(.75), fwd, 5), add(wa, fwd, 4.5),
                  add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6), add(sh, fwd, -5.5)];
   sPoly(grow(torso, .6), top[0]);
   sPoly(torso, top[2]);
-  sPoly([add(sh, fwd, -5.5), add(sh, fwd, -2.5), add(at(.6), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6)], top[1]);
-  sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
-  if (tshirt) {
-    const pc = add(at(.4), fwd, 1); sR(pc[0], pc[1], 1, 1, top[1]);
-    const pc2 = add(at(.4), fwd, 4); sR(pc2[0], pc2[1], 1, 1, top[1]);
-    const ab = add(at(.7), fwd, 3); sR(ab[0], ab[1], 1, 1, top[1]);
+  if (backView) {
+    // Dos : omoplates éclairées, colonne vertébrale, flanc avant dans l'ombre
+    sPoly([add(sh, fwd, 6), add(sh, fwd, 3), add(at(.6), fwd, 2.5), add(wa, fwd, 2), add(wa, fwd, 4.5), add(at(.75), fwd, 5), add(at(.3), fwd, 6.5)], top[1]);
+    sPoly([add(sh, fwd, -5), add(sh, fwd, -1), add(at(.3), fwd, -1.5), add(at(.32), fwd, -5)], top[3]);
+    for (let t = .1; t <= .85; t += .12) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, top[1]); }
+    const bl1 = add(at(.35), fwd, -3); sR(bl1[0], bl1[1], 2, 1, top[1]);
+    const bl2 = add(at(.35), fwd, 2.5); sR(bl2[0], bl2[1], 2, 1, top[1]);
   } else {
-    sPoly([add(sh, fwd, 1), add(sh, fwd, 4), add(at(.3), fwd, 2.5)], sk[2]);
-    for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
+    sPoly([add(sh, fwd, -5.5), add(sh, fwd, -2.5), add(at(.6), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6)], top[1]);
+    sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
+    if (tshirt) {
+      const pc = add(at(.4), fwd, 1); sR(pc[0], pc[1], 1, 1, top[1]);
+      const pc2 = add(at(.4), fwd, 4); sR(pc2[0], pc2[1], 1, 1, top[1]);
+      const ab = add(at(.7), fwd, 3); sR(ab[0], ab[1], 1, 1, top[1]);
+    } else {
+      sPoly([add(sh, fwd, 1), add(sh, fwd, 4), add(at(.3), fwd, 2.5)], sk[2]);
+      for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
+    }
   }
-  // Cou
-  limbT([n[0] + dir * .5, n[1] + 1], [h[0] - dir * .5, h[1] + 3], 4, 4, 0, sk);
+  // Cou (nuque en vue de dos)
+  limbT([n[0] + dir * .5, n[1] + 1], [h[0] - dir * .5, h[1] + 3], 4, 4, 0, backView ? dim(sk) : sk);
 
-  // Jambe avant
-  limbT(p, fk, 7, 5, .8, legs);
-  if (d.torn) {
-    limbT(fk, ff, 4, 3, 1, sk);
-    const cut = mix(fk, ff, .45);
-    limbT(fk, cut, 6, 5.5, 0, legs);
-    sR(cut[0] - 2, cut[1] + 2, 1, 1, legs[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, legs[1]);
-    const tr = mix(p, fk, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
-  } else limbT(fk, ff, 5.5, 4.5, .8, legs);
-  footP(ff, dir, sk);
+  // ---- Jambe proche ----
+  if (backView) leg(bk, bf, true); else leg(fk, ff, true);
 
   // Pans de veste
   if (d.style === 'jacket') {
     const hang = f.air ? 5 : 7, flare = Math.min(2, Math.abs(f.vx));
     const back = [add(p, fwd, -4.5), add(p, fwd, -.5), add([p[0], p[1] + hang], fwd, -1 - flare), add([p[0], p[1] + hang], fwd, -5.5 - flare)];
     const front = [add(p, fwd, .5), add(p, fwd, 5), add([p[0], p[1] + hang], fwd, 5.5), add([p[0], p[1] + hang - 1], fwd, 1)];
-    sPoly(back, top[1]); sPoly(front, top[2]);
-    const hl = add(p, fwd, 3); sR(hl[0], hl[1] + 1, 1, hang - 2, top[3]);
+    if (backView) { sPoly(front, top[1]); sPoly(back, top[2]); const hl = add(p, fwd, -3); sR(hl[0], hl[1] + 1, 1, hang - 2, top[3]); }
+    else { sPoly(back, top[1]); sPoly(front, top[2]); const hl = add(p, fwd, 3); sR(hl[0], hl[1] + 1, 1, hang - 2, top[3]); }
   }
 
-  // Ceinture
+  // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
   limbT(add(by, fwd, -4.5), add(by, fwd, 5), 3, 3, 0, bl);
-  const kn = add(by, fwd, 3.5);
-  sR(kn[0] - 1, kn[1] - 1, 3, 3, bl[2]); sR(kn[0] - 1, kn[1] - 1, 1, 1, bl[3]);
-  sR(kn[0] + (dir > 0 ? 1 : -1), kn[1] + 1, 1, 5, bl[1]);
-  sR(kn[0], kn[1] + 1, 1, 4, bl[2]);
+  if (!backView) {
+    const kn = add(by, fwd, 3.5);
+    sR(kn[0] - 1, kn[1] - 1, 3, 3, bl[2]); sR(kn[0] - 1, kn[1] - 1, 1, 1, bl[3]);
+    sR(kn[0] + (dir > 0 ? 1 : -1), kn[1] + 1, 1, 5, bl[1]);
+    sR(kn[0], kn[1] + 1, 1, 4, bl[2]);
+  } else {
+    const kn = add(by, fwd, 4.5);   // pans du nœud qui dépassent devant
+    sR(kn[0], kn[1] + 1, 1, 4, bl[1]);
+  }
 
-  // Tête
-  const map = d.head, hp = d.hair, bp = d.bandP || [];
-  const pal = { a: hp.a, h: hp.h, H: hp.H, L: hp.L, b: bp[1], B: bp[2],
+  // ---- Tête ----
+  const map = backView ? d.headBack : d.head, hp = d.hair, bp = d.bandP || [];
+  const pal = { a: hp.a, h: hp.h, H: hp.H, L: hp.L, b: bp[1], B: bp[2], n: bp[3],
                 e: sk[0], S: sk[1], s: sk[2], l: sk[3], k: '#120a06', m: sk[0] };
   const hx = Math.round(h[0]), hy = Math.round(h[1]) - 7;
   for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
@@ -473,12 +526,9 @@ function drawFighter(f, x = f.x, y = f.y) {
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
   }
 
-  // Bras avant
-  limbT(sdA, fe, 5, 4, 1.2, sk);
-  limbT(sdA, mix(sdA, fe, tshirt ? .4 : 1), 6, 5.5, tshirt ? 0 : .5, top);
-  limbT(fe, fh, 4.5, 3.5, 1, sk);
-  if (!tshirt) limbT(fe, mix(fe, fh, .25), 5.5, 5.5, 0, top);
-  fist(fh, dir, d.glove, sk);
+  // ---- Plan avant ----
+  if (backView) { drawBraid(); drawBand(); arm(sdB, be, bh, true); }
+  else arm(sdA, fe, fh, true);
 
   if (f.flash > 0) {
     const img = sx.getImageData(0, 0, SPR.width, SPR.height), dd = img.data;
