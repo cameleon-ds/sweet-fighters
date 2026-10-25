@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v9';
+const VERSION = 'v10';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -404,7 +404,8 @@ function drawFighter(f, x = f.x, y = f.y) {
   let ux = p[0] - n[0], uy = p[1] - n[1]; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
   const fwd = [uy * dir, -ux * dir];
   const sh = add(n, [ux, uy], 1);
-  const sdA = add(sh, fwd, 1), sdB = add(sh, fwd, -1.5);
+  // épaules écartées : avant (côté adversaire) et arrière (côté caméra)
+  const sdA = add(sh, fwd, 3.5), sdB = add(sh, fwd, -4.5);
 
   const drawBand = () => {
     if (!d.band) return;
@@ -459,14 +460,23 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // ---- Plan arrière ----
   if (!backView) { drawBand(); drawBraid(); }
-  if (backView) { arm(sdA, fe, fh, false); leg(fk, ff, false); }
-  else { arm(sdB, be, bh, false); leg(bk, bf, false); }
+  // Le bras éloigné (celui qui frappe) passe derrière le torse ; le bras proche de la caméra
+  // part de l'épaule arrière, ce qui laisse voir pectoraux et abdos en vue de face.
+  const guard = !backView && ['idle', 'walk', 'crouch', 'jump', 'land', 'getup', 'parry', 'hit', 'stunned', 'kick', 'ckick', 'jkick'].includes(f.state);
+  const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
+  if (guard && f.state !== 'parry') {
+    // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
+    const e1 = add(sdA, [dir * 4, 1 + bob]), h1 = add(sdA, [dir * 8.5, -.5 + bob]);
+    arm(sdA, e1, h1, true);
+  } else arm(sdA, fe, fh, !backView);
+  if (backView) leg(fk, ff, false); else leg(bk, bf, false);
 
   // ---- Torse ----
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
-  const torso = [add(sh, fwd, 6), add(at(.3), fwd, 6.5), add(at(.75), fwd, 5), add(wa, fwd, 4.5),
-                 add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6), add(sh, fwd, -5.5)];
+  const tw = 1.15;   // torse plus large (on le voit de 3/4)
+  const torso = [add(sh, fwd, 6 * tw), add(at(.3), fwd, 6.5 * tw), add(at(.75), fwd, 5 * tw), add(wa, fwd, 4.5 * tw),
+                 add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw), add(at(.25), fwd, -6 * tw), add(sh, fwd, -5.5 * tw)];
   sPoly(grow(torso, .6), top[0]);
   sPoly(torso, top[2]);
   if (backView) {
@@ -480,11 +490,22 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(sh, fwd, -5.5), add(sh, fwd, -2.5), add(at(.6), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6)], top[1]);
     sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
     if (tshirt) {
-      const pc = add(at(.4), fwd, 1); sR(pc[0], pc[1], 1, 1, top[1]);
-      const pc2 = add(at(.4), fwd, 4); sR(pc2[0], pc2[1], 1, 1, top[1]);
-      const ab = add(at(.7), fwd, 3); sR(ab[0], ab[1], 1, 1, top[1]);
+      // pectoraux (reflet + ligne d'ombre dessous) et abdos sous le t-shirt moulant
+      sPoly([add(sh, fwd, -3), add(sh, fwd, 5), add(at(.3), fwd, 5.5), add(at(.32), fwd, -3)], top[3]);
+      for (let k = -3; k <= 5; k++) { const q = add(at(.36 + (k === 1 ? -.04 : 0)), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
+      const mid = add(at(.2), fwd, 1); sR(mid[0], mid[1], 1, 3, top[1]);
+      [.52, .66, .8].forEach(t => {
+        const q1 = add(at(t), fwd, -1), q2 = add(at(t), fwd, 3);
+        sR(q1[0], q1[1], 2, 1, top[1]); sR(q2[0], q2[1], 2, 1, top[1]);
+        sR(q1[0], q1[1] - 1, 2, 1, top[3]); sR(q2[0], q2[1] - 1, 2, 1, top[3]);
+      });
+      const ln = add(at(.55), fwd, 1); sR(ln[0], ln[1], 1, 6, top[1]);
     } else {
-      sPoly([add(sh, fwd, 1), add(sh, fwd, 4), add(at(.3), fwd, 2.5)], sk[2]);
+      // veste ouverte en V : torse nu visible
+      sPoly([add(sh, fwd, -1), add(sh, fwd, 4.5), add(at(.55), fwd, 1.5)], sk[2]);
+      sPoly([add(sh, fwd, 0), add(sh, fwd, 3), add(at(.25), fwd, 1.5)], sk[3]);
+      for (let k = 0; k <= 3; k++) { const q = add(at(.3), fwd, k); sR(q[0], q[1], 1, 1, sk[1]); }
+      const ab = add(at(.45), fwd, 1.5); sR(ab[0], ab[1], 1, 1, sk[1]);
       for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
     }
   }
@@ -528,7 +549,16 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // ---- Plan avant ----
   if (backView) { drawBraid(); drawBand(); arm(sdB, be, bh, true); }
-  else arm(sdA, fe, fh, true);
+  else {
+    // Vue de face : en garde, le bras proche reste sur le côté gauche du corps
+    // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
+    const guard2 = ['idle', 'walk', 'punch', 'kick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
+    if (guard2) {
+      const e2 = add(sdB, [-dir * 3.5, 6 + bob]);
+      const h2 = add(e2, [dir * 3, -2.5]);
+      arm(sdB, e2, h2, true);
+    } else arm(sdB, be, bh, true);
+  }
 
   if (f.flash > 0) {
     const img = sx.getImageData(0, 0, SPR.width, SPR.height), dd = img.data;
