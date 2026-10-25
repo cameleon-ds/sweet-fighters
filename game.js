@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v21';
+const VERSION = 'v22';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -769,13 +769,22 @@ addEventListener('pointerdown', e => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
+// Stick tactile : très petite zone morte, la direction est choisie selon l'angle (8 directions)
+function stickDirs() {
+  const x = touch.x, y = touch.y, m = Math.hypot(x, y);
+  if (m < 0.12) return { l: false, r: false, u: false, d: false };
+  const ax = Math.abs(x) / m, ay = Math.abs(y) / m;   // cos de l'angle avec chaque axe
+  const H = ax > 0.38, V = ay > 0.38;                // secteurs de 67,5° : diagonales comprises
+  return { l: H && x < 0, r: H && x > 0, u: V && y < 0, d: V && y > 0 };
+}
 function readPlayer() {
+  const st = stickDirs();
   const K = k => keys.has(k) || latched.has(k);
   const r = {
-    l: K('l') || touch.x < -0.4,
-    r: K('r') || touch.x > 0.4,
-    u: K('u') || touch.y < -0.5,
-    d: K('d') || touch.y > 0.5,
+    l: K('l') || st.l,
+    r: K('r') || st.r,
+    u: K('u') || st.u,
+    d: K('d') || st.d,
     p: K('p') || touch.btn.has('p'),
     k: K('k') || touch.btn.has('k'),
     s: K('s') || touch.btn.has('s'),
