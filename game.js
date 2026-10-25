@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v18';
+const VERSION = 'v19';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -282,33 +282,33 @@ const DEFS = [
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
 const POSES = {
-  idle0:   [3,-55, 1,-47, -1,-29, 9,-40, 14,-48, 4,-38, 9,-45, 7,-15, 11,0, -8,-14, -12,0],
-  idle1:   [3,-54, 1,-46, -1,-28, 9,-39, 14,-47, 4,-37, 9,-44, 7,-14, 11,0, -8,-13, -12,0],
-  walk0:   [4,-55, 2,-47, 0,-29, 10,-40, 15,-48, 5,-38, 10,-45, 4,-15, 5,0, -3,-15, -5,0],
-  walk1:   [4,-56, 2,-48, 0,-30, 10,-41, 15,-49, 5,-39, 10,-46, 10,-16, 15,0, -9,-14, -14,0],
-  walk2:   [4,-56, 2,-48, 0,-30, 10,-41, 15,-49, 5,-39, 10,-46, -4,-15, -8,0, 6,-15, 10,0],
-  jump:    [3,-58, 1,-50, 0,-34, 9,-44, 13,-51, 4,-42, 9,-48, 9,-30, 6,-20, 2,-26, -4,-18],
-  punch0:  [2,-55, 0,-47, -1,-29, 4,-40, 7,-45, -6,-38, -3,-43, 8,-15, 13,0, -9,-14, -13,0],
-  punch1:  [5,-55, 3,-47, 0,-29, 15,-46, 27,-47, -4,-38, -1,-43, 9,-15, 14,0, -9,-14, -14,0],
-  kick0:   [-2,-56, -3,-48, -3,-30, 4,-42, 8,-48, -8,-40, -4,-46, 12,-40, 10,-26, -3,-15, -5,0],
-  kick1:   [-7,-54, -7,-46, -3,-30, 0,-42, 4,-48, -12,-40, -8,-46, 22,-38, 46,-42, -4,-15, -6,0],
-  fpunch0: [3,-55, 1,-47, -1,-29, 8,-40, 12,-46, -6,-38, -2,-42, 8,-15, 13,0, -9,-14, -13,0],
-  fpunch1: [9,-54, 7,-46, 3,-29, 2,-40, 6,-44, 18,-47, 36,-48, 12,-15, 18,0, -6,-14, -10,0],
-  fkick0:  [-3,-56, -4,-48, -3,-30, 4,-42, 8,-48, -8,-40, -4,-46, 6,-15, 10,0, 12,-40, 10,-26],
-  fkick1:  [-9,-53, -9,-45, -3,-30, -2,-42, 2,-48, -14,-40, -10,-46, 6,-15, 10,0, 26,-38, 56,-44],
-  special0:[0,-54, -1,-46, -2,-28, -6,-36, -9,-31, -8,-37, -11,-32, 8,-14, 13,0, -10,-13, -15,0],
-  special1:[5,-53, 3,-45, 0,-28, 14,-40, 24,-40, 12,-37, 22,-37, 10,-14, 15,0, -10,-12, -16,0],
+  idle0:   [4,-52, 2,-44, 0,-26, 9,-40, 14,-48, 4,-38, 9,-45, 10,-14, 15,0, -7,-13, -14,0],
+  idle1:   [4,-51, 2,-43, 0,-25, 9,-39, 14,-47, 4,-37, 9,-44, 10,-13, 15,0, -7,-12, -14,0],
+  walk0:   [5,-52, 3,-44, 1,-26, 10,-40, 15,-48, 5,-38, 10,-45, 6,-14, 7,0, -4,-14, -6,0],
+  walk1:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, 12,-14, 17,0, -8,-13, -15,0],
+  walk2:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, -2,-14, -7,0, 8,-14, 12,0],
+  jump:    [3,-58, 1,-50, 0,-34, 9,-44, 13,-51, 4,-42, 9,-48, 10,-30, 6,-20, 2,-27, -4,-18],
+  punch0:  [3,-52, 1,-44, 0,-26, 6,-40, 9,-46, -4,-38, 0,-42, 10,-14, 16,0, -8,-12, -16,0],
+  punch1:  [8,-51, 6,-43, 2,-26, 17,-44, 30,-45, -4,-38, 0,-42, 11,-14, 17,0, -9,-11, -18,0],
+  kick0:   [-1,-55, -2,-47, -2,-30, 4,-42, 8,-48, -8,-40, -4,-46, 13,-42, 9,-30, -4,-15, -6,0],
+  kick1:   [-9,-52, -8,-44, -3,-30, 0,-42, 4,-48, -12,-40, -8,-46, 20,-40, 42,-44, -4,-15, -7,0],
+  fpunch0: [3,-52, 1,-44, 0,-26, 8,-40, 12,-46, -6,-38, -2,-42, 10,-14, 16,0, -8,-12, -16,0],
+  fpunch1: [9,-51, 7,-43, 3,-26, 3,-40, 6,-46, 16,-45, 32,-46, 13,-14, 20,0, -5,-11, -12,0],
+  fkick0:  [-2,-55, -3,-47, -2,-30, 4,-42, 8,-48, -8,-40, -4,-46, 6,-15, 9,0, 12,-42, 9,-29],
+  fkick1:  [-10,-52, -9,-44, -3,-30, -2,-42, 2,-48, -14,-40, -10,-46, 5,-15, 8,0, 22,-40, 48,-44],
+  special0:[-1,-52, -2,-44, -2,-26, -7,-34, -11,-30, -9,-35, -13,-31, 10,-13, 15,0, -9,-12, -16,0],
+  special1:[6,-50, 4,-42, 1,-25, 15,-40, 26,-40, 13,-38, 24,-37, 11,-13, 18,0, -8,-11, -17,0],
   upper0:  [4,-46, 2,-38, 0,-22, 8,-30, 10,-24, 4,-30, 8,-36, 10,-12, 12,0, -6,-10, -10,0],
   upper1:  [3,-58, 2,-50, 0,-32, 6,-62, 8,-76, -4,-44, -2,-38, 8,-26, 6,-12, -3,-16, -6,-2],
   upper2:  [3,-58, 1,-50, 0,-34, 8,-56, 12,-66, -4,-44, -2,-38, 9,-30, 6,-20, 2,-26, -4,-18],
   hit:     [-4,-53, -4,-45, -2,-28, 2,-40, 6,-46, -8,-38, -4,-44, 6,-14, 10,0, -9,-13, -13,0],
-  block:   [0,-54, -1,-46, -2,-28, 7,-40, 6,-52, 5,-42, 9,-52, 6,-14, 10,0, -9,-13, -14,0],
-  jkick:   [0,-56, -1,-48, 0,-32, 6,-44, 10,-50, -6,-42, -2,-48, 12,-24, 25,-14, 0,-24, -6,-18],
-  jpunch:  [4,-56, 2,-48, 0,-32, 12,-42, 22,-34, -4,-42, 0,-48, 8,-28, 4,-18, 0,-26, -6,-20],
-  crouch:  [4,-38, 2,-31, -1,-15, 10,-24, 14,-31, 5,-22, 10,-28, 12,-10, 13,0, -8,-4, -16,0],
-  cblock:  [1,-37, 0,-30, -2,-15, 7,-25, 6,-36, 5,-26, 9,-36, 11,-10, 12,0, -8,-4, -16,0],
+  block:   [0,-52, -1,-44, -2,-26, 7,-40, 6,-52, 5,-42, 9,-52, 8,-13, 12,0, -8,-12, -14,0],
+  jkick:   [-2,-58, -2,-50, 0,-34, 6,-44, 10,-50, -6,-42, -2,-48, 14,-26, 30,-18, 2,-28, -6,-24],
+  jpunch:  [5,-56, 3,-48, 0,-33, 14,-42, 26,-34, -4,-42, 0,-48, 10,-28, 6,-18, 2,-27, -5,-20],
+  crouch:  [5,-36, 3,-29, 0,-14, 10,-24, 14,-31, 5,-22, 10,-28, 12,-10, 14,0, -8,-6, -16,0],
+  cblock:  [1,-35, 0,-28, -2,-14, 7,-25, 6,-36, 5,-26, 9,-36, 11,-10, 13,0, -8,-6, -16,0],
   cpunch:  [5,-37, 3,-30, 0,-15, 15,-30, 27,-31, -4,-23, -1,-28, 12,-10, 13,0, -8,-4, -16,0],
-  ckick:   [-3,-35, -4,-28, -2,-14, 4,-22, 8,-28, -10,-20, -14,-8, 14,-6, 30,-2, -8,-4, -14,0],
+  ckick:   [-2,-33, -3,-27, -2,-12, 4,-20, 8,-12, -10,-20, -14,-8, 16,-5, 34,-2, -8,-4, -14,0],
   tatsu:   [1,-58, 0,-50, 0,-34, -7,-46, -13,-44, 6,-46, 12,-44, 14,-36, 30,-37, 3,-24, -3,-17],
   parry:   [2,-55, 0,-47, -1,-29, 10,-44, 16,-53, 8,-42, 15,-47, 8,-15, 12,0, -9,-14, -13,0],
   stunned: [-3,-52, -3,-44, -1,-28, 2,-36, 4,-29, -7,-36, -5,-29, 6,-14, 10,0, -8,-13, -12,0],
@@ -413,7 +413,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
-  if (['idle', 'block', 'parry', 'punch', 'special', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; Q[14] += 4; Q[15] += 1; }   // jambes avant et arrière légèrement pliées vers l'avant
+  if (['parry', 'stunned', 'win'].includes(f.state)) { Q[18] += 4; Q[19] += 1; Q[14] += 4; Q[15] += 1; }   // jambes avant et arrière légèrement pliées vers l'avant
   const footBefore = Math.max(Q[17], Q[21]);
   for (const i of [7, 8, 9, 10]) { Q[i * 2] = px0 + (Q[i * 2] - px0) * LF; Q[i * 2 + 1] = py0 + (Q[i * 2 + 1] - py0) * LF; }
   const lift = footBefore - Math.max(Q[17], Q[21]);
@@ -493,7 +493,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
   if (guard && f.state !== 'parry') {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
-    const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 4, -4]);   // bras avant plié, poing devant la poitrine
+    const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 3.5, -6]);   // bras avant plié, poing devant la poitrine
     arm(sdA, e1, h1, true);
   } else arm(sdA, fe, fh, !backView);
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
@@ -595,8 +595,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
     const guard2 = ['idle', 'walk', 'punch', 'kick', 'fkick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
     if (guard2) {
-      const e2 = add(sdB, [-dir * 3.5, 6 + bob]);
-      const h2 = add(e2, [dir * 3, -2.5]);
+      const e2 = add(sdB, [-dir * 2.5, 6 + bob]);
+      const h2 = add(e2, [dir * 4, -5]);
       arm(sdB, e2, h2, true);
     } else arm(sdB, be, bh, true);
   }
@@ -795,9 +795,9 @@ const backPress = c => edge(c, 'k') || edge(c, 'back');
 /* ---------------- Données d'attaque ---------------- */
 const ATK = {
   punch:    { dur: 18, act: [4, 10], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
-  fpunch:   { dur: 22, act: [5, 12], box: [18, -80, 58, -58], dmg: 9,  stun: 17, bstun: 11, push: 3.2, sfx: 'hit' },
-  fkick:    { dur: 30, act: [9, 16], box: [26, -70, 80, -44], dmg: 11, stun: 19, bstun: 13, push: 3.6, sfx: 'heavy' },
-  kick:     { dur: 26, act: [7, 14], box: [20, -68, 66, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
+  fpunch:   { dur: 22, act: [5, 12], box: [18, -80, 52, -58], dmg: 9,  stun: 17, bstun: 11, push: 3.2, sfx: 'hit' },
+  fkick:    { dur: 30, act: [9, 16], box: [26, -70, 72, -44], dmg: 11, stun: 19, bstun: 13, push: 3.6, sfx: 'heavy' },
+  kick:     { dur: 26, act: [7, 14], box: [20, -68, 62, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
   jpunch:   { act: [3, 16], box: [11, -59, 38, -34], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
@@ -1030,7 +1030,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     // l'adversaire passe au ralenti pendant une seconde, éclair + fond assombri
     att.hasHit = true; att.slowT = 60;
     setState(def, 'idle'); def.counterT = 60; def.vx = 0;
-    G.flashT = 10; G.darkT = 60; G.boltX = sx; G.boltY = sy;
+    G.flashT = 12; G.darkT = 60; G.boltX = sx; G.boltY = sy;
     addPopup(def.x, def.y - 100, 'CONTRE !', '#7af0ff');
     return;
   }
@@ -1375,15 +1375,27 @@ function drawFight() {
     }
   });
   if (G.flashT > 0) {
-    // éclair : flash blanc + zigzag lumineux qui tombe sur le point de contre
-    R(0, 0, W, H, `rgba(220,240,255,${G.flashT / 14})`);
-    let x0 = G.boltX + (G.frame % 2 ? 6 : -6), y0 = 0;
-    seed = 900 + (G.frame >> 1);
-    while (y0 < G.boltY) {
-      const x1 = G.boltX + (rnd() - .5) * 26, y1 = Math.min(G.boltY, y0 + 10 + rnd() * 12);
-      seg([x0, y0], [x1, y1], 4, '#7af0ff'); seg([x0, y0], [x1, y1], 2, '#ffffff');
-      x0 = x1; y0 = y1;
+    // éclat en étoile qui jaillit du point de contre : grandit très vite en tournant puis s'efface
+    const k = 1 - G.flashT / 12;                       // 0 → 1
+    const rad = 10 + 70 * Math.sqrt(k), alpha = Math.min(1, G.flashT / 6);
+    const rot = k * 1.6 + .2;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha;
+    const g = ctx.createRadialGradient(G.boltX, G.boltY, 0, G.boltX, G.boltY, rad * .6);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(.3, '#bff8ff'); g.addColorStop(1, 'rgba(60,200,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(G.boltX, G.boltY, rad * .6, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(G.boltX, G.boltY); ctx.rotate(rot);
+    for (let i = 0; i < 8; i++) {                        // 8 branches, alternance longues/courtes
+      const L = i % 2 ? rad * .55 : rad, w = i % 2 ? 3 : 5;
+      ctx.fillStyle = '#7af0ff';
+      ctx.beginPath(); ctx.moveTo(0, -w); ctx.lineTo(L, 0); ctx.lineTo(0, w); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(0, -w * .4); ctx.lineTo(L * .8, 0); ctx.lineTo(0, w * .4); ctx.closePath(); ctx.fill();
+      ctx.rotate(Math.PI / 4);
     }
+    ctx.restore();
+    if (G.flashT > 9) R(0, 0, W, H, 'rgba(220,245,255,.25)');   // très bref flash d'écran
   }
   G.popups.forEach(pp => { if ((pp.t >> 2) % 4 !== 3 || pp.t < 30) text(pp.txt, pp.x, pp.y - pp.t * .4, 8, pp.col, 'center'); });
   drawHUD();
