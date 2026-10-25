@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v10';
+const VERSION = 'v11';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -238,11 +238,11 @@ const HEAD_KAITO_BACK = [
   "aHHHLLHHHa",
   "aBBBBBBBBB",
   "abbbnbbbbb",
-  "ahHHhHHhSs",
-  "ahhHHhHHSs",
-  "ahhhhhhhSs",
-  ".ahhhhhSSs",
-  "..ahhhSSs.",
+  "ahHHhHHSks",
+  "ahhHHhHSks",
+  "ahhhhhhSss",
+  ".ahhhhSsss",
+  "..ahhhSss.",
   "...eSSSSe.",
 ];
 const HEAD_SORA_BACK = [
@@ -251,11 +251,11 @@ const HEAD_SORA_BACK = [
   "aHHLLLLHHa",
   "aHHHLLHHHa",
   "aHHHHHHHHa",
-  "ahHHhHHhSs",
-  "ahhHHhHHSs",
-  "ahhhHHhhSs",
-  ".ahhhhhSSs",
-  "..ahhhSSs.",
+  "ahHHhHHSks",
+  "ahhHHhHSks",
+  "ahhhhhhSss",
+  ".ahhhhSsss",
+  "..ahhhSss.",
   "...eSSSSe.",
 ];
 
@@ -469,7 +469,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     const e1 = add(sdA, [dir * 4, 1 + bob]), h1 = add(sdA, [dir * 8.5, -.5 + bob]);
     arm(sdA, e1, h1, true);
   } else arm(sdA, fe, fh, !backView);
-  if (backView) leg(fk, ff, false); else leg(bk, bf, false);
+  leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
 
   // ---- Torse ----
   const wa = add(p, [-ux, -uy], 1);
@@ -513,7 +513,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   limbT([n[0] + dir * .5, n[1] + 1], [h[0] - dir * .5, h[1] + 3], 4, 4, 0, backView ? dim(sk) : sk);
 
   // ---- Jambe proche ----
-  if (backView) leg(bk, bf, true); else leg(fk, ff, true);
+  leg(bk, bf, true);    // jambe arrière au premier plan, côté caméra
 
   // Pans de veste
   if (d.style === 'jacket') {
