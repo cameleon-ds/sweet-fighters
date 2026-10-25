@@ -199,47 +199,63 @@ function makeBG() {
 }
 let BG = null;
 
-/* ---------------- Personnages (originaux) ---------------- */
-const HEAD_K = [
-  "....ooo......",
-  "...oHhho.....",
-  "...ohhho.....",
-  "..oooohoooo..",
-  ".ohhhhhhhhhho",
-  "ohhhhhhhhhhho",
-  "ohhhhhssssso.",
-  "ohhhhsssskso.",
-  "ohhhssssssso.",
-  ".ohhSsssssSo.",
-  ".ohhSssssooo.",
-  "..oSSsssso...",
-  "...oSssso....",
-  "....oooo.....",
+/* ---------------- Personnages (designs originaux, rendu 16 bits) ---------------- */
+// Têtes de profil (regard vers la droite). Palette :
+// h/H/L cheveux (foncé / moyen / clair) · s/S/l peau (moyen / ombre / reflet)
+// k sourcils/pupille · w blanc de l'œil · m bouche · '.' transparent
+const HEAD_KAITO = [
+  "..h.h.h.h.....",
+  ".hHhHhHhHh....",
+  ".hHHLHHLHhh...",
+  "hhHHHHHHHhhh..",
+  "hhhhhhhhhhhhh.",
+  "hhhhhhhhsssss.",
+  "hhhhhSsslllss.",
+  "hhhhSsssskkks.",
+  "hhhSSssssswks.",
+  ".hhSSsssssssss",
+  ".hSSsssssslss.",
+  "..SSssssssss..",
+  "..SSSsssmmms..",
+  "...SSSsssss...",
+  "....SSSSss....",
 ];
-const HEAD_S = [
-  "..o..o.o.....",
-  ".oHooHoHo....",
-  "oHHHHHHHHo...",
-  ".oHhhhhhhhoo.",
-  "oHhhhhhhhhhho",
-  ".ohhhhhhhhhho",
-  "ohhhhhssssso.",
-  ".ohhhsssskso.",
-  "ohhhssssssso.",
-  ".ohhSsssssSo.",
-  "..ohSssssooo.",
-  "..oSSsssso...",
-  "...oSssso....",
-  "....oooo.....",
+const HEAD_SORA = [
+  "....hhhh......",
+  "..hHHLLHHh....",
+  ".hHLLLLLLHh...",
+  "hHHLLHHHHLHh..",
+  "hHHHHHHHHHHLh.",
+  "hhHHHHHHHssss.",
+  "hhhHHSsslllss.",
+  "hhhhSsssskkks.",
+  "hhhSSssssswks.",
+  "hhhSSsssssssss",
+  ".hSSsssssslss.",
+  "..SSssssssss..",
+  "..SSSsssmmms..",
+  "...SSSsssss...",
+  "....SSSSss....",
 ];
 
+// Palettes 3 tons : [ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', gi: '#2c3c8c', giL: '#4a63c8', giD: '#1a2558', belt: '#141414',
-    skin: '#eab07c', skinD: '#b87a4c', hair: '#1b1b24', hairL: '#4a4a66', head: HEAD_K,
-    fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'], wrap: null },
-  { name: 'SORA', gi: '#2e7a3a', giL: '#52ad5c', giD: '#1a4622', belt: '#6e3610',
-    skin: '#c88a58', skinD: '#94603a', hair: '#bfc2d4', hairL: '#f6f6ff', head: HEAD_S,
-    fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'], wrap: '#e2d8be' },
+  { name: 'KAITO', style: 'vest', head: HEAD_KAITO,
+    skin: ['#a8683e', '#dc9a64', '#f6c48e'],
+    hair: { h: '#16131a', H: '#2e2a38', L: '#4e4860' },
+    top:  ['#465060', '#76808f', '#aab4c2'],   // gi gris acier sans manches
+    legs: ['#3c4554', '#6a7484', '#9ea8b6'],
+    wrap: ['#18203e', '#2a376e', '#4658a0'],   // bandes bleu nuit
+    belt: ['#121a34', '#22305e', '#3a4c8c'],
+    fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
+  { name: 'SORA', style: 'jacket', head: HEAD_SORA, braid: true,
+    skin: ['#94583a', '#c48452', '#e6aa78'],
+    hair: { h: '#8a8ea4', H: '#c6cad8', L: '#f2f4fa' },
+    top:  ['#1c5644', '#2e8666', '#5cc29a'],   // veste jade mi-longue
+    legs: ['#121216', '#26262e', '#42424c'],   // pantalon noir
+    wrap: null,
+    belt: ['#8a6420', '#c8983a', '#f0cc66'],   // ceinture nouée dorée
+    fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
 ];
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
@@ -274,58 +290,195 @@ const POSES = {
 };
 
 const OUT = '#140c08';
+const K = 1.4;                       // échelle des sprites
+const SPR = document.createElement('canvas');
+SPR.width = 220; SPR.height = 160;
+const sx = SPR.getContext('2d');
+const OX = 110, OY = 140;            // origine (pieds) dans le sprite
+
+const sR = (x, y, w, h, c) => { sx.fillStyle = c; sx.fillRect(Math.round(x), Math.round(y), w, h); };
+function sSeg(a, b, w, col) {
+  sx.fillStyle = col;
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));
+  const o = Math.floor(w / 2);
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    sx.fillRect(Math.round(a[0] + dx * t) - o, Math.round(a[1] + dy * t) - o, w, w);
+  }
+}
+function sPoly(pts, col) {
+  sx.fillStyle = col;
+  let y0 = Infinity, y1 = -Infinity;
+  pts.forEach(p => { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+  for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
+    const yc = y + .5, xs = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if ((a[1] <= yc && b[1] > yc) || (b[1] <= yc && a[1] > yc)) xs.push(a[0] + (yc - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+    }
+    xs.sort((p, q) => p - q);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const xa = Math.round(xs[i]), xb = Math.round(xs[i + 1]);
+      if (xb > xa) sx.fillRect(xa, y, xb - xa, 1);
+    }
+  }
+}
+function polyOut(pts, col) {
+  const c = pts.reduce((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length], [0, 0]);
+  sPoly(pts.map(p => { const dx = p[0] - c[0], dy = p[1] - c[1], l = Math.hypot(dx, dy) || 1; return [p[0] + dx / l * 1.3, p[1] + dy / l * 1.3]; }), OUT);
+  sPoly(pts, col);
+}
+// Membre ombré : contour, ombre, ton moyen décalé vers la lumière (haut-gauche), reflet
+function limb(a, b, w, pal) {
+  sSeg(a, b, w + 2, OUT);
+  sSeg(a, b, w, pal[0]);
+  sSeg([a[0] - .6, a[1] - .9], [b[0] - .6, b[1] - .9], Math.max(1, w - 2), pal[1]);
+  if (w >= 5) sSeg([a[0] - 1.2, a[1] - 1.8], [b[0] - 1.2, b[1] - 1.8], Math.max(1, Math.floor(w / 3)), pal[2]);
+}
+function fist(q, pal, big) {
+  const s = big ? 8 : 7, x = Math.round(q[0]) - (s >> 1), y = Math.round(q[1]) - (s >> 1);
+  sR(x - 1, y - 1, s + 2, s + 2, OUT);
+  sR(x, y, s, s, pal[0]);
+  sR(x, y, s - 2, s - 2, pal[1]);
+  sR(x + 1, y + 1, 2, 2, pal[2]);
+  sR(x + 1, y + 3, s - 3, 1, pal[0]);          // phalanges
+}
+function footP(q, dir, pal) {
+  const a = [q[0] - dir, q[1] - 2], b = [q[0] + dir * 6, q[1] - 1];
+  sSeg(a, b, 6, OUT); sSeg(a, b, 4, pal[0]); sSeg([a[0], a[1] - 1], [b[0], b[1] - 1], 2, pal[1]);
+}
+const add = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k];
 
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
-  const wh = f.flash > 0;
-  const C = c => (wh ? '#ffffff' : c);
-  const O = wh ? '#ffffff' : OUT;
-  const pt = i => [x + dir * P[i * 2], y + P[i * 2 + 1]];
+  sx.clearRect(0, 0, SPR.width, SPR.height);
+  const pt = i => [OX + dir * P[i * 2] * K, OY + P[i * 2 + 1] * K];
   const [h, n, p, fe, fh, be, bh, fk, ff, bk, bf] = [0,1,2,3,4,5,6,7,8,9,10].map(pt);
-  const part = (a, b, w, col) => { seg(a, b, w + 2, O); seg(a, b, w, C(col)); };
-  const fist = (q, col) => { R(Math.round(q[0]) - 3, Math.round(q[1]) - 3, 7, 7, O); R(Math.round(q[0]) - 2, Math.round(q[1]) - 2, 5, 5, C(col)); };
-  const foot = (q, col) => { const a = [q[0], q[1] - 1], b = [q[0] + dir * 4, q[1] - 1]; seg(a, b, 5, O); seg(a, b, 3, C(col)); };
-  const wrap = (e, q) => { if (d.wrap) seg(lerp(e, q, .55), lerp(e, q, .8), 4, C(d.wrap)); };
+  const sk = d.skin, top = d.top, legs = d.legs;
+  const shade = pal => [pal[0], pal[0], pal[1]];   // côté arrière plus sombre
 
-  // bras arrière
-  part(n, be, 5, d.giD); part(be, bh, 4, d.skinD); wrap(be, bh); fist(bh, d.skinD);
-  // jambe arrière
-  part(p, bk, 7, d.giD); part(bk, bf, 6, d.giD); foot(bf, d.skinD);
-  // torse
-  part(n, p, 11, d.gi);
-  part([n[0] - 4, n[1] + 2], [n[0] + 4, n[1] + 2], 5, d.gi);
-  seg([n[0] + dir * 3, n[1] + 2], [p[0] + dir * 3, p[1] - 2], 2, C(d.giL));
-  seg([n[0] + dir, n[1]], lerp(n, p, .3), 3, C(d.skin));
-  seg(lerp(n, p, .3), lerp(n, p, .7), 1, C(d.giD));
-  // jambe avant
-  part(p, fk, 7, d.gi); part(fk, ff, 6, d.gi); foot(ff, d.skin);
-  seg([p[0] - 5, p[1] + 1], [p[0] + 5, p[1] + 1], 8, C(d.gi));
-  // ceinture
-  part([p[0] - 6, p[1] - 3], [p[0] + 6, p[1] - 3], 3, d.belt);
-  seg([p[0] + dir * 3, p[1] - 2], [p[0] + dir * 5, p[1] + 4], 2, C(d.belt));
-  // tête
-  const map = d.head, hx = Math.round(h[0]), hy = Math.round(h[1]) - 7;
-  const pal = { o: O, h: C(d.hair), H: C(d.hairL), s: C(d.skin), S: C(d.skinD), k: wh ? '#fff' : OUT };
-  for (let r = 0; r < map.length; r++) {
-    const row = map[r];
-    for (let c = 0; c < row.length; c++) {
-      const ch = row[c]; if (ch === '.') continue;
-      ctx.fillStyle = pal[ch];
-      ctx.fillRect(hx + (dir > 0 ? c - 6 : 6 - c), hy + r, 1, 1);
+  // Axe du torse et vecteur « avant »
+  let ux = p[0] - n[0], uy = p[1] - n[1]; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+  const fwd = [uy * dir, -ux * dir];
+  const fwdAbs = [Math.abs(fwd[0]) > .01 ? fwd[0] : dir, fwd[1]];
+
+  // Bras arrière
+  const armUp = d.style === 'vest' ? sk : top;
+  limb(n, be, 7, shade(armUp));
+  limb(be, bh, 6, shade(d.style === 'vest' ? sk : top));
+  if (d.wrap) limb(add(be, [bh[0] - be[0], bh[1] - be[1]], .35), bh, 6, shade(d.wrap));
+  fist(bh, shade(sk));
+  // Jambe arrière
+  limb(p, bk, 10, shade(legs)); limb(bk, bf, 9, shade(legs)); footP(bf, dir, shade(sk));
+
+  // Tresse (derrière le corps)
+  if (d.braid) {
+    const hp = d.hair, base = [h[0] - dir * 7, h[1] - 1];
+    const swing = (f.air ? -f.vx * 1.5 : 0) + Math.sin(G.frame * .12) * .8;
+    for (let i = 0; i < 7; i++) {
+      const q = [base[0] - dir * (2.6 * i - .12 * i * i) + swing * i * .35, base[1] + 4.2 * i];
+      sR(q[0] - 3, q[1] - 3, 6, 6, OUT);
+      sR(q[0] - 2, q[1] - 2, 4, 4, i % 2 ? hp.h : hp.H);
+      sR(q[0] - 1, q[1] - 2, 2, 1, hp.L);
+      if (i === 6) { sR(q[0] - 2, q[1] + 2, 4, 2, OUT); sR(q[0] - 1, q[1] + 3, 3, 4, hp.H); sR(q[0] - 2, q[1] + 1, 4, 1, '#1c5644'); }
     }
   }
-  // bras avant
-  part(n, fe, 5, d.gi); part(fe, fh, 4, d.skin); wrap(fe, fh); fist(fh, d.skin);
+
+  // Torse (polygone : épaules larges, taille plus fine)
+  const sw = 10, ww = 7.5;
+  const sh = n, wa = add(p, [-ux, -uy], 2);
+  const torso = [add(sh, fwd, sw), add(sh, fwd, -sw), add(wa, fwd, -ww), add(wa, fwd, ww)];
+  polyOut(torso, top[1]);
+  // ombre côté dos + reflet côté avant
+  sPoly([add(sh, fwd, -sw), add(sh, fwd, -sw + 4), add(wa, fwd, -ww + 3), add(wa, fwd, -ww)], top[0]);
+  sSeg(add(sh, fwd, sw - 2), add(wa, fwd, ww - 2), 2, top[2]);
+  if (d.style === 'vest') {
+    // Gilet ouvert : torse nu visible à l'avant
+    const mid = [sh[0] + (wa[0] - sh[0]) * .62, sh[1] + (wa[1] - sh[1]) * .62];
+    sPoly([add(sh, fwd, 1), add(sh, fwd, 8), add(mid, fwd, 2.5)], sk[1]);
+    sSeg(add(sh, fwd, 6), add([sh[0] + (wa[0] - sh[0]) * .35, sh[1] + (wa[1] - sh[1]) * .35], fwd, 5), 1, sk[0]); // pectoral
+    sSeg(add(sh, fwd, 7), add(mid, fwd, 2.5), 1, top[0]);
+    sSeg(add(sh, fwd, 2), add(sh, fwd, 4), 1, sk[2]);
+  } else {
+    // Veste croisée : col en V et revers
+    const mid = [sh[0] + (wa[0] - sh[0]) * .55, sh[1] + (wa[1] - sh[1]) * .55];
+    sPoly([add(sh, fwd, 2), add(sh, fwd, 6), add([sh[0] + (wa[0] - sh[0]) * .2, sh[1] + (wa[1] - sh[1]) * .2], fwd, 4)], sk[1]);
+    sSeg(add(sh, fwd, 7), add(mid, fwd, -2), 2, top[0]);
+    sSeg(add(sh, fwd, 6), add(mid, fwd, -3), 1, top[2]);
+  }
+  // Cou
+  sSeg([n[0] + dir, n[1] + 1], [h[0] - dir, h[1] + 6], 7, OUT);
+  sSeg([n[0] + dir, n[1] + 1], [h[0] - dir, h[1] + 6], 5, sk[0]);
+  sSeg([n[0] + dir * 2, n[1]], [h[0], h[1] + 6], 2, sk[1]);
+
+  // Jambe avant
+  limb(p, fk, 10, legs); limb(fk, ff, 9, legs); footP(ff, dir, sk);
+  if (d.style === 'vest') {
+    // pli du pantalon au genou
+    sSeg(add(fk, [-dir, -2]), add(fk, [dir * 2, 1]), 1, legs[0]);
+  }
+
+  // Bas de la veste (Sora) : pans qui tombent sur les cuisses
+  if (d.style === 'jacket') {
+    const hang = f.air ? 10 : 14;
+    const flare = Math.min(4, Math.abs(f.vx) * 1.5);
+    const back = [add(p, fwd, -ww - .5), add(p, fwd, -1), add([p[0], p[1] + hang], fwd, -2 - flare), add([p[0], p[1] + hang], fwd, -ww - 3 - flare)];
+    const front = [add(p, fwd, 1), add(p, fwd, ww + .5), add([p[0], p[1] + hang], fwd, ww + 3), add([p[0], p[1] + hang - 2], fwd, 2)];
+    polyOut(back, top[0]); polyOut(front, top[1]);
+    sSeg(add(p, fwd, 4), add([p[0], p[1] + hang - 3], fwd, 5), 1, top[2]);
+  }
+
+  // Ceinture nouée
+  const bl = d.belt, by = add(p, [-ux, -uy], 3);
+  sSeg(add(by, fwd, -ww - 1), add(by, fwd, ww + 1), 6, OUT);
+  sSeg(add(by, fwd, -ww), add(by, fwd, ww), 4, bl[1]);
+  sSeg(add(by, fwd, -ww), add(by, fwd, ww), 1, bl[2]);
+  const knot = add(by, fwd, ww - 1);
+  sR(knot[0] - 3, knot[1] - 3, 6, 6, OUT); sR(knot[0] - 2, knot[1] - 2, 4, 4, bl[1]); sR(knot[0] - 2, knot[1] - 2, 2, 2, bl[2]);
+  const tl = f.air ? -2 : 0;
+  limb([knot[0] + dir, knot[1] + 2], [knot[0] + dir * (3 + tl), knot[1] + 10], 2, bl);
+  limb([knot[0] - dir, knot[1] + 2], [knot[0] - dir * 1, knot[1] + 8], 2, bl);
+
+  // Tête (pixel par pixel, avec contour)
+  const map = d.head, hp = d.hair;
+  const pal = { h: hp.h, H: hp.H, L: hp.L, s: sk[1], S: sk[0], l: sk[2], k: OUT, w: '#f4f0e8', m: '#7a3828' };
+  const hx = Math.round(h[0]), hy = Math.round(h[1]) - 8;
+  const px = c => hx + (dir > 0 ? c - 7 : 7 - c);
+  for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
+    if (map[r][c] === '.') continue;
+    sR(px(c) - 1, hy + r, 3, 1, OUT); sR(px(c), hy + r - 1, 1, 3, OUT);
+  }
+  for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
+    const ch = map[r][c]; if (ch === '.') continue;
+    sR(px(c), hy + r, 1, 1, pal[ch]);
+  }
+
+  // Bras avant
+  limb(n, fe, 7, d.style === 'vest' ? sk : top);
+  if (d.style === 'vest') sSeg(add(n, [0, 0]), add(n, [dir * 2, 2]), 4, top[1]);   // emmanchure du gilet
+  limb(fe, fh, 6, d.style === 'vest' ? sk : top);
+  if (d.wrap) limb(add(fe, [fh[0] - fe[0], fh[1] - fe[1]], .35), fh, 6, d.wrap);
+  else sSeg(add(fe, [fh[0] - fe[0], fh[1] - fe[1]], .82), add(fe, [fh[0] - fe[0], fh[1] - fe[1]], .9), 7, top[0]); // poignet de manche
+  fist(fh, sk, true);
+
+  // Flash blanc à l'impact
+  if (f.flash > 0) {
+    const img = sx.getImageData(0, 0, SPR.width, SPR.height), dd = img.data;
+    for (let i = 0; i < dd.length; i += 4) if (dd[i + 3]) { dd[i] = dd[i + 1] = dd[i + 2] = 255; }
+    sx.putImageData(img, 0, 0);
+  }
+  ctx.drawImage(SPR, Math.round(x) - OX, Math.round(y) - OY);
 }
 
 function drawShadow(f) {
-  const k = 1 - Math.min(.55, (GROUND - f.y) / 110);
+  const k = 1 - Math.min(.55, (GROUND - f.y) / 140);
   ctx.fillStyle = 'rgba(30,12,4,.38)';
-  const w = (f.state === 'down' ? 26 : 16) * k;
+  const w = (f.state === 'down' ? 34 : 22) * k;
   for (let dy = -2; dy <= 2; dy++) {
     const ww = Math.round(w * Math.sqrt(1 - (dy / 3) ** 2));
-    ctx.fillRect(Math.round(f.x) - ww + (f.state === 'down' ? -6 * f.dir : 0), GROUND + 1 + dy, ww * 2, 1);
+    ctx.fillRect(Math.round(f.x) - ww + (f.state === 'down' ? -8 * f.dir : 0), GROUND + 1 + dy, ww * 2, 1);
   }
 }
 
@@ -491,14 +644,14 @@ const backPress = c => edge(c, 'j') || edge(c, 'back');
 
 /* ---------------- Données d'attaque ---------------- */
 const ATK = {
-  punch:    { dur: 18, act: [4, 10], box: [10, -54, 31, -42], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
-  kick:     { dur: 24, act: [7, 13], box: [12, -45, 35, -30], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
-  jpunch:   { act: [3, 16], box: [8, -42, 27, -24], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
-  jkick:    { act: [3, 18], box: [6, -30, 31, -8],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
-  cpunch:   { dur: 16, act: [3, 8],  box: [10, -36, 30, -25], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
-  ckick:    { dur: 28, act: [6, 12], box: [10, -10, 35, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
-  tatsu:    { act: [4, 90], box: [-30, -50, 32, -28], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
-  uppercut: { act: [3, 15], box: [0, -82, 22, -26], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
+  punch:    { dur: 18, act: [4, 10], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
+  kick:     { dur: 24, act: [7, 13], box: [17, -63, 49, -42], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
+  jpunch:   { act: [3, 16], box: [11, -59, 38, -34], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
+  jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
+  cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
+  ckick:    { dur: 28, act: [6, 12], box: [14, -14, 49, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
+  tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
+  uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const ATTACKING = ['punch', 'kick', 'cpunch', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
@@ -551,13 +704,13 @@ function poseOf(f) {
 
 function threatened(f, o) {
   const dist = Math.abs(o.x - f.x);
-  if (ATTACKING.includes(o.state) && dist < 90) return true;
+  if (ATTACKING.includes(o.state) && dist < 120) return true;
   if (o.fb && Math.sign(o.fb.vx) === Math.sign(f.x - o.fb.x) && Math.abs(o.fb.x - f.x) < 110) return true;
   return false;
 }
 
 function spawnFireball(f) {
-  f.fb = { owner: f, x: f.x + f.dir * 28, y: f.y - 40, vx: 3.3 * f.dir, dir: f.dir, t: 0, alive: true };
+  f.fb = { owner: f, x: f.x + f.dir * 40, y: f.y - 56, vx: 3.8 * f.dir, dir: f.dir, t: 0, alive: true };
   G.fbs.push(f.fb);
   sfx('fb');
 }
@@ -591,12 +744,12 @@ function updFighter(f, o) {
       if (take(c, 'p')) { setState(f, 'punch'); f.vx = 0; sfx('whoosh'); break; }
       if (take(c, 'k')) { setState(f, 'kick'); f.vx = 0; sfx('whoosh'); break; }
       if (take(c, 'j')) {
-        setState(f, 'jump'); f.vy = -6.3; f.air = true; f.airAtk = false;
-        f.vx = (fwd ? 1.9 : back ? -1.9 : 0) * f.dir; break;
+        setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false;
+        f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir; break;
       }
       if (back && threatened(f, o)) { f.vx = 0; if (f.state !== 'block') { setState(f, 'block'); f.bstun = 0; } break; }
-      if (fwd) { f.vx = 1.5 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
-      else if (back) { f.vx = -1.15 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      if (fwd) { f.vx = 1.8 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      else if (back) { f.vx = -1.4 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
@@ -608,7 +761,7 @@ function updFighter(f, o) {
       if (f.t >= 40) setState(f, 'idle');
       break;
     case 'uppercut':
-      if (f.t === 3) { f.vy = -7.3; f.vx = 1.3 * f.dir; f.air = true; sfx('upper'); }
+      if (f.t === 3) { f.vy = -8.6; f.vx = 1.6 * f.dir; f.air = true; sfx('upper'); }
       break;
     case 'jump':
       if (!f.airAtk && live) {
@@ -617,12 +770,12 @@ function updFighter(f, o) {
         else if (take(c, 's')) {
           // Coup de pied tournoyant aérien
           setState(f, 'tatsu'); f.airAtk = true;
-          f.vy = Math.min(f.vy, -2.6); f.vx = 2.3 * f.dir; sfx('upper');
+          f.vy = Math.min(f.vy, -1.5); f.vx = 2.7 * f.dir; sfx('upper');
         }
       }
       break;
     case 'tatsu':
-      f.vy -= GRAV * 0.55; // plane un peu pendant la rotation
+      f.vy -= GRAV * 0.45; // plane un peu pendant la rotation
       if (f.t % 8 === 4) sfx('whoosh');
       break;
     case 'land': if (f.t >= f.landT) setState(f, 'idle'); break;
@@ -648,7 +801,7 @@ function updFighter(f, o) {
   } else {
     f.x += f.vx;
   }
-  f.x = Math.max(14, Math.min(W - 14, f.x));
+  f.x = Math.max(18, Math.min(W - 18, f.x));
 
   // Barre de vie « traînante »
   if (f.lag > f.hp) { if (f.lagT > 0) f.lagT--; else f.lag = Math.max(f.hp, f.lag - .6); }
@@ -656,10 +809,10 @@ function updFighter(f, o) {
 
 function hurtbox(f) {
   if (f.invuln > 0 || ['fall', 'down', 'getup'].includes(f.state)) return null;
-  if (f.air) return [f.x - 9, f.y - 58, f.x + 9, f.y - 12];
-  if (f.state === 'land' || f.state === 'uppercut') return [f.x - 10, f.y - 48, f.x + 10, f.y];
-  if (['crouch', 'cblock', 'cpunch', 'ckick'].includes(f.state)) return [f.x - 11, f.y - 40, f.x + 11, f.y];
-  return [f.x - 10, f.y - 60, f.x + 10, f.y];
+  if (f.air) return [f.x - 13, f.y - 81, f.x + 13, f.y - 17];
+  if (f.state === 'land' || f.state === 'uppercut') return [f.x - 14, f.y - 67, f.x + 14, f.y];
+  if (['crouch', 'cblock', 'cpunch', 'ckick'].includes(f.state)) return [f.x - 15, f.y - 56, f.x + 15, f.y];
+  return [f.x - 14, f.y - 84, f.x + 14, f.y];
 }
 function atkBox(f) {
   const a = ATK[f.state];
@@ -692,7 +845,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   def.hp = Math.max(0, def.hp - data.dmg); def.lagT = 32;
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
-    setState(def, 'fall'); def.air = true; def.vy = -4.2; def.vx = away * 2.1;
+    setState(def, 'fall'); def.air = true; def.vy = -4.8; def.vx = away * 2.3;
     if (def.fb && def.state !== 'special') {}
   } else {
     setState(def, 'hit'); def.stun = data.stun; def.vx = away * data.push;
@@ -718,8 +871,8 @@ function aiInput(f, o) {
   if (!G.fighting) return held;
   const neutral = NEUTRAL.includes(f.state);
   if (f.state === 'jump' && !f.airAtk && !a.press) {
-    if (dist < 95 && f.vy > -3 && Math.random() < .06) press(a, 's');
-    else if (dist < 50 && Math.random() < .12) press(a, 'k');
+    if (dist < 120 && f.vy > -3 && Math.random() < .06) press(a, 's');
+    else if (dist < 70 && Math.random() < .12) press(a, 'k');
   }
   const fb = o.fb;
 
@@ -731,9 +884,9 @@ function aiInput(f, o) {
     else if (!f.fb) press(a, 's');
   }
   if (!fb) a.reacted = false;
-  if (neutral && o.air && dist < 58 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
-  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 70 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
-  if (neutral && o.state === 'ckick' && o.t < 6 && dist < 70 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
+  if (neutral && o.air && dist < 80 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
+  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
+  if (neutral && o.state === 'ckick' && o.t < 6 && dist < 95 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
   if (neutral && o.state === 'tatsu' && dist < 110 && Math.random() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
 
   if (--a.cd <= 0 && neutral && !a.press) {
@@ -743,7 +896,7 @@ function aiInput(f, o) {
       if (r < .35 && !f.fb) press(a, 's');
       else if (r < .85) { a.hold = { [fwd]: true }; a.holdT = 20 + (Math.random() * 20 | 0); }
       else { press(a, 'j'); a.hold = { [fwd]: true }; a.holdT = 6; }
-    } else if (dist > 55) {
+    } else if (dist > 72) {
       if (r < .2 && !f.fb) press(a, 's');
       else if (r < .6) { a.hold = { [fwd]: true }; a.holdT = 15; }
       else if (r < .72) { press(a, 'j'); a.hold = { [fwd]: true }; a.holdT = 6; }
@@ -765,14 +918,14 @@ function aiInput(f, o) {
 
 /* ---------------- Déroulé des rounds ---------------- */
 function startMatch(pick) {
-  G.f = [makeFighter(DEFS[pick], 0, CX - 72, 1, false), makeFighter(DEFS[1 - pick], 1, CX + 72, -1, true)];
+  G.f = [makeFighter(DEFS[pick], 0, CX - 80, 1, false), makeFighter(DEFS[1 - pick], 1, CX + 80, -1, true)];
   G.f[0].ctl = pctl;
   G.round = 1;
   startRound();
 }
 function startRound() {
   const [a, b] = G.f;
-  [[a, CX - 72, 1], [b, CX + 72, -1]].forEach(([f, x, d]) => {
+  [[a, CX - 80, 1], [b, CX + 80, -1]].forEach(([f, x, d]) => {
     Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
@@ -872,15 +1025,15 @@ function stepFight() {
   }
 
   // Séparation des corps
-  if (Math.abs(a.y - b.y) < 40 && !['down'].includes(a.state) && !['down'].includes(b.state)) {
-    const dx = b.x - a.x, minD = 22;
+  if (Math.abs(a.y - b.y) < 56 && !['down'].includes(a.state) && !['down'].includes(b.state)) {
+    const dx = b.x - a.x, minD = 30;
     if (Math.abs(dx) < minD) {
       const push = (minD - Math.abs(dx)) / 2, s = dx === 0 ? (a.dir > 0 ? 1 : -1) : Math.sign(dx);
       a.x -= push * s; b.x += push * s;
-      if (a.x < 14) { b.x += 14 - a.x; a.x = 14; }
-      if (b.x < 14) { a.x += 14 - b.x; b.x = 14; }
-      if (a.x > W - 14) { b.x -= a.x - (W - 14); a.x = W - 14; }
-      if (b.x > W - 14) { a.x -= b.x - (W - 14); b.x = W - 14; }
+      if (a.x < 18) { b.x += 18 - a.x; a.x = 18; }
+      if (b.x < 18) { a.x += 18 - b.x; b.x = 18; }
+      if (a.x > W - 18) { b.x -= a.x - (W - 18); a.x = W - 18; }
+      if (b.x > W - 18) { a.x -= b.x - (W - 18); b.x = W - 18; }
     }
   }
 
@@ -1010,7 +1163,7 @@ function drawTitle() {
   // Combattants
   const fa = { def: DEFS[0], dir: 1, state: 'idle', id: 0, flash: 0, t: 0, x: 0, y: 0 };
   const fb = { def: DEFS[1], dir: -1, state: 'idle', id: 1, flash: 0, t: 0, x: 0, y: 0 };
-  drawFighter(fa, CX - 122, 190); drawFighter(fb, CX + 122, 190);
+  drawFighter(fa, CX - 160, 196); drawFighter(fb, CX + 160, 196);
   if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'APPUIE SUR A' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
   if (!isTouch) {
     text('FLÈCHES : DÉPLACER   BAS : S\'ACCROUPIR', W / 2, 144, 8, '#d8c8a8', 'center');
@@ -1034,8 +1187,8 @@ function drawSelect() {
     R(x + 3, 43, 84, 134, '#1a1020');
     R(x + 3, 43, 84, 134, sel ? 'rgba(80,40,120,.6)' : 'rgba(30,20,40,.6)');
     ctx.save();
-    ctx.translate(x + 45, 168);
-    ctx.scale(2, 2);
+    ctx.translate(x + 45, 174);
+    ctx.scale(1.35, 1.35);
     const f = { def: DEFS[i], dir: i === 0 ? 1 : -1, state: sel ? 'idle' : 'idle', id: i, flash: 0, t: 0 };
     drawFighter(f, 0, 0);
     ctx.restore();
