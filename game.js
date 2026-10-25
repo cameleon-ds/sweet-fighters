@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v11';
+const VERSION = 'v12';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -387,7 +387,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = dir < 0;
+  const backView = false;   // vue de dos 3/4 désactivée pour l'instant (design cohérent)
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
@@ -490,16 +490,10 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(sh, fwd, -5.5), add(sh, fwd, -2.5), add(at(.6), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6)], top[1]);
     sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
     if (tshirt) {
-      // pectoraux (reflet + ligne d'ombre dessous) et abdos sous le t-shirt moulant
-      sPoly([add(sh, fwd, -3), add(sh, fwd, 5), add(at(.3), fwd, 5.5), add(at(.32), fwd, -3)], top[3]);
-      for (let k = -3; k <= 5; k++) { const q = add(at(.36 + (k === 1 ? -.04 : 0)), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
-      const mid = add(at(.2), fwd, 1); sR(mid[0], mid[1], 1, 3, top[1]);
-      [.52, .66, .8].forEach(t => {
-        const q1 = add(at(t), fwd, -1), q2 = add(at(t), fwd, 3);
-        sR(q1[0], q1[1], 2, 1, top[1]); sR(q2[0], q2[1], 2, 1, top[1]);
-        sR(q1[0], q1[1] - 1, 2, 1, top[3]); sR(q2[0], q2[1] - 1, 2, 1, top[3]);
-      });
-      const ln = add(at(.55), fwd, 1); sR(ln[0], ln[1], 1, 6, top[1]);
+      // t-shirt moulant : ombre sous les pectoraux, ligne centrale des abdos
+      for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
+      for (let t = .48; t <= .85; t += .1) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, top[1]); }
+      const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0], a1[1], 2, 1, top[1]); sR(a2[0], a2[1], 2, 1, top[1]);
     } else {
       // veste ouverte en V : torse nu visible
       sPoly([add(sh, fwd, -1), add(sh, fwd, 4.5), add(at(.55), fwd, 1.5)], sk[2]);
@@ -509,8 +503,20 @@ function drawFighter(f, x = f.x, y = f.y) {
       for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
     }
   }
-  // Cou (nuque en vue de dos)
-  limbT([n[0] + dir * .5, n[1] + 1], [h[0] - dir * .5, h[1] + 3], 4, 4, 0, backView ? dim(sk) : sk);
+  // Cou court et large
+  limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], 5, 5, 0, sk);
+  if (tshirt && !backView) {
+    // Col en V ouvert : haut des pectoraux visible
+    const c1 = add(sh, fwd, -3), c2 = add(sh, fwd, 5), cb = add(at(.34), fwd, 1);
+    sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);   // bord du col
+    sPoly([c1, c2, cb], sk[2]);                                            // peau
+    sPoly([add(c1, fwd, .5), add(sh, fwd, .5), add(at(.18), fwd, .5)], sk[3]);   // reflet pectoral gauche
+    sPoly([add(sh, fwd, 2), add(c2, fwd, -.8), add(at(.16), fwd, 2.2)], sk[3]);  // reflet pectoral droit
+    for (let t = .05; t <= .3; t += .06) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, sk[1]); }  // sillon
+    const pl = add(at(.22), fwd, -1); sR(pl[0], pl[1], 2, 1, sk[1]);
+    const pr = add(at(.22), fwd, 2.5); sR(pr[0], pr[1], 2, 1, sk[1]);
+  }
+
 
   // ---- Jambe proche ----
   leg(bk, bf, true);    // jambe arrière au premier plan, côté caméra
@@ -540,7 +546,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   // ---- Tête ----
   const map = backView ? d.headBack : d.head, hp = d.hair, bp = d.bandP || [];
   const pal = { a: hp.a, h: hp.h, H: hp.H, L: hp.L, b: bp[1], B: bp[2], n: bp[3],
-                e: sk[0], S: sk[1], s: sk[2], l: sk[3], k: '#120a06', m: sk[0] };
+                e: sk[0], S: sk[1], s: sk[2], l: sk[3], k: '#120a06', m: sk[2] };
   const hx = Math.round(h[0]), hy = Math.round(h[1]) - 7;
   for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
     const ch = map[r][c]; if (ch === '.') continue;
