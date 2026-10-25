@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v22';
+const VERSION = 'v24';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -408,7 +408,8 @@ function footP(q, dir, skin) {
 
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
-  const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
+  const spinning = (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54);
+  const dir = spinning && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
   const backView = f.state === 'rupper';   // l'uppercut accroupi est vu de dos, bras proche levé
   sx.clearRect(0, 0, SPR.width, SPR.height);
@@ -742,6 +743,12 @@ let tap = null; // dernier tap en coordonnées canvas
   const bend = e => { owners.delete(e.pointerId); refresh(); };
   bz.addEventListener('pointerup', bend);
   bz.addEventListener('pointercancel', bend);
+  const sb = document.getElementById('startBtn');
+  if (sb) {
+    sb.addEventListener('pointerdown', e => { latched.add('start'); sb.classList.add('on'); e.preventDefault(); e.stopPropagation(); });
+    const off = () => sb.classList.remove('on');
+    sb.addEventListener('pointerup', off); sb.addEventListener('pointercancel', off); sb.addEventListener('pointerleave', off);
+  }
 })();
 
 // Bouton « Continuer » de l'écran portrait (rotation verrouillée)
@@ -772,7 +779,7 @@ document.addEventListener('touchmove', e => e.preventDefault(), { passive: false
 // Stick tactile : très petite zone morte, la direction est choisie selon l'angle (8 directions)
 function stickDirs() {
   const x = touch.x, y = touch.y, m = Math.hypot(x, y);
-  if (m < 0.12) return { l: false, r: false, u: false, d: false };
+  if (m < 0.15) return { l: false, r: false, u: false, d: false };
   const ax = Math.abs(x) / m, ay = Math.abs(y) / m;   // cos de l'angle avec chaque axe
   const H = ax > 0.38, V = ay > 0.38;                // secteurs de 67,5° : diagonales comprises
   return { l: H && x < 0, r: H && x > 0, u: V && y < 0, d: V && y > 0 };
@@ -800,8 +807,8 @@ const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
 function ctlUpdate(c, held) {
   c.prev = c.held; c.held = held;
   for (const b of [...BTNS, 'start', 'back', 'l', 'r', 'u', 'd']) {
-    if (held[b] && !c.prev[b]) c.buf[b] = 8;
-    else if (c.buf[b] > 0) c.buf[b]--;
+    if (held[b] && !c.prev[b]) { c.buf[b] = (b === 'p' || b === 'k' || b === 's') ? 14 : 8; c.ord = c.ord || {}; c.n = (c.n || 0) + 1; c.ord[b] = c.n; }
+    else if (c.buf[b] > 0 && !(G.freeze > 0)) c.buf[b]--;   // le tampon ne s'use pas pendant l'arrêt sur impact
   }
 }
 function take(c, b) { if (c.buf[b] > 0) { c.buf[b] = 0; return true; } return false; }
@@ -819,13 +826,16 @@ const ATK = {
   jpunch:   { act: [3, 16], box: [11, -59, 38, -34], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
-  ckick:    { dur: 28, act: [6, 12], box: [14, -14, 49, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
+  ckick:    { dur: 14, act: [3, 7],  box: [14, -14, 49, 0],   dmg: 4,  stun: 16, low: true, bstun: 10, push: 0.5, sfx: 'hit' },
   rupper:   { dur: 30, act: [4, 13], box: [8, -110, 50, -40], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
+  flame:    { dur: 26, act: [6, 12], box: [14, -80, 54, -48], dmg: 10, stun: 18, bstun: 12, push: 3.0, sfx: 'heavy' },
+  gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
-const ATTACKING = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
+const ATTACKING = ['punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -857,6 +867,8 @@ function poseOf(f) {
     case 'cpunch': return f.t < 3 || f.t >= 8 ? 'crouch' : 'cpunch';
     case 'ckick': return f.t < 6 || f.t >= 12 ? 'crouch' : 'ckick';
     case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
+    case 'gtatsu': return f.t >= 6 && f.t < 54 ? 'tatsu' : 'kick0';
+    case 'flame': return f.t < 5 ? 'special0' : 'special1';
     case 'jump': return f.roll && f.t > 3 ? 'tuck' : 'jump';
     case 'rupper': return f.t < 4 ? 'rup0' : f.t < 9 ? 'rup1' : f.t < 17 ? 'rup2' : 'rup3';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
@@ -889,8 +901,8 @@ function threatened(f, o) {
   return false;
 }
 
-function spawnFireball(f) {
-  f.fb = { owner: f, x: f.x + f.dir * 40, y: f.y - 56, vx: 3.8 * f.dir, dir: f.dir, t: 0, alive: true };
+function spawnFireball(f, big) {
+  f.fb = { owner: f, x: f.x + f.dir * (big ? 52 : 40), y: f.y - 56, vx: 3.8 * f.dir, dir: f.dir, t: 0, alive: true, big: !!big, sc: big ? 2 : 1 };
   G.fbs.push(f.fb);
   sfx('fb');
 }
@@ -909,9 +921,12 @@ function updFighter(f, o) {
       if ((f.state === 'block' || f.state === 'cblock') && f.bstun > 0) { f.bstun--; f.vx *= .8; break; }
       face(f, o);
       if (!live) { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); break; }
+      // 4e coup d'un enchaînement Y Y B / B B Y : A = frappe enflammée
+      if (comboReady(f, o) && take(c, 's')) { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); break; }
       if (take(c, 's')) {
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 9; break; }
-        if (!f.fb) { setState(f, 'special'); f.vx = 0; break; }
+        if (back) { setState(f, 'gtatsu'); f.vx = 0; f.spinN = 0; sfx('upper'); break; }   // arrière + A : tornade au sol x4
+        if (!f.fb) { setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
       }
       // Prise après un contre réussi : Y renverse, B projette de l'autre côté
       if (f.counterT > 0 && o.slowT > 0 && Math.abs(o.x - f.x) < 80) {
@@ -939,8 +954,8 @@ function updFighter(f, o) {
         break;
       }
       // avant + Y : coup de poing du bras proche, plus long · avant + B : coup de pied de l'autre jambe, plus long
-      if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); break; }
-      if (take(c, 'k')) { setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); break; }
+      if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'p'); break; }
+      if (take(c, 'k')) { setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'k'); break; }
       if (back && threatened(f, o)) { f.vx = 0; if (f.state !== 'block') { setState(f, 'block'); f.bstun = 0; } break; }
       if (fwd) { f.vx = 1.9 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else if (back) { f.vx = -1.45 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
@@ -949,11 +964,34 @@ function updFighter(f, o) {
     }
     case 'fpunch': if (f.t < 7) f.vx = 1.4 * f.dir; else f.vx = 0;
     // fallthrough
-    case 'punch': case 'kick': case 'fkick': case 'cpunch': case 'ckick': case 'rupper':
+    case 'ckick':
+      // enchaînement : on peut relancer un coup de pied bas dès la fin de la frappe
+      if (f.t >= 7 && h.d && take(c, 'k')) { setState(f, 'ckick'); sfx('whoosh'); break; }
+    // fallthrough
+    case 'punch': case 'kick': case 'fkick': case 'cpunch': case 'rupper': case 'flame':
+      // combo : dès que le coup touche, on peut enchaîner immédiatement le suivant
+      if (f.hasHit && live && ['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && tryCombo(f, o, c, fwd)) break;
       if (f.t >= ATK[f.state].dur) setState(f, h.d ? 'crouch' : 'idle');
       break;
+    case 'gtatsu': {
+      const tt = f.t - 6;
+      f.vx = tt >= 0 && tt < 48 ? 2.0 * f.dir : 0;
+      if (tt >= 0 && tt < 48 && tt % 12 === 0) { f.hasHit = false; sfx('whoosh'); }   // 4 tours = 4 coups
+      if (f.t >= 62) setState(f, 'idle');
+      break;
+    }
     case 'special':
-      if (f.t === 12) spawnFireball(f);
+      if (!f.fired) {
+        if (h.s && f.t >= 6 && live) {
+          // A maintenu : position de charge
+          f.chargeT = (f.chargeT || 0) + 1; f.t = Math.min(f.t, 10);
+          if (f.chargeT === 180) {   // 3 secondes : charge maximale
+            f.charged = true; G.darkT = 60; G.flashT = 12;
+            G.boltX = f.x - f.dir * 14; G.boltY = f.y - 44; sfx('parry');
+            addPopup(f.x, f.y - 100, 'MAX!', '#ffd23a');
+          }
+        } else if (f.t >= 12) { spawnFireball(f, f.charged); f.fired = true; }
+      }
       if (f.t >= 40) setState(f, 'idle');
       break;
     case 'uppercut':
@@ -975,7 +1013,10 @@ function updFighter(f, o) {
       if (f.t % 8 === 4) sfx('whoosh');
       break;
     case 'land': if (f.t >= f.landT) setState(f, 'idle'); break;
-    case 'hit': f.vx *= .82; if (f.t >= f.stun) setState(f, 'idle'); break;
+    case 'hit':
+      // on peut parer le tour suivant d'une tornade même après avoir encaissé le premier
+      if (o.state === 'gtatsu' && take(c, 'x')) { setState(f, 'parry'); f.vx = 0; break; }
+      f.vx *= .82; if (f.t >= f.stun) setState(f, 'idle'); break;
     case 'down':
       f.vx *= .8;
       if (!f.ko && f.t >= 40) { setState(f, 'getup'); f.invuln = 22; }
@@ -1036,12 +1077,31 @@ function isBlocking(d, fromX, data) {
 // Prises après un contre :
 //  'toss' (B) : on attrape, roulade arrière, l'adversaire est propulsé à l'opposé de l'écran
 //  'slam' (Y) : l'adversaire passe par-dessus nous en tournant et retombe juste de l'autre côté
+const FINISHERS = ['ppkk', 'kkpp', 'ppks', 'kkps'];
+function comboReady(f, o) {
+  return o.state === 'hit' && G.frame - (f.comboLast || -999) < 50 && (f.combo === 'ppk' || f.combo === 'kkp');
+}
+// Le 4e coup d'un enchaînement est en feu (bleu Kaito, rouge Sora)
+function markFire(f, o, kind) {
+  const live = o.state === 'hit' && G.frame - (f.comboLast || -999) < 50;
+  f.fireState = live && FINISHERS.includes((f.combo || '') + kind) ? f.state : null;
+  if (f.fireState) sfx('fb');
+}
+function tryCombo(f, o, c, fwd) {
+  // le bouton appuyé en premier passe en premier
+  const order = ['s', 'p', 'k'].filter(b => c.buf[b] > 0 && (b !== 's' || comboReady(f, o))).sort((x, y) => (c.ord || {})[x] - (c.ord || {})[y]);
+  const b = order[0]; if (!b) return false;
+  take(c, b);
+  if (b === 's') { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); return true; }
+  if (b === 'p') { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'p'); return true; }
+  setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'k'); return true;
+}
 function doThrow(f, o, type) {
   setState(f, 'throw'); f.throwType = type; f.vx = 0; f.vy = 0; f.counterT = 0; f.victim = o;
   f.gx = f.x; f.gy = f.y;
   setState(o, 'held'); o.air = false; o.vx = o.vy = 0; o.slowT = 0; o.flash = 3; o.invuln = 0;
   G.freeze = 6; sfx('whoosh');
-  addPopup(f.x, f.y - 100, 'PRISE !', '#ff7a3a');
+  addPopup(f.x, f.y - 100, 'THROW!', '#ff7a3a');
 }
 function updThrow(f) {
   const o = f.victim; if (!o) return;
@@ -1076,6 +1136,12 @@ function updThrow(f) {
 function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 
 function applyHit(att, def, data, sx, sy, fromX, projectile) {
+  // coups de pied bas enchaînés : le 3e qui touche d'affilée fait tomber l'adversaire
+  if (att.state === 'ckick' && !projectile && !(def.state === 'parry' && def.t <= 12) && !isBlocking(def, fromX, data)) {
+    att.ckN = G.frame - (att.ckLast || -999) < 40 ? (att.ckN || 0) + 1 : 1;
+    att.ckLast = G.frame;
+    if (att.ckN >= 3) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.ckN = 0; }
+  }
   // Contre réussi : l'attaquant est bloqué une demi-seconde
   if (def.state === 'parry' && def.t <= 12) {
     G.freeze = 10; addSpark(sx, sy, 'parry'); sfx('parry');
@@ -1084,7 +1150,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     att.hasHit = true; att.slowT = 60;
     setState(def, 'idle'); def.counterT = 60; def.vx = 0;
     G.flashT = 12; G.darkT = 60; G.boltX = sx; G.boltY = sy;
-    addPopup(def.x, def.y - 100, 'CONTRE !', '#7af0ff');
+    addPopup(def.x, def.y - 100, 'COUNTER!', '#7af0ff');
     return;
   }
   const away = fromX < def.x ? 1 : -1;
@@ -1095,17 +1161,37 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     G.freeze = 5; addSpark(sx, sy, 'block'); sfx('block');
     return;
   }
+  // enchaînements : on mémorise la suite des coups qui touchent pendant que l'adversaire est sonné
+  let finisher = false;
+  const kind = { punch: 'p', fpunch: 'p', kick: 'k', fkick: 'k', flame: 's' }[att.state];
+  if (kind && !projectile) {
+    att.combo = (def.state === 'hit' && G.frame - (att.comboLast || -999) < 50 ? (att.combo || '') : '') + kind;
+    att.comboLast = G.frame;
+    if (FINISHERS.includes(att.combo)) { finisher = true; att.combo = ''; data = Object.assign({}, data, { knock: true, dmg: data.dmg + 8 }); }
+    else if (att.combo.length >= 4) att.combo = att.combo.slice(-3);
+  }
+  if (att.state === 'gtatsu' && !projectile) {
+    att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
+    if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
+  }
   def.hp = Math.max(0, def.hp - data.dmg); def.lagT = 32;
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
     setState(def, 'fall'); def.air = true; def.vy = -4.8; def.vx = away * 2.3;
     if (def.fb && def.state !== 'special') {}
   } else {
-    setState(def, 'hit'); def.stun = data.stun; def.vx = away * data.push;
+    setState(def, 'hit'); def.stun = data.stun; def.vx = away * data.push * (att.combo && att.combo.length >= 1 && !projectile ? .45 : 1);
   }
   G.freeze = 8; G.shake = 4;
   addSpark(sx, sy, projectile ? 'fb' : 'hit', projectile ? att.def.fb : null);
   sfx(data.sfx);
+  if (finisher) {
+    // enchaînement réussi : l'adversaire s'enflamme et tombe au ralenti
+    def.burn = 120; def.burnPal = att.def.fb; def.slowT = 60;
+    G.darkT = 60; G.flashT = 12; G.boltX = sx; G.boltY = sy; G.freeze = 10; G.shake = 7;
+    addPopup(def.x, def.y - 100, 'COMBO FINISH!', '#ffd23a');
+    sfx('fb');
+  }
 }
 
 function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
@@ -1141,6 +1227,8 @@ function aiInput(f, o) {
   if (neutral && o.air && dist < 80 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 3 && dist < 95 && Math.random() < .07) press(a, 'x');
+  if (['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && f.hasHit && !a.press && Math.random() < .35) press(a, comboReady(f, o) && Math.random() < .5 ? 's' : (Math.random() < .5 ? 'p' : 'k'));
+  if (neutral && dist > 60 && dist < 130 && !a.press && Math.random() < .012) { a.hold = { [back]: true }; a.holdT = 3; press(a, 's'); }
   if (neutral && f.counterT > 0 && o.slowT > 0 && dist < 80 && !a.press) press(a, Math.random() < .5 ? 'p' : 'k');
   if (neutral && o.state === 'ckick' && o.t < 6 && dist < 95 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
   if (neutral && o.state === 'tatsu' && dist < 110 && Math.random() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
@@ -1182,7 +1270,7 @@ function startMatch(pick) {
 function startRound() {
   const [a, b] = G.f;
   [[a, CX - 80, 1], [b, CX + 80, -1]].forEach(([f, x, d]) => {
-    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0 });
+    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '' });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
@@ -1197,19 +1285,58 @@ function endRound(winner) {
 }
 
 /* ---------------- Boucle principale ---------------- */
+function goTitle() { G.scene = 'title'; G.t = 100; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
+function stepMoves() {
+  if (edge(pctl, 'l')) { G.mpage = ((G.mpage || 0) + MOVES.length - 1) % MOVES.length; sfx('beep'); }
+  if (edge(pctl, 'r')) { G.mpage = ((G.mpage || 0) + 1) % MOVES.length; sfx('beep'); }
+  if (backPress(pctl) || edge(pctl, 'start')) { G.showMoves = false; sfx('beep'); }
+}
+function stepPause() {
+  if (G.showMoves) { stepMoves(); return; }
+  if (edge(pctl, 'u')) { G.pcur = (G.pcur + 2) % 3; sfx('beep'); }
+  if (edge(pctl, 'd')) { G.pcur = (G.pcur + 1) % 3; sfx('beep'); }
+  if (backPress(pctl)) { G.paused = false; return; }
+  if (okPress(pctl)) {
+    sfx('select');
+    if (G.pcur === 0) G.paused = false;
+    else if (G.pcur === 1) { G.showMoves = true; G.mpage = 0; }
+    else { G.paused = false; G.scene = 'select'; G.t = 0; }
+  }
+}
 function step() {
   G.frame++;
   ctlUpdate(pctl, readPlayer());
 
+  // Pause (bouton START) pendant le combat
+  if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
+    if (G.paused) { stepPause(); tap = null; return; }
+    if (edge(pctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; sfx('select'); tap = null; return; }
+  }
+
   switch (G.scene) {
-    case 'title':
-      if (okPress(pctl) || tap) { G.scene = 'select'; G.t = 0; sfx('select'); }
+    case 'title': {
+      G.t++;
+      if (G.showMoves) { stepMoves(); break; }
+      const any = BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap;
+      if (G.tstate !== 1) {
+        if (G.t > 25 && any) { G.tstate = 1; G.tcur = 0; sfx('select'); }
+      } else {
+        if (edge(pctl, 'u') || edge(pctl, 'd')) { G.tcur = 1 - (G.tcur || 0); sfx('beep'); }
+        if (tap) { if (tap.y > 150 && tap.y < 164) G.tcur = 0; else if (tap.y >= 164 && tap.y < 178) G.tcur = 1; else break; }
+        if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
+        else if (okPress(pctl) || tap) {
+          sfx('select');
+          if ((G.tcur || 0) === 0) { G.scene = 'select'; G.t = 0; }
+          else { G.showMoves = true; G.mpage = 0; }
+        }
+      }
       break;
+    }
     case 'select': {
       G.t++;
       if (pctl.buf.l === 8 || pctl.buf.r === 8) { G.pick = 1 - G.pick; sfx('beep'); }
       if (G.t > 10 && okPress(pctl)) { startMatch(G.pick); sfx('select'); }
-      else if (G.t > 10 && backPress(pctl)) { G.scene = 'title'; G.t = 0; sfx('beep'); }
+      else if (G.t > 10 && backPress(pctl)) { goTitle(); sfx('beep'); }
       break;
     }
     case 'intro': case 'fight': case 'ko': case 'timeup':
@@ -1218,7 +1345,7 @@ function step() {
     case 'over':
       G.t++;
       if (G.t > 60 && okPress(pctl)) { G.scene = 'select'; G.t = 0; sfx('select'); }
-      else if (G.t > 60 && backPress(pctl)) { G.scene = 'title'; G.t = 0; sfx('beep'); }
+      else if (G.t > 60 && backPress(pctl)) { goTitle(); sfx('beep'); }
       break;
   }
   tap = null;
@@ -1235,8 +1362,8 @@ function stepFight() {
   }
 
   // Entrées
-  if (a.cpu) ctlUpdate(a.ctl, aiInput(a, b));
-  if (b.cpu) ctlUpdate(b.ctl, aiInput(b, a));
+  if (a.cpu && !G.noAI) ctlUpdate(a.ctl, aiInput(a, b));
+  if (b.cpu && !G.noAI) ctlUpdate(b.ctl, aiInput(b, a));
 
   if (G.shake > 0) G.shake *= .8;
   if (G.shake < .3) G.shake = 0;
@@ -1250,6 +1377,7 @@ function stepFight() {
   });
   if (G.flashT > 0) G.flashT--;
   if (G.darkT > 0) G.darkT--;
+  [a, b].forEach(f => { if (f.burn > 0) f.burn--; });
 
   // Boules d'énergie
   for (const fb of G.fbs) {
@@ -1258,7 +1386,7 @@ function stepFight() {
   }
   for (let i = 0; i < G.fbs.length; i++) for (let j = i + 1; j < G.fbs.length; j++) {
     const p = G.fbs[i], q = G.fbs[j];
-    if (p.alive && q.alive && p.owner !== q.owner && Math.abs(p.x - q.x) < 14 && Math.abs(p.y - q.y) < 14) {
+    if (p.alive && q.alive && p.owner !== q.owner && Math.abs(p.x - q.x) < 14 * Math.max(p.sc, q.sc) && Math.abs(p.y - q.y) < 14 * Math.max(p.sc, q.sc)) {
       p.alive = q.alive = false;
       addSpark((p.x + q.x) / 2, p.y, 'fb', p.owner.def.fb); sfx('block');
     }
@@ -1267,9 +1395,9 @@ function stepFight() {
     if (!fb.alive) continue;
     const def = fb.owner === a ? b : a;
     const hb = hurtbox(def);
-    if (overlap([fb.x - 12, fb.y - 11, fb.x + 12, fb.y + 11], hb)) {
+    if (overlap([fb.x - 12 * fb.sc, fb.y - 11 * fb.sc, fb.x + 12 * fb.sc, fb.y + 11 * fb.sc], hb)) {
       fb.alive = false;
-      applyHit(fb.owner, def, FB_HIT, fb.x + fb.dir * 4, fb.y, fb.x - fb.vx * 10, true);
+      applyHit(fb.owner, def, fb.big ? FB_BIG : FB_HIT, fb.x + fb.dir * 4, fb.y, fb.x - fb.vx * 10, true);
     }
   }
   G.fbs = G.fbs.filter(fb => fb.alive);
@@ -1328,33 +1456,33 @@ function stepFight() {
 
 /* ---------------- Rendu ---------------- */
 function drawFireball(fb) {
-  const pal = fb.owner.def.fb, x = Math.round(fb.x), y = Math.round(fb.y), d = fb.dir, t = fb.t;
+  const pal = fb.owner.def.fb, x = Math.round(fb.x), y = Math.round(fb.y), d = fb.dir, t = fb.t, S = fb.sc || 1;
   const pulse = 1 + Math.sin(t * .5) * .08;
   // halo lumineux (mélange additif)
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const g = ctx.createRadialGradient(x, y, 2, x, y, 30 * pulse);
+  const g = ctx.createRadialGradient(x, y, 2, x, y, 30 * S * pulse);
   g.addColorStop(0, pal[1] + 'cc'); g.addColorStop(.35, pal[2] + '66'); g.addColorStop(1, pal[3] + '00');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 30 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 30 * S * pulse, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
   // traînée d'énergie
   for (let i = 5; i >= 1; i--) {
-    const wob = Math.sin(t * .6 + i) * 2;
-    disc(x - d * i * 6, y + wob, Math.max(2, 10 - i * 1.6) | 0, i > 3 ? pal[3] : pal[2]);
+    const wob = Math.sin(t * .6 + i) * 2 * S;
+    disc(x - d * i * 6 * S, y + wob, Math.max(2, (10 - i * 1.6) * S) | 0, i > 3 ? pal[3] : pal[2]);
   }
   // corps de la boule
-  disc(x, y, 12, pal[3]);
-  disc(x + d, y, 10, pal[2]);
-  disc(x + d * 2, y - 1, 7, pal[1]);
-  disc(x + d * 3, y - 2, 4, pal[0]);
-  R(x + d * 2 - 1, y - 6, 3, 2, pal[0]);
+  disc(x, y, 12 * S, pal[3]);
+  disc(x + d * S, y, 10 * S, pal[2]);
+  disc(x + d * 2 * S, y - S, 7 * S, pal[1]);
+  disc(x + d * 3 * S, y - 2 * S, 4 * S, pal[0]);
+  R(x + d * 2 * S - S, y - 6 * S, 3 * S, 2 * S, pal[0]);
   // étincelles qui tournent autour
-  for (let i = 0; i < 6; i++) {
-    const a = t * .35 + i * Math.PI / 3, r = 13 + (i % 2) * 3;
-    R(x + Math.cos(a) * r - 1, y + Math.sin(a) * r * .8 - 1, 2, 2, i % 2 ? pal[0] : pal[1]);
+  for (let i = 0; i < 6 + (S > 1 ? 4 : 0); i++) {
+    const a = t * .35 + i * Math.PI * 2 / (6 + (S > 1 ? 4 : 0)), r = (13 + (i % 2) * 3) * S;
+    R(x + Math.cos(a) * r - 1, y + Math.sin(a) * r * .8 - 1, 2 * S, 2 * S, i % 2 ? pal[0] : pal[1]);
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = pal[1] + '55'; ctx.beginPath(); ctx.arc(x + d * 2, y - 1, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = pal[1] + '55'; ctx.beginPath(); ctx.arc(x + d * 2 * S, y - S, 9 * S, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -1407,29 +1535,79 @@ function drawMedal(x, y) {
 
 function bigMsg(s, size, col, y = 84) { text(s, W / 2, y, size, col, 'center', '#3a0a04'); }
 
+// Flammes sur un combattant (enchaînement final) : couleur de l'attaquant
+function drawBurn(f) {
+  const pal = f.burnPal || f.def.fb, lying = f.state === 'fall' || f.state === 'down' || f.state === 'held';
+  const hgt = lying ? 34 : 84, wid = lying ? 30 : 14;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(f.x, f.y - hgt / 2, 2, f.x, f.y - hgt / 2, hgt * .8);
+  g.addColorStop(0, pal[2] + '88'); g.addColorStop(1, pal[3] + '00');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y - hgt / 2, hgt * .8, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  for (let i = 0; i < 16; i++) {
+    const life = ((G.frame * 1.6 + i * 7.3) % 40) / 40;           // 0 → 1 en montant
+    const x = f.x + Math.sin(i * 2.3 + G.frame * .25) * wid * (1 - life * .5);
+    const y = f.y - 4 - life * hgt;
+    const r = Math.max(1, Math.round(7 * (1 - life)));
+    disc(x, y, r, life < .5 ? pal[2] : pal[3]);
+    if (r > 2) disc(x, y + 1, r - 2, pal[1]);
+  }
+}
+// Frappe enflammée : boule de feu dans la main pendant la frappe
+function drawFlameHand(f) {
+  if (!f.fireState || f.state !== f.fireState) return;
+  const at = ATK[f.state]; if (!at || f.t > at.act[1] + 6) return;
+  const pal = f.def.fb, x = f.x + f.dir * at.box[2] * .85, y = f.y + (at.box[1] + at.box[3]) / 2;
+  const k = Math.max(.35, 1 - Math.abs(f.t - at.act[0]) / 10);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 1, x, y, 22 * k + 6);
+  g.addColorStop(0, pal[1] + 'ee'); g.addColorStop(1, pal[3] + '00');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 22 * k + 6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  for (let i = 0; i < 6; i++) {
+    const a = G.frame * .5 + i;
+    disc(x + Math.cos(a) * 5 - f.dir * i * 2, y + Math.sin(a) * 4 - i * 1.5, Math.max(1, 5 - i), i < 3 ? pal[2] : pal[3]);
+  }
+  disc(x, y, 4, pal[1]); disc(x, y, 2, pal[0]);
+}
+
 function drawFight() {
+  const [a, b] = G.f;
+  // Caméra : zoom de 100 % (distance de départ) à 120 % quand les combattants se rapprochent
+  const dist = Math.abs(a.x - b.x), D0 = 160, D1 = 50;
+  const zt = 1 + .2 * Math.max(0, Math.min(1, (D0 - dist) / (D0 - D1)));
+  G.zoom = (G.zoom || 1) + (zt - (G.zoom || 1)) * .08;
+  const z = G.zoom, vw = W / z, vh = H / z;
+  const left = Math.max(0, Math.min(W - vw, (a.x + b.x) / 2 - vw / 2)), top = H - vh;
+  ctx.save();
+  ctx.scale(z, z); ctx.translate(-left, -top);
   ctx.drawImage(BG, 0, 0);
   if (G.darkT > 0) {   // fond assombri pendant le ralenti
     const k = Math.min(1, G.darkT / 10, (60 - G.darkT) / 6 + .2);
-    R(0, 0, W, H, `rgba(6,4,18,${.62 * k})`);
+    R(-40, -40, W + 80, H + 80, `rgba(6,4,18,${.62 * k})`);
   }
-  const [a, b] = G.f;
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
   order.forEach(f => drawFighter(f));
+  G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); });
   G.fbs.forEach(drawFireball);
-  G.sparks.forEach(drawSpark);
-  // étoiles au-dessus d'un combattant sonné
+  // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
-    if (f.state !== 'stunned') return;
-    for (let i = 0; i < 3; i++) {
-      const a = G.frame * .15 + i * 2.1;
-      R(f.x + Math.cos(a) * 12 - 1, f.y - 92 + Math.sin(a) * 3, 3, 3, i % 2 ? '#ffe14a' : '#ffffff');
-    }
+    if (f.state !== 'special' || f.fired || !f.chargeT) return;
+    const pal = f.def.fb, k = Math.min(1, f.chargeT / 180);
+    const cx = f.x - f.dir * 14, cy = f.y - 44;
+    const r = 3 + k * 7 + (f.charged ? Math.sin(G.frame * .6) * 2 : 0);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.4);
+    g.addColorStop(0, pal[1] + 'dd'); g.addColorStop(1, pal[3] + '00');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    disc(cx, cy, r | 0, pal[2]); disc(cx, cy, Math.max(1, r * .55) | 0, pal[0]);
   });
+  G.sparks.forEach(drawSpark);
   if (G.flashT > 0) {
-    // éclat en étoile qui jaillit du point de contre : grandit très vite en tournant puis s'efface
-    const k = 1 - G.flashT / 12;                       // 0 → 1
+    // éclat en étoile qui jaillit du point d'impact : grandit très vite en tournant puis s'efface
+    const k = 1 - G.flashT / 12;
     const rad = 10 + 70 * Math.sqrt(k), alpha = Math.min(1, G.flashT / 6);
     const rot = k * 1.6 + .2;
     ctx.save();
@@ -1439,7 +1617,7 @@ function drawFight() {
     g.addColorStop(0, '#ffffff'); g.addColorStop(.3, '#bff8ff'); g.addColorStop(1, 'rgba(60,200,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(G.boltX, G.boltY, rad * .6, 0, Math.PI * 2); ctx.fill();
     ctx.translate(G.boltX, G.boltY); ctx.rotate(rot);
-    for (let i = 0; i < 8; i++) {                        // 8 branches, alternance longues/courtes
+    for (let i = 0; i < 8; i++) {
       const L = i % 2 ? rad * .55 : rad, w = i % 2 ? 3 : 5;
       ctx.fillStyle = '#7af0ff';
       ctx.beginPath(); ctx.moveTo(0, -w); ctx.lineTo(L, 0); ctx.lineTo(0, w); ctx.closePath(); ctx.fill();
@@ -1448,61 +1626,101 @@ function drawFight() {
       ctx.rotate(Math.PI / 4);
     }
     ctx.restore();
-    if (G.flashT > 9) R(0, 0, W, H, 'rgba(220,245,255,.25)');   // très bref flash d'écran
   }
   G.popups.forEach(pp => { if ((pp.t >> 2) % 4 !== 3 || pp.t < 30) text(pp.txt, pp.x, pp.y - pp.t * .4, 8, pp.col, 'center'); });
+  ctx.restore();
+  if (G.flashT > 9) R(0, 0, W, H, 'rgba(220,245,255,.25)');   // très bref flash d'écran
   drawHUD();
 
   if (G.scene === 'intro') {
     if (G.t < 70) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
-    else bigMsg('FIGHT !', 24, '#ff4a2a');
+    else bigMsg('FIGHT!', 24, '#ff4a2a');
   } else if (G.scene === 'ko') {
     if (G.t < 120) { if ((G.t >> 2) % 2 || G.t > 40) bigMsg('K.O.', 32, '#ff3a2a', 76); }
-    else bigMsg(G.winner ? G.winner.def.name + ' GAGNE !' : 'DOUBLE K.O.', 16, '#ffd23a');
+    else bigMsg(G.winner ? G.winner.def.name + ' WINS!' : 'DOUBLE K.O.', 16, '#ffd23a');
   } else if (G.scene === 'timeup') {
-    if (G.t < 120) bigMsg('TEMPS ÉCOULÉ', 16, '#ffd23a');
-    else bigMsg(G.winner ? G.winner.def.name + ' GAGNE !' : 'MATCH NUL', 16, '#ffd23a');
+    if (G.t < 120) bigMsg('TIME OVER', 16, '#ffd23a');
+    else bigMsg(G.winner ? G.winner.def.name + ' WINS!' : 'DRAW', 16, '#ffd23a');
   }
 }
 
+// ---------- Liste des coups (3 pages) ----------
+const MOVES = [
+  { title: 'BASICS', lines: [
+    ['Y', 'PUNCH'], ['B', 'KICK'], ['STICK UP', 'JUMP (FWD/BACK = ROLL)'], ['STICK DOWN', 'CROUCH'],
+    ['BACK', 'BLOCK  -  DOWN+BACK: LOW BLOCK'], ['FWD + Y', 'LONG PUNCH'], ['FWD + B', 'LONG KICK'],
+    ['DOWN + Y', 'RISING UPPERCUT'], ['DOWN + B x3', 'LOW KICKS (3RD KNOCKS DOWN)'] ] },
+  { title: 'SPECIALS & COUNTER', lines: [
+    ['A', 'FIREBALL'], ['HOLD A 3S', 'MAX FIREBALL (2X SIZE)'], ['UP + A', 'UPPERCUT'],
+    ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
+    ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'] ] },
+  { title: 'COMBOS', lines: [
+    ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
+    ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
+];
+function drawMoves() {
+  R(0, 0, W, H, 'rgba(8,4,16,.88)');
+  const pg = MOVES[G.mpage || 0];
+  text('MOVE LIST', CX, 10, 8, '#ff7a3a', 'center');
+  text(pg.title + '  ' + ((G.mpage || 0) + 1) + '/' + MOVES.length, CX, 24, 8, '#ffd23a', 'center');
+  const x0 = Math.max(16, CX - 168);
+  pg.lines.forEach(([k, v], i) => {
+    const y = 44 + i * 15;
+    if (k) text(k, x0, y, 8, '#7af0ff', 'left');
+    text(v, k ? x0 + 112 : CX, y, 8, '#ffffff', k ? 'left' : 'center');
+  });
+  if (!isTouch) text('PC: J=Y  K=B  L=A  SPACE=X  ENTER=START', CX, 182, 8, '#9a8a70', 'center');
+  text(isTouch ? '< >: PAGE    B: BACK' : '< >: PAGE    ESC: BACK', CX, 198, 8, '#d8c8a8', 'center');
+}
+function drawPause() {
+  R(0, 0, W, H, 'rgba(0,0,0,.55)');
+  if (G.showMoves) { drawMoves(); return; }
+  R(CX - 90, 50, 180, 104, 'rgba(20,10,30,.9)');
+  R(CX - 90, 50, 180, 2, '#ffd23a'); R(CX - 90, 152, 180, 2, '#ffd23a');
+  text('PAUSE', CX, 62, 16, '#ffd23a', 'center');
+  ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT'].forEach((t, i) => {
+    const sel = G.pcur === i;
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 92 + i * 18, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
+  });
+}
+
+const LOGO = new Image();
+LOGO.src = 'logo.png?v=24';
 function drawTitle() {
   ctx.drawImage(BG, 0, 0);
-  R(0, 0, W, H, 'rgba(10,4,16,.55)');
-  // Logo
-  ctx.font = '24px "Press Start 2P", monospace';
-  const gS = ctx.createLinearGradient(0, 40, 0, 64);
-  gS.addColorStop(0, '#ffd6f0'); gS.addColorStop(.5, '#ff6ec4'); gS.addColorStop(1, '#c42a8a');
-  text('SWEET', CX - 22, 40, 24, gS, 'center', '#3a0626');
-  const gF = ctx.createLinearGradient(0, 72, 0, 88);
-  gF.addColorStop(0, '#fff6b0'); gF.addColorStop(.5, '#ffd23a'); gF.addColorStop(1, '#ff8a1a');
-  text('FIGHTERS', CX - 22, 72, 16, gF, 'center', '#4a1600');
-  const g2 = ctx.createLinearGradient(0, 38, 0, 88);
-  g2.addColorStop(0, '#ffb0a0'); g2.addColorStop(.5, '#ff3a2a'); g2.addColorStop(1, '#a01010');
-  text('2', CX + 76, 40, 48, g2, 'center', '#2a0404');
-  // Combattants
-  const fa = { def: DEFS[0], dir: 1, state: 'idle', id: 0, flash: 0, t: 0, x: 0, y: 0 };
-  const fb = { def: DEFS[1], dir: -1, state: 'idle', id: 1, flash: 0, t: 0, x: 0, y: 0 };
-  drawFighter(fa, CX - 160, 196); drawFighter(fb, CX + 160, 196);
-  text(VERSION, W - 6, H - 12, 8, '#9a8a70', 'right');
-  if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'APPUIE SUR A' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
-  if (!isTouch) {
-    text('FLÈCHES : BOUGER  HAUT SAUT  BAS ACCROUPI', W / 2, 138, 8, '#d8c8a8', 'center');
-    text('J POING   K PIED   ESPACE CONTRE', W / 2, 150, 8, '#d8c8a8', 'center');
-    text('L SPÉCIAL   HAUT + L UPPERCUT', W / 2, 162, 8, '#d8c8a8', 'center');
-    text('EN L\'AIR + L : PIED TOURNOYANT', W / 2, 174, 8, '#d8c8a8', 'center');
-    text('CONTRE RÉUSSI + J OU K : PRISE', W / 2, 186, 8, '#d8c8a8', 'center');
+  R(0, 0, W, H, 'rgba(10,4,16,.45)');
+  const t = G.t;
+  const bk = Math.max(0, 1 - t / 45);           // le noir s'efface pour révéler le décor
+  if (bk > 0) R(0, 0, W, H, `rgba(0,0,0,${bk})`);
+  // logo : dézoom + fondu rapide
+  const k = Math.min(1, t / 30), ease = 1 - Math.pow(1 - k, 3);
+  const sc = 1.8 - .8 * ease, al = Math.min(1, t / 20);
+  if (LOGO.complete && LOGO.naturalWidth) {
+    const lw = 176 * sc, lh = lw * LOGO.naturalHeight / LOGO.naturalWidth;
+    ctx.save(); ctx.globalAlpha = al; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(LOGO, CX - lw / 2, 74 - lh / 2, lw, lh);
+    ctx.restore();
+  } else text('SWEET FIGHTERS', CX, 60, 16, '#ff7a3a', 'center');
+  if (G.showMoves) { drawMoves(); return; }
+  if (G.tstate !== 1) {
+    if (t > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 160, 8, '#ffffff', 'center');
   } else {
-    text('STICK HAUT : SAUT   X : CONTRE', W / 2, 144, 8, '#d8c8a8', 'center');
-    text('A SPÉCIAL   HAUT + A UPPERCUT', W / 2, 156, 8, '#d8c8a8', 'center');
-    text('EN L\'AIR + A : PIED TOURNOYANT', W / 2, 168, 8, '#d8c8a8', 'center');
-    text('CONTRE RÉUSSI + Y OU B : PRISE', W / 2, 180, 8, '#d8c8a8', 'center');
+    ['SELECT CHARACTER', 'VIEW COMMANDS'].forEach((m, i) => {
+      const sel = G.tcur === i;
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 154 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+    });
   }
+  if (t > 30) {
+    text('POWERED BY SUPER ROCKET GAMES', CX, 188, 8, '#c8b8a0', 'center');
+    text('ALL RIGHTS RESERVED 2026', CX, 200, 8, '#9a8a70', 'center');
+  }
+  text(VERSION, W - 4, 4, 8, '#7a6a58', 'right');
 }
 
 function drawSelect() {
   ctx.drawImage(BG, 0, 0);
   R(0, 0, W, H, 'rgba(10,4,16,.6)');
-  text('CHOISIS TON COMBATTANT', W / 2, 18, 8, '#ffd23a', 'center');
+  text('SELECT YOUR FIGHTER', W / 2, 18, 8, '#ffd23a', 'center');
   [0, 1].forEach(i => {
     const x = i === 0 ? CX - 96 : CX + 6, sel = G.pick === i;
     R(x, 40, 90, 140, sel ? ((G.frame >> 3) % 2 ? '#ffd23a' : '#ff6a1a') : '#3a2a3a');
@@ -1517,7 +1735,7 @@ function drawSelect() {
     text(DEFS[i].name, x + 45, 186, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
     if (sel) text('1P', x + 45, 30, 8, '#5ac8ff', 'center');
   });
-  text(isTouch ? 'A : VALIDER   B : RETOUR' : 'ENTRÉE : VALIDER   ÉCHAP : RETOUR', W / 2, 202, 8, '#d8c8a8', 'center');
+  text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', W / 2, 202, 8, '#d8c8a8', 'center');
 }
 
 function drawOver() {
@@ -1525,8 +1743,8 @@ function drawOver() {
   R(0, 0, W, H, 'rgba(0,0,0,.45)');
   const p = G.f.find(f => !f.cpu);
   const won = p ? p.wins >= 2 : true;
-  bigMsg(won ? 'VICTOIRE !' : 'DÉFAITE...', 24, won ? '#ffd23a' : '#ff5a4a', 80);
-  if (G.t > 60 && (G.frame >> 5) % 2 === 0) text(isTouch ? 'A : REJOUER   B : MENU' : 'ENTRÉE : REJOUER   ÉCHAP : MENU', W / 2, 124, 8, '#ffffff', 'center');
+  bigMsg(won ? 'YOU WIN!' : 'YOU LOSE...', 24, won ? '#ffd23a' : '#ff5a4a', 80);
+  if (G.t > 60 && (G.frame >> 5) % 2 === 0) text(isTouch ? 'A: REMATCH   B: TITLE' : 'ENTER: REMATCH   ESC: TITLE', W / 2, 124, 8, '#ffffff', 'center');
 }
 
 function render() {
@@ -1536,7 +1754,7 @@ function render() {
     case 'title': drawTitle(); break;
     case 'select': drawSelect(); break;
     case 'over': drawOver(); break;
-    default: drawFight();
+    default: drawFight(); if (G.paused) drawPause();
   }
   ctx.restore();
 }

@@ -65,3 +65,11 @@ body.touch #touch{display:block}
 @media (orientation:portrait){
   body.touch:not(.rotok) #rotate{display:flex}
 }
+
+/* ---------- Bouton START (pause) ---------- */
+#startBtn{
+  position:absolute;left:50%;bottom:calc(3vh + env(safe-area-inset-bottom));transform:translateX(-50%);
+  width:auto;height:auto;padding:7px 14px;border-radius:14px;pointer-events:auto;
+  font-size:9px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.7)
+}
+#startBtn.on{transform:translateX(-50%) scale(.92);background:rgba(255,255,255,.25)}

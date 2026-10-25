@@ -1,22 +1,20 @@
 # Sweet Fighters 2
 
-Jeu de combat en pixel art, jouable sur navigateur (PC et mobile en paysage).
+Pixel-art fighting game playable in the browser (PC and mobile in landscape).
 
-## Tester en local
-Double-clique sur `index.html` : le jeu s'ouvre dans ton navigateur.
+## Play locally
+Double-click `index.html`.
 
-## Contrôles mobile (paysage)
-- Stick : se déplacer · haut = saut · bas = s'accroupir · bas + arrière = garde basse
-- Y : poing · B : pied · A : boule d'énergie · haut + A : uppercut
-- Avant + Y : coup de poing long (bras proche) · Avant + B : coup de pied long (autre jambe)
-- En l'air + A : coup de pied tournoyant
-- Accroupi + Y : uppercut montant (idéal contre un adversaire qui saute)
-- Saut vers l'avant : roulade en l'air
-- X : contre. Appuyé juste avant le coup adverse : éclair, fond assombri et l'adversaire passe au ralenti pendant une seconde.
-  Pendant ce temps, collé à lui : Y = il passe par-dessus toi en tournant et retombe juste de l'autre côté,
-  B = tu l'attrapes, roulade arrière, et il est propulsé à l'opposé de l'écran.
+## Mobile controls (landscape)
+- Stick: move · up = jump (forward/back = roll) · down = crouch · down + back = low block · back = block
+- Y: punch · B: kick · A: fireball (hold 3 s for a MAX fireball) · X: counter
+- Forward + Y: long punch · Forward + B: long kick
+- Down + Y: rising uppercut · Down + B x3: low kicks, the 3rd knocks down
+- Up + A: uppercut · Back + A: tornado kick x4 (4 hits in a row knock down, each spin can be countered)
+- Air + A: spin kick
+- X just before a hit: counter (flash, foe in slow motion 1 s). Then close to him: Y = overhead slam, B = rolling throw
+- Combos while the foe is stunned: Y Y B B · B B Y Y · Y Y B A · B B Y A — the 4th hit is on fire and knocks him down
+- START: pause (continue, move list, character select)
 
-## Contrôles PC
-- Flèches : se déplacer / sauter / s'accroupir
-- J : poing · K : pied · L : spécial · Espace : contre
-- Menus : Entrée valide, Échap revient en arrière
+## PC controls
+- Arrows: move · J: punch · K: kick · L: special · Space: counter · Enter: start/confirm · Esc: back
