@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v20';
+const VERSION = 'v21';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -261,7 +261,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false,
+  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -284,9 +284,10 @@ const DEFS = [
 const POSES = {
   idle0:   [3,-55, 1,-47, -1,-29, 9,-40, 14,-48, 4,-38, 9,-45, 7,-15, 11,0, -8,-14, -12,0],
   idle1:   [3,-54, 1,-46, -1,-28, 9,-39, 14,-47, 4,-37, 9,-44, 7,-14, 11,0, -8,-13, -12,0],
-  walk0:   [5,-52, 3,-44, 1,-26, 10,-40, 15,-48, 5,-38, 10,-45, 6,-14, 7,0, -4,-14, -6,0],
-  walk1:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, 12,-14, 17,0, -8,-13, -15,0],
-  walk2:   [5,-53, 3,-45, 1,-27, 10,-41, 15,-49, 5,-39, 10,-46, -2,-14, -7,0, 8,-14, 12,0],
+  walk0:   [4,-55, 2,-47, 0,-29, 6,-38, 11,-44, -5,-37, 0,-43, 8,-15, 12,0, -6,-14, -11,0],
+  walk1:   [4,-57, 2,-49, 0,-31, 7,-40, 12,-46, -6,-38, -2,-44, 2,-16, 1,0, 5,-21, 1,-9],
+  walk2:   [4,-55, 2,-47, 0,-29, 9,-39, 14,-45, -8,-36, -4,-42, -5,-14, -10,0, 8,-15, 12,0],
+  walk3:   [4,-57, 2,-49, 0,-31, 7,-40, 12,-46, -6,-38, -2,-44, 5,-21, 1,-9, 2,-16, 1,0],
   jump:    [3,-58, 1,-50, 0,-34, 9,-44, 13,-51, 4,-42, 9,-48, 10,-30, 6,-20, 2,-27, -4,-18],
   punch0:  [3,-52, 1,-44, 0,-26, 6,-40, 9,-46, -4,-38, 0,-42, 10,-14, 16,0, -8,-12, -16,0],
   punch1:  [8,-51, 6,-43, 2,-26, 17,-44, 30,-45, -4,-38, 0,-42, 11,-14, 17,0, -9,-11, -18,0],
@@ -481,6 +482,12 @@ function drawFighter(f, x = f.x, y = f.y) {
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
     } else limbT(k, ank, 5.5, 3.5, .8, Lg);
+    if (d.hem) {
+      // bas du kimono effiloché aux chevilles
+      const hx = Math.round(ank[0]), hy = Math.round(ank[1]);
+      sR(hx - 3, hy, 6, 1, Lg[1]);
+      [[-3, 2], [-2, 1], [-1, 3], [0, 1], [1, 2], [2, 1]].forEach(([dx, l], i) => sR(hx + dx, hy + 1, 1, l, i % 2 ? Lg[2] : Lg[1]));
+    }
     if (d.shoes) shoeP(ft, dir, !near); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
@@ -489,7 +496,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (!backView) { drawBand(); drawBraid(); }
   // Le bras éloigné (celui qui frappe) passe derrière le torse ; le bras proche de la caméra
   // part de l'épaule arrière, ce qui laisse voir pectoraux et abdos en vue de face.
-  const guard = !backView && ['idle', 'walk', 'crouch', 'jump', 'land', 'getup', 'parry', 'hit', 'stunned', 'kick', 'fkick', 'ckick', 'jkick'].includes(f.state);
+  const guard = !backView && ['idle', 'crouch', 'jump', 'land', 'getup', 'parry', 'hit', 'stunned', 'kick', 'fkick', 'ckick', 'jkick'].includes(f.state);
   const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
   if (guard && f.state !== 'parry') {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
@@ -593,7 +600,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   else {
     // Vue de face : en garde, le bras proche reste sur le côté gauche du corps
     // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
-    const guard2 = ['idle', 'walk', 'punch', 'kick', 'fkick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
+    const guard2 = ['idle', 'punch', 'kick', 'fkick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
     if (guard2) {
       const e2 = add(sdB, [-dir * 3.5, 6 + bob]);
       const h2 = add(e2, [dir * 3, -2.5]);
@@ -608,10 +615,12 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
   const prev = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
   let src = SPR;
-  if (f.state === 'jump' && f.roll && f.t > 3) {
-    // roulade : rotation complète autour du centre du corps, en basse résolution
-    const ang = f.roll * dir * Math.min(1, (f.t - 3) / 34) * Math.PI * 2;   // avant ou arrière
-    const cx = OX, cy = OY - 30 * K;
+  let ang = null, cy = OY - 30 * K;
+  if (f.state === 'jump' && f.roll && f.t > 3) ang = f.roll * dir * Math.min(1, (f.t - 3) / 34) * Math.PI * 2;   // roulade avant / arrière
+  if (f.rotAng != null) { ang = f.rotAng; if (f.state === 'throw') cy = OY - 14 * K; }
+  if (ang != null) {
+    // rotation autour du centre du corps, en basse résolution
+    const cx = OX;
     rx.setTransform(1, 0, 0, 1, 0, 0); rx.clearRect(0, 0, ROLLC.width, ROLLC.height);
     rx.imageSmoothingEnabled = false;
     rx.translate(cx, cy); rx.rotate(ang); rx.drawImage(SPR, -cx, -cy);
@@ -826,13 +835,13 @@ function makeFighter(def, id, x, dir, cpu) {
   };
 }
 
-function setState(f, s) { f.state = s; f.t = 0; f.hasHit = false; }
+function setState(f, s) { f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
 function poseOf(f) {
   switch (f.state) {
     case 'idle': return ((G.frame / 18 | 0) + f.id) % 2 ? 'idle1' : 'idle0';
-    case 'walk': return ['walk0', 'walk1', 'walk0', 'walk2'][(f.t / 7 | 0) % 4];
+    case 'walk': { const i = (f.t / 7 | 0) % 4; return ['walk0', 'walk1', 'walk2', 'walk3'][f.vx * f.dir < 0 ? 3 - i : i]; }
     case 'block': return 'block';
     case 'crouch': return 'crouch';
     case 'cblock': return 'cblock';
@@ -856,7 +865,10 @@ function poseOf(f) {
     case 'win': return 'win';
     case 'parry': return 'parry';
     case 'stunned': return 'stunned';
-    case 'throw': return f.t < 8 ? 'throw0' : (f.throwType === 'slam' ? 'throwS' : 'throwT');
+    case 'held': return 'fall';
+    case 'throw':
+      if (f.throwType === 'toss') return f.t >= 6 && f.t < 26 ? 'tuck' : 'throw0';
+      return f.t < 6 ? 'throw0' : f.t < 22 ? 'throwT' : 'throwS';
   }
   return 'idle0';
 }
@@ -921,8 +933,8 @@ function updFighter(f, o) {
       if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); break; }
       if (take(c, 'k')) { setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); break; }
       if (back && threatened(f, o)) { f.vx = 0; if (f.state !== 'block') { setState(f, 'block'); f.bstun = 0; } break; }
-      if (fwd) { f.vx = 1.8 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
-      else if (back) { f.vx = -1.4 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      if (fwd) { f.vx = 1.9 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      else if (back) { f.vx = -1.45 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
@@ -962,7 +974,8 @@ function updFighter(f, o) {
     case 'getup': if (f.t >= 16) setState(f, 'idle'); break;
     case 'parry': f.vx = 0; if (f.t >= 22) setState(f, 'idle'); break;
     case 'stunned': f.vx *= .8; if (f.t >= f.stun) setState(f, 'idle'); break;
-    case 'throw': f.vx = 0; if (f.t >= 26) setState(f, 'idle'); break;
+    case 'throw': f.vx = 0; updThrow(f); if (f.t >= 38) { f.rotAng = null; f.victim = null; setState(f, 'idle'); } break;
+    case 'held': return;   // positionné par le lanceur
   }
 
   // Physique
@@ -986,7 +999,7 @@ function updFighter(f, o) {
 }
 
 function hurtbox(f) {
-  if (f.invuln > 0 || ['fall', 'down', 'getup'].includes(f.state)) return null;
+  if (f.invuln > 0 || ['fall', 'down', 'getup', 'held'].includes(f.state)) return null;
   if (f.air) return [f.x - 13, f.y - 81, f.x + 13, f.y - 17];
   if (f.state === 'land' || f.state === 'uppercut') return [f.x - 14, f.y - 67, f.x + 14, f.y];
   if (['crouch', 'cblock', 'cpunch', 'ckick'].includes(f.state)) return [f.x - 15, f.y - 56, f.x + 15, f.y];
@@ -1011,14 +1024,45 @@ function isBlocking(d, fromX, data) {
   return true;
 }
 
+// Prises après un contre :
+//  'toss' (B) : on attrape, roulade arrière, l'adversaire est propulsé à l'opposé de l'écran
+//  'slam' (Y) : l'adversaire passe par-dessus nous en tournant et retombe juste de l'autre côté
 function doThrow(f, o, type) {
-  setState(f, 'throw'); f.throwType = type; f.vx = 0; f.counterT = 0;
-  o.hp = Math.max(0, o.hp - (type === 'slam' ? 14 : 12)); o.lagT = 32; o.flash = 3; o.invuln = 0;
-  setState(o, 'fall'); o.air = true; o.slowT = 0;
-  if (type === 'slam') { o.vy = -3.6; o.vx = f.dir * 1.4; }
-  else { o.vy = -7; o.vx = -f.dir * 3.6; o.y -= 4; }
-  G.freeze = 8; G.shake = 6; sfx('heavy');
+  setState(f, 'throw'); f.throwType = type; f.vx = 0; f.vy = 0; f.counterT = 0; f.victim = o;
+  f.gx = f.x; f.gy = f.y;
+  setState(o, 'held'); o.air = false; o.vx = o.vy = 0; o.slowT = 0; o.flash = 3; o.invuln = 0;
+  G.freeze = 6; sfx('whoosh');
   addPopup(f.x, f.y - 100, 'PRISE !', '#ff7a3a');
+}
+function updThrow(f) {
+  const o = f.victim; if (!o) return;
+  const d = f.dir, t = f.t, T0 = 6, T1 = 26;
+  const k = Math.max(0, Math.min(1, (t - T0) / (T1 - T0)));
+  if (f.throwType === 'toss') {
+    // roulade arrière du lanceur
+    f.rotAng = t >= T0 && t < T1 ? -d * k * Math.PI * 2 : null;
+    if (t >= T0 && t < T1) f.x = f.gx - d * 14 * k;
+    // la victime passe au-dessus, d'avant en arrière
+    const phi = k * Math.PI;
+    o.x = f.x + d * Math.cos(phi) * 30; o.y = f.y - 6 - Math.sin(phi) * 34;
+    o.rotAng = -d * phi; o.dir = d === 1 ? -1 : 1;
+    if (t === T1) {
+      setState(o, 'fall'); o.air = true; o.vx = -d * 5.6; o.vy = -4.5; o.rotAng = null;
+      o.hp = Math.max(0, o.hp - 13); o.lagT = 32; o.flash = 3;
+      G.shake = 6; sfx('heavy');
+    }
+  } else {
+    // renversement : la victime fait un demi-tour complet autour de nous
+    const phi = k * Math.PI;
+    o.x = f.x + d * Math.cos(phi) * 24; o.y = f.y - 8 - Math.sin(phi) * 44;
+    o.rotAng = -d * phi * 1.15; o.dir = d === 1 ? -1 : 1;
+    if (t === T1) {
+      setState(o, 'fall'); o.air = true; o.vx = -d * 1.2; o.vy = 2.5; o.rotAng = null;
+      o.hp = Math.max(0, o.hp - 15); o.lagT = 32; o.flash = 3;
+      G.shake = 9; sfx('heavy');
+    }
+  }
+  if (t > T1) f.victim = null;
 }
 function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 
@@ -1234,7 +1278,7 @@ function stepFight() {
   }
 
   // Séparation des corps
-  if (Math.abs(a.y - b.y) < 56 && !['down'].includes(a.state) && !['down'].includes(b.state)) {
+  if (Math.abs(a.y - b.y) < 56 && a.state !== 'held' && b.state !== 'held' && !['down'].includes(a.state) && !['down'].includes(b.state)) {
     const dx = b.x - a.x, minD = 30;
     if (Math.abs(dx) < minD) {
       const push = (minD - Math.abs(dx)) / 2, s = dx === 0 ? (a.dir > 0 ? 1 : -1) : Math.sign(dx);

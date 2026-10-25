@@ -13,7 +13,8 @@ Double-clique sur `index.html` : le jeu s'ouvre dans ton navigateur.
 - Accroupi + Y : uppercut montant (idéal contre un adversaire qui saute)
 - Saut vers l'avant : roulade en l'air
 - X : contre. Appuyé juste avant le coup adverse : éclair, fond assombri et l'adversaire passe au ralenti pendant une seconde.
-  Pendant ce temps, collé à lui : Y = prise qui le renverse, B = prise qui le projette de l'autre côté.
+  Pendant ce temps, collé à lui : Y = il passe par-dessus toi en tournant et retombe juste de l'autre côté,
+  B = tu l'attrapes, roulade arrière, et il est propulsé à l'opposé de l'écran.
 
 ## Contrôles PC
 - Flèches : se déplacer / sauter / s'accroupir
