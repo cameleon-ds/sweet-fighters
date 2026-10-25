@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v17';
+const VERSION = 'v18';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -290,8 +290,12 @@ const POSES = {
   jump:    [3,-58, 1,-50, 0,-34, 9,-44, 13,-51, 4,-42, 9,-48, 9,-30, 6,-20, 2,-26, -4,-18],
   punch0:  [2,-55, 0,-47, -1,-29, 4,-40, 7,-45, -6,-38, -3,-43, 8,-15, 13,0, -9,-14, -13,0],
   punch1:  [5,-55, 3,-47, 0,-29, 15,-46, 27,-47, -4,-38, -1,-43, 9,-15, 14,0, -9,-14, -14,0],
-  kick0:   [0,-56, -1,-48, -2,-30, 6,-42, 10,-48, -6,-40, -2,-46, 8,-34, 4,-22, -3,-15, -4,0],
-  kick1:   [-3,-55, -3,-47, -1,-30, 4,-42, 8,-48, -9,-40, -6,-46, 14,-36, 30,-38, -3,-15, -4,0],
+  kick0:   [-2,-56, -3,-48, -3,-30, 4,-42, 8,-48, -8,-40, -4,-46, 12,-40, 10,-26, -3,-15, -5,0],
+  kick1:   [-7,-54, -7,-46, -3,-30, 0,-42, 4,-48, -12,-40, -8,-46, 22,-38, 46,-42, -4,-15, -6,0],
+  fpunch0: [3,-55, 1,-47, -1,-29, 8,-40, 12,-46, -6,-38, -2,-42, 8,-15, 13,0, -9,-14, -13,0],
+  fpunch1: [9,-54, 7,-46, 3,-29, 2,-40, 6,-44, 18,-47, 36,-48, 12,-15, 18,0, -6,-14, -10,0],
+  fkick0:  [-3,-56, -4,-48, -3,-30, 4,-42, 8,-48, -8,-40, -4,-46, 6,-15, 10,0, 12,-40, 10,-26],
+  fkick1:  [-9,-53, -9,-45, -3,-30, -2,-42, 2,-48, -14,-40, -10,-46, 6,-15, 10,0, 26,-38, 56,-44],
   special0:[0,-54, -1,-46, -2,-28, -6,-36, -9,-31, -8,-37, -11,-32, 8,-14, 13,0, -10,-13, -15,0],
   special1:[5,-53, 3,-45, 0,-28, 14,-40, 24,-40, 12,-37, 22,-37, 10,-14, 15,0, -10,-12, -16,0],
   upper0:  [4,-46, 2,-38, 0,-22, 8,-30, 10,-24, 4,-30, 8,-36, 10,-12, 12,0, -6,-10, -10,0],
@@ -485,7 +489,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (!backView) { drawBand(); drawBraid(); }
   // Le bras éloigné (celui qui frappe) passe derrière le torse ; le bras proche de la caméra
   // part de l'épaule arrière, ce qui laisse voir pectoraux et abdos en vue de face.
-  const guard = !backView && ['idle', 'walk', 'crouch', 'jump', 'land', 'getup', 'parry', 'hit', 'stunned', 'kick', 'ckick', 'jkick'].includes(f.state);
+  const guard = !backView && ['idle', 'walk', 'crouch', 'jump', 'land', 'getup', 'parry', 'hit', 'stunned', 'kick', 'fkick', 'ckick', 'jkick'].includes(f.state);
   const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
   if (guard && f.state !== 'parry') {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
@@ -589,7 +593,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   else {
     // Vue de face : en garde, le bras proche reste sur le côté gauche du corps
     // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
-    const guard2 = ['idle', 'walk', 'punch', 'kick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
+    const guard2 = ['idle', 'walk', 'punch', 'kick', 'fkick', 'crouch', 'cpunch', 'ckick', 'jpunch', 'jkick', 'jump', 'land', 'getup', 'hit', 'stunned'].includes(f.state);
     if (guard2) {
       const e2 = add(sdB, [-dir * 3.5, 6 + bob]);
       const h2 = add(e2, [dir * 3, -2.5]);
@@ -791,7 +795,9 @@ const backPress = c => edge(c, 'k') || edge(c, 'back');
 /* ---------------- Données d'attaque ---------------- */
 const ATK = {
   punch:    { dur: 18, act: [4, 10], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
-  kick:     { dur: 24, act: [7, 13], box: [17, -63, 49, -42], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
+  fpunch:   { dur: 22, act: [5, 12], box: [18, -80, 58, -58], dmg: 9,  stun: 17, bstun: 11, push: 3.2, sfx: 'hit' },
+  fkick:    { dur: 30, act: [9, 16], box: [26, -70, 80, -44], dmg: 11, stun: 19, bstun: 13, push: 3.6, sfx: 'heavy' },
+  kick:     { dur: 26, act: [7, 14], box: [20, -68, 66, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
   jpunch:   { act: [3, 16], box: [11, -59, 38, -34], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
@@ -801,13 +807,13 @@ const ATK = {
   uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
-const ATTACKING = ['punch', 'kick', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const ATTACKING = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
 const G = {
   scene: 'title', frame: 0, t: 0, round: 1, timer: 99, tick: 0,
-  pick: 0, freeze: 0, shake: 0, f: [], fbs: [], sparks: [], popups: [], msg: null, winner: null, fighting: false,
+  pick: 0, freeze: 0, shake: 0, flashT: 0, darkT: 0, boltX: 0, boltY: 0, f: [], fbs: [], sparks: [], popups: [], msg: null, winner: null, fighting: false,
 };
 const pctl = makeCtl();
 
@@ -838,7 +844,9 @@ function poseOf(f) {
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
-    case 'kick': return f.t < 7 || f.t >= 13 ? 'kick0' : 'kick1';
+    case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
+    case 'fpunch': return f.t < 5 ? 'fpunch0' : f.t < 13 ? 'fpunch1' : 'fpunch0';
+    case 'fkick': return f.t < 9 || f.t >= 17 ? 'fkick0' : 'fkick1';
     case 'special': return f.t < 12 ? 'special0' : 'special1';
     case 'uppercut': return f.t < 3 ? 'upper0' : (f.vy < 0 ? 'upper1' : 'upper2');
     case 'land': case 'getup': return 'upper0';
@@ -885,7 +893,7 @@ function updFighter(f, o) {
         if (!f.fb) { setState(f, 'special'); f.vx = 0; break; }
       }
       // Prise après un contre réussi : Y renverse, B projette de l'autre côté
-      if (f.counterT > 0 && o.state === 'stunned' && Math.abs(o.x - f.x) < 80) {
+      if (f.counterT > 0 && o.slowT > 0 && Math.abs(o.x - f.x) < 80) {
         if (take(c, 'p')) { doThrow(f, o, 'slam'); break; }
         if (take(c, 'k')) { doThrow(f, o, 'toss'); break; }
       }
@@ -909,15 +917,18 @@ function updFighter(f, o) {
         if (f.state !== want) { setState(f, want); f.bstun = 0; }
         break;
       }
-      if (take(c, 'p')) { setState(f, 'punch'); f.vx = 0; sfx('whoosh'); break; }
-      if (take(c, 'k')) { setState(f, 'kick'); f.vx = 0; sfx('whoosh'); break; }
+      // avant + Y : coup de poing du bras proche, plus long · avant + B : coup de pied de l'autre jambe, plus long
+      if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); break; }
+      if (take(c, 'k')) { setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); break; }
       if (back && threatened(f, o)) { f.vx = 0; if (f.state !== 'block') { setState(f, 'block'); f.bstun = 0; } break; }
       if (fwd) { f.vx = 1.8 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else if (back) { f.vx = -1.4 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
-    case 'punch': case 'kick': case 'cpunch': case 'ckick': case 'rupper':
+    case 'fpunch': if (f.t < 7) f.vx = 1.4 * f.dir; else f.vx = 0;
+    // fallthrough
+    case 'punch': case 'kick': case 'fkick': case 'cpunch': case 'ckick': case 'rupper':
       if (f.t >= ATK[f.state].dur) setState(f, h.d ? 'crouch' : 'idle');
       break;
     case 'special':
@@ -1003,7 +1014,7 @@ function isBlocking(d, fromX, data) {
 function doThrow(f, o, type) {
   setState(f, 'throw'); f.throwType = type; f.vx = 0; f.counterT = 0;
   o.hp = Math.max(0, o.hp - (type === 'slam' ? 14 : 12)); o.lagT = 32; o.flash = 3; o.invuln = 0;
-  setState(o, 'fall'); o.air = true;
+  setState(o, 'fall'); o.air = true; o.slowT = 0;
   if (type === 'slam') { o.vy = -3.6; o.vx = f.dir * 1.4; }
   else { o.vy = -7; o.vx = -f.dir * 3.6; o.y -= 4; }
   G.freeze = 8; G.shake = 6; sfx('heavy');
@@ -1016,9 +1027,10 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   if (def.state === 'parry' && def.t <= 12) {
     G.freeze = 10; addSpark(sx, sy, 'parry'); sfx('parry');
     if (projectile) return;
-    if (att.air) { setState(att, 'fall'); att.vy = -3; att.vx = (att.x < def.x ? -1 : 1) * 1.6; }
-    else { setState(att, 'stunned'); att.stun = 30; att.vx = 0; }
-    setState(def, 'idle'); def.counterT = 34; def.vx = 0;
+    // l'adversaire passe au ralenti pendant une seconde, éclair + fond assombri
+    att.hasHit = true; att.slowT = 60;
+    setState(def, 'idle'); def.counterT = 60; def.vx = 0;
+    G.flashT = 10; G.darkT = 60; G.boltX = sx; G.boltY = sy;
     addPopup(def.x, def.y - 100, 'CONTRE !', '#7af0ff');
     return;
   }
@@ -1076,7 +1088,7 @@ function aiInput(f, o) {
   if (neutral && o.air && dist < 80 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
   if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 3 && dist < 95 && Math.random() < .07) press(a, 'x');
-  if (neutral && f.counterT > 0 && o.state === 'stunned' && dist < 80 && !a.press) press(a, Math.random() < .5 ? 'p' : 'k');
+  if (neutral && f.counterT > 0 && o.slowT > 0 && dist < 80 && !a.press) press(a, Math.random() < .5 ? 'p' : 'k');
   if (neutral && o.state === 'ckick' && o.t < 6 && dist < 95 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
   if (neutral && o.state === 'tatsu' && dist < 110 && Math.random() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
 
@@ -1117,11 +1129,11 @@ function startMatch(pick) {
 function startRound() {
   const [a, b] = G.f;
   [[a, CX - 80, 1], [b, CX + 80, -1]].forEach(([f, x, d]) => {
-    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0 });
+    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
-  G.fbs = []; G.sparks = []; G.popups = []; G.timer = 99; G.tick = 0; G.fighting = false;
+  G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
 
@@ -1178,7 +1190,13 @@ function stepFight() {
   if (G.freeze > 0) { G.freeze--; return; }
   if (G.scene === 'ko' && G.t < 60 && G.t % 2) return; // ralenti du K.O.
 
-  updFighter(a, b); updFighter(b, a);
+  // ralenti : un combattant sous l'effet du contre n'avance qu'une image sur trois
+  [[a, b], [b, a]].forEach(([f, o]) => {
+    if (f.slowT > 0) { f.slowT--; if (G.frame % 3) return; }
+    updFighter(f, o);
+  });
+  if (G.flashT > 0) G.flashT--;
+  if (G.darkT > 0) G.darkT--;
 
   // Boules d'énergie
   for (const fb of G.fbs) {
@@ -1338,6 +1356,10 @@ function bigMsg(s, size, col, y = 84) { text(s, W / 2, y, size, col, 'center', '
 
 function drawFight() {
   ctx.drawImage(BG, 0, 0);
+  if (G.darkT > 0) {   // fond assombri pendant le ralenti
+    const k = Math.min(1, G.darkT / 10, (60 - G.darkT) / 6 + .2);
+    R(0, 0, W, H, `rgba(6,4,18,${.62 * k})`);
+  }
   const [a, b] = G.f;
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
@@ -1352,6 +1374,17 @@ function drawFight() {
       R(f.x + Math.cos(a) * 12 - 1, f.y - 92 + Math.sin(a) * 3, 3, 3, i % 2 ? '#ffe14a' : '#ffffff');
     }
   });
+  if (G.flashT > 0) {
+    // éclair : flash blanc + zigzag lumineux qui tombe sur le point de contre
+    R(0, 0, W, H, `rgba(220,240,255,${G.flashT / 14})`);
+    let x0 = G.boltX + (G.frame % 2 ? 6 : -6), y0 = 0;
+    seed = 900 + (G.frame >> 1);
+    while (y0 < G.boltY) {
+      const x1 = G.boltX + (rnd() - .5) * 26, y1 = Math.min(G.boltY, y0 + 10 + rnd() * 12);
+      seg([x0, y0], [x1, y1], 4, '#7af0ff'); seg([x0, y0], [x1, y1], 2, '#ffffff');
+      x0 = x1; y0 = y1;
+    }
+  }
   G.popups.forEach(pp => { if ((pp.t >> 2) % 4 !== 3 || pp.t < 30) text(pp.txt, pp.x, pp.y - pp.t * .4, 8, pp.col, 'center'); });
   drawHUD();
 
