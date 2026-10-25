@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v13';
+const VERSION = 'v14';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -456,15 +456,17 @@ function drawFighter(f, x = f.x, y = f.y) {
   const leg = (k, ft, near) => {
     const Lg = near ? legs : dim(legs), S = near ? sk : dim(sk);
     limbT(p, k, 7, 5, .8, Lg);
+    // la jambe s'arrête à la cheville : rien ne dépasse sous le pied / la semelle
+    const ank = add(ft, [0, d.shoes ? -3.5 : -2.5]);
     if (d.torn) {
-      limbT(k, ft, 4, 3, 1, S);
-      const cut = mix(k, ft, .45);
+      limbT(k, ank, 4, 3, 1, S);
+      const cut = mix(k, ank, .45);
       limbT(k, cut, 6, 5.5, 0, Lg);
       if (near) {
         sR(cut[0] - 2, cut[1] + 2, 1, 1, Lg[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, Lg[1]);
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
-    } else limbT(k, ft, 5.5, 4.5, .8, Lg);
+    } else limbT(k, ank, 5.5, 4.5, .8, Lg);
     if (d.shoes) shoeP(ft, dir, !near); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
