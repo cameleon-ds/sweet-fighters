@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v12';
+const VERSION = 'v13';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -261,7 +261,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', style: 'tshirt', head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: true,
+  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -270,13 +270,13 @@ const DEFS = [
     belt:  ['#040406', '#121216', '#26262e', '#44444e'],
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],
     fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
-  { name: 'SORA', style: 'jacket', head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true,
+  { name: 'SORA', style: 'tshirt', head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
     skin:  ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],
-    hair:  { a: '#7a7e94', h: '#a8acc0', H: '#d8dcea', L: '#ffffff' },
-    top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],
-    legs:  ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'],
-    belt:  ['#6a4a14', '#a07424', '#d8a83e', '#ffdc78'],
-    glove: ['#9a9284', '#c8c0b0', '#ece6d8', '#ffffff'],
+    hair:  { a: '#8a5a14', h: '#c08a24', H: '#ecc048', L: '#fff08a' },   // blond
+    top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],                 // t-shirt rouge
+    legs:  ['#16264a', '#2a4478', '#4a6eac', '#82a8dc'],                 // jean bleu
+    belt:  ['#2e180a', '#4e2c14', '#704220', '#9a6436'],                 // ceinture cuir
+    glove: ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],                 // mains nues
     fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
 ];
 
@@ -377,6 +377,16 @@ function fist(q, dir, glove, skin) {
   sR(fx, y0 + 3, 2, 1, skin[0]);
   sR(fx + (dir > 0 ? 1 : 0), y0, 1, 1, skin[3]);
 }
+// Baskets montantes en toile noire, bout et semelle blancs
+function shoeP(q, dir, dark) {
+  const x = Math.round(q[0]), y = Math.round(q[1]);
+  const x0 = x - (dir > 0 ? 2 : 4);
+  sR(x0, y - 4, 6, 3, dark ? '#0a0a0e' : '#16161c');          // tige noire
+  sR(x0 + (dir > 0 ? 1 : 2), y - 4, 3, 1, dark ? '#1c1c24' : '#34343e');   // reflet
+  sR(x0 + (dir > 0 ? 4 : 0), y - 3, 3, 2, dark ? '#b8b8b0' : '#f4f4ee');   // bout blanc
+  sR(x0, y - 1, 7, 1, dark ? '#a8a8a0' : '#e8e8e0');          // semelle blanche
+  sR(x0 + 1, y - 3, 1, 1, '#d8d8d0');                          // œillet
+}
 function footP(q, dir, skin) {
   const x0 = Math.round(q[0]) - (dir > 0 ? 1 : 3);
   sR(x0, Math.round(q[1]) - 2, 5, 2, skin[1]);
@@ -455,7 +465,8 @@ function drawFighter(f, x = f.x, y = f.y) {
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
     } else limbT(k, ft, 5.5, 4.5, .8, Lg);
-    footP(ft, dir, S);
+    if (d.shoes) shoeP(ft, dir, !near); else footP(ft, dir, S);
+    if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
 
   // ---- Plan arrière ----
@@ -505,7 +516,13 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
   // Cou court et large
   limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], 5, 5, 0, sk);
-  if (tshirt && !backView) {
+  if (tshirt && !backView && !d.vneck) {
+    // col rond
+    const c1 = add(sh, fwd, -1.5), c2 = add(sh, fwd, 3.5), cb = add(at(.1), fwd, 1);
+    sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);
+    sPoly([c1, c2, cb], sk[2]);
+  }
+  if (tshirt && !backView && d.vneck) {
     // Col en V ouvert : haut des pectoraux visible
     const c1 = add(sh, fwd, -3), c2 = add(sh, fwd, 5), cb = add(at(.34), fwd, 1);
     sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);   // bord du col
@@ -533,7 +550,9 @@ function drawFighter(f, x = f.x, y = f.y) {
   // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
   limbT(add(by, fwd, -4.5), add(by, fwd, 5), 3, 3, 0, bl);
-  if (!backView) {
+  if (d.jeans) {
+    const bk2 = add(by, fwd, 3); sR(bk2[0] - 1, bk2[1] - 1, 3, 2, '#d8b048'); sR(bk2[0], bk2[1] - 1, 1, 1, '#fff0a0');   // boucle
+  } else if (!backView) {
     const kn = add(by, fwd, 3.5);
     sR(kn[0] - 1, kn[1] - 1, 3, 3, bl[2]); sR(kn[0] - 1, kn[1] - 1, 1, 1, bl[3]);
     sR(kn[0] + (dir > 0 ? 1 : -1), kn[1] + 1, 1, 5, bl[1]);
