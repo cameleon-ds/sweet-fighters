@@ -263,6 +263,11 @@ const POSES = {
   block:   [0,-54, -1,-46, -2,-28, 7,-40, 6,-52, 5,-42, 9,-52, 6,-14, 10,0, -9,-13, -14,0],
   jkick:   [0,-56, -1,-48, 0,-32, 6,-44, 10,-50, -6,-42, -2,-48, 12,-24, 25,-14, 0,-24, -6,-18],
   jpunch:  [4,-56, 2,-48, 0,-32, 12,-42, 22,-34, -4,-42, 0,-48, 8,-28, 4,-18, 0,-26, -6,-20],
+  crouch:  [4,-38, 2,-31, -1,-15, 10,-24, 14,-31, 5,-22, 10,-28, 12,-10, 13,0, -8,-4, -16,0],
+  cblock:  [1,-37, 0,-30, -2,-15, 7,-25, 6,-36, 5,-26, 9,-36, 11,-10, 12,0, -8,-4, -16,0],
+  cpunch:  [5,-37, 3,-30, 0,-15, 15,-30, 27,-31, -4,-23, -1,-28, 12,-10, 13,0, -8,-4, -16,0],
+  ckick:   [-3,-35, -4,-28, -2,-14, 4,-22, 8,-28, -10,-20, -14,-8, 14,-6, 30,-2, -8,-4, -14,0],
+  tatsu:   [1,-58, 0,-50, 0,-34, -7,-46, -13,-44, 6,-46, 12,-44, 14,-36, 30,-37, 3,-24, -3,-17],
   win:     [1,-57, 0,-49, 0,-30, 6,-58, 8,-71, -6,-40, -2,-32, 5,-15, 7,0, -6,-15, -8,0],
   fall:    [-14,-40, -9,-36, 2,-26, -6,-44, -12,-50, -14,-30, -18,-26, 10,-30, 18,-36, 12,-22, 20,-24],
   down:    [-24,-6, -17,-6, 0,-5, -14,-12, -8,-14, -20,-3, -26,-2, 9,-9, 18,-3, 10,-4, 20,-2],
@@ -271,7 +276,8 @@ const POSES = {
 const OUT = '#140c08';
 
 function drawFighter(f, x = f.x, y = f.y) {
-  const d = f.def, P = POSES[poseOf(f)], dir = f.dir;
+  const d = f.def, P = POSES[poseOf(f)];
+  const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   const wh = f.flash > 0;
   const C = c => (wh ? '#ffffff' : c);
   const O = wh ? '#ffffff' : OUT;
@@ -487,12 +493,16 @@ const backPress = c => edge(c, 'j') || edge(c, 'back');
 const ATK = {
   punch:    { dur: 18, act: [4, 10], box: [10, -54, 31, -42], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
   kick:     { dur: 24, act: [7, 13], box: [12, -45, 35, -30], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
-  jpunch:   { act: [3, 16], box: [8, -42, 27, -24], dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
-  jkick:    { act: [3, 18], box: [6, -30, 31, -8],  dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
+  jpunch:   { act: [3, 16], box: [8, -42, 27, -24], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
+  jkick:    { act: [3, 18], box: [6, -30, 31, -8],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
+  cpunch:   { dur: 16, act: [3, 8],  box: [10, -36, 30, -25], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
+  ckick:    { dur: 28, act: [6, 12], box: [10, -10, 35, 0],   dmg: 9,  knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
+  tatsu:    { act: [4, 90], box: [-30, -50, 32, -28], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   uppercut: { act: [3, 15], box: [0, -82, 22, -26], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
-const ATTACKING = ['punch', 'kick', 'jpunch', 'jkick', 'uppercut', 'special'];
+const ATTACKING = ['punch', 'kick', 'cpunch', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
 const G = {
@@ -518,6 +528,11 @@ function poseOf(f) {
     case 'idle': return ((G.frame / 18 | 0) + f.id) % 2 ? 'idle1' : 'idle0';
     case 'walk': return ['walk0', 'walk1', 'walk0', 'walk2'][(f.t / 7 | 0) % 4];
     case 'block': return 'block';
+    case 'crouch': return 'crouch';
+    case 'cblock': return 'cblock';
+    case 'cpunch': return f.t < 3 || f.t >= 8 ? 'crouch' : 'cpunch';
+    case 'ckick': return f.t < 6 || f.t >= 12 ? 'crouch' : 'ckick';
+    case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
     case 'jump': return 'jump';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
@@ -556,13 +571,22 @@ function updFighter(f, o) {
   const live = G.fighting;
 
   switch (f.state) {
-    case 'idle': case 'walk': case 'block': {
-      if (f.state === 'block' && f.bstun > 0) { f.bstun--; f.vx *= .8; break; }
+    case 'idle': case 'walk': case 'block': case 'crouch': case 'cblock': {
+      if ((f.state === 'block' || f.state === 'cblock') && f.bstun > 0) { f.bstun--; f.vx *= .8; break; }
       face(f, o);
       if (!live) { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); break; }
       if (take(c, 's')) {
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 9; break; }
         if (!f.fb) { setState(f, 'special'); f.vx = 0; break; }
+      }
+      // Accroupi : coups bas, garde basse avec bas + arrière
+      if (h.d) {
+        f.vx = 0;
+        if (take(c, 'p')) { setState(f, 'cpunch'); sfx('whoosh'); break; }
+        if (take(c, 'k')) { setState(f, 'ckick'); sfx('whoosh'); break; }
+        const want = back && threatened(f, o) ? 'cblock' : 'crouch';
+        if (f.state !== want) { setState(f, want); f.bstun = 0; }
+        break;
       }
       if (take(c, 'p')) { setState(f, 'punch'); f.vx = 0; sfx('whoosh'); break; }
       if (take(c, 'k')) { setState(f, 'kick'); f.vx = 0; sfx('whoosh'); break; }
@@ -576,8 +600,8 @@ function updFighter(f, o) {
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
-    case 'punch': case 'kick':
-      if (f.t >= ATK[f.state].dur) setState(f, 'idle');
+    case 'punch': case 'kick': case 'cpunch': case 'ckick':
+      if (f.t >= ATK[f.state].dur) setState(f, h.d ? 'crouch' : 'idle');
       break;
     case 'special':
       if (f.t === 12) spawnFireball(f);
@@ -590,7 +614,16 @@ function updFighter(f, o) {
       if (!f.airAtk && live) {
         if (take(c, 'p')) { setState(f, 'jpunch'); f.airAtk = true; sfx('whoosh'); }
         else if (take(c, 'k')) { setState(f, 'jkick'); f.airAtk = true; sfx('whoosh'); }
+        else if (take(c, 's')) {
+          // Coup de pied tournoyant aérien
+          setState(f, 'tatsu'); f.airAtk = true;
+          f.vy = Math.min(f.vy, -2.6); f.vx = 2.3 * f.dir; sfx('upper');
+        }
       }
+      break;
+    case 'tatsu':
+      f.vy -= GRAV * 0.55; // plane un peu pendant la rotation
+      if (f.t % 8 === 4) sfx('whoosh');
       break;
     case 'land': if (f.t >= f.landT) setState(f, 'idle'); break;
     case 'hit': f.vx *= .82; if (f.t >= f.stun) setState(f, 'idle'); break;
@@ -608,6 +641,7 @@ function updFighter(f, o) {
       f.y = GROUND; f.vy = 0; f.air = false;
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
+      else if (f.state === 'tatsu') { setState(f, 'land'); f.landT = 10; }
       else if (['jump', 'jpunch', 'jkick'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
@@ -624,28 +658,32 @@ function hurtbox(f) {
   if (f.invuln > 0 || ['fall', 'down', 'getup'].includes(f.state)) return null;
   if (f.air) return [f.x - 9, f.y - 58, f.x + 9, f.y - 12];
   if (f.state === 'land' || f.state === 'uppercut') return [f.x - 10, f.y - 48, f.x + 10, f.y];
+  if (['crouch', 'cblock', 'cpunch', 'ckick'].includes(f.state)) return [f.x - 11, f.y - 40, f.x + 11, f.y];
   return [f.x - 10, f.y - 60, f.x + 10, f.y];
 }
 function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if ((f.state === 'jpunch' || f.state === 'jkick' || f.state === 'uppercut') && !f.air) return null;
+  if (['jpunch', 'jkick', 'uppercut', 'tatsu'].includes(f.state) && !f.air) return null;
   const [x0, y0, x1, y1] = a.box;
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
 }
 const overlap = (a, b) => a && b && a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
 
-function isBlocking(d, fromX) {
-  if (d.air || !['idle', 'walk', 'block'].includes(d.state)) return false;
+function isBlocking(d, fromX, data) {
+  if (d.air || !NEUTRAL.includes(d.state)) return false;
   const h = d.ctl.held;
-  return fromX < d.x ? h.r : h.l;
+  if (!(fromX < d.x ? h.r : h.l)) return false;
+  if (data.low && !h.d) return false;   // balayage : garde basse obligatoire
+  if (data.high && h.d) return false;   // attaque sautée : garde debout obligatoire
+  return true;
 }
 
 function applyHit(att, def, data, sx, sy, fromX, projectile) {
   const away = fromX < def.x ? 1 : -1;
-  if (isBlocking(def, fromX)) {
-    setState(def, 'block'); def.bstun = data.bstun; def.vx = away * data.push;
+  if (isBlocking(def, fromX, data)) {
+    setState(def, def.ctl.held.d ? 'cblock' : 'block'); def.bstun = data.bstun; def.vx = away * data.push;
     const chip = projectile ? data.chip : (data.knock ? 1 : 0);
     if (chip) { def.hp = Math.max(1, def.hp - chip); def.lagT = 30; }
     G.freeze = 5; addSpark(sx, sy, 'block'); sfx('block');
@@ -668,6 +706,7 @@ function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
 
 /* ---------------- IA du CPU ---------------- */
 function press(a, b, up) { a.press = b; a.pressU = !!up; a.pressFrames = 2; }
+function lowAttack(a, b) { a.hold = { d: true }; a.holdT = 10; press(a, b); }
 function aiInput(f, o) {
   const a = f.ai, held = {};
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l', back = dx > 0 ? 'l' : 'r';
@@ -677,7 +716,11 @@ function aiInput(f, o) {
     if (--a.pressFrames <= 0) { a.press = null; a.pressU = false; }
   }
   if (!G.fighting) return held;
-  const neutral = ['idle', 'walk', 'block'].includes(f.state);
+  const neutral = NEUTRAL.includes(f.state);
+  if (f.state === 'jump' && !f.airAtk && !a.press) {
+    if (dist < 95 && f.vy > -3 && Math.random() < .06) press(a, 's');
+    else if (dist < 50 && Math.random() < .12) press(a, 'k');
+  }
   const fb = o.fb;
 
   if (neutral && fb && Math.sign(fb.vx) === Math.sign(f.x - fb.x) && Math.abs(fb.x - f.x) < 120 && !a.reacted) {
@@ -689,7 +732,9 @@ function aiInput(f, o) {
   }
   if (!fb) a.reacted = false;
   if (neutral && o.air && dist < 58 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
-  if (neutral && ['punch', 'kick'].includes(o.state) && o.t < 5 && dist < 70 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
+  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 70 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
+  if (neutral && o.state === 'ckick' && o.t < 6 && dist < 70 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
+  if (neutral && o.state === 'tatsu' && dist < 110 && Math.random() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
 
   if (--a.cd <= 0 && neutral && !a.press) {
     a.cd = 10 + (Math.random() * 20 | 0);
@@ -705,10 +750,13 @@ function aiInput(f, o) {
       else if (r < .85) { a.hold = { [back]: true }; a.holdT = 12; }
       else { a.hold = {}; a.holdT = 10; }
     } else {
-      if (r < .33) press(a, 'p');
-      else if (r < .6) press(a, 'k');
-      else if (r < .7) press(a, 's', true);
-      else if (r < .86) { a.hold = { [back]: true }; a.holdT = 20; }
+      if (r < .25) press(a, 'p');
+      else if (r < .45) press(a, 'k');
+      else if (r < .55) lowAttack(a, 'k');
+      else if (r < .63) lowAttack(a, 'p');
+      else if (r < .71) press(a, 's', true);
+      else if (r < .80) { a.hold = { [back]: true, d: true }; a.holdT = 20; }
+      else if (r < .88) { a.hold = { [back]: true }; a.holdT = 20; }
       else { a.hold = { [back]: true }; a.holdT = 10; }
     }
   }
@@ -853,7 +901,7 @@ function stepFight() {
     }
   } else if (G.scene === 'ko' || G.scene === 'timeup') {
     const w = G.winner;
-    if (w && G.t > 100 && !w.air && ['idle', 'walk', 'block', 'land'].includes(w.state)) { setState(w, 'win'); w.vx = 0; }
+    if (w && G.t > 100 && !w.air && [...NEUTRAL, 'land'].includes(w.state)) { setState(w, 'win'); w.vx = 0; }
     if (G.t > 260) {
       if (G.f.some(f => f.wins >= 2)) { G.scene = 'over'; G.t = 0; }
       else { G.round++; startRound(); }
@@ -965,11 +1013,14 @@ function drawTitle() {
   drawFighter(fa, CX - 122, 190); drawFighter(fb, CX + 122, 190);
   if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'APPUIE SUR A' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
   if (!isTouch) {
-    text('FLÈCHES : DÉPLACER', W / 2, 148, 8, '#d8c8a8', 'center');
-    text('J POING   K PIED   ESPACE SAUT', W / 2, 160, 8, '#d8c8a8', 'center');
-    text('L SPÉCIAL   HAUT + L UPPERCUT', W / 2, 172, 8, '#d8c8a8', 'center');
+    text('FLÈCHES : DÉPLACER   BAS : S\'ACCROUPIR', W / 2, 144, 8, '#d8c8a8', 'center');
+    text('J POING   K PIED   ESPACE SAUT', W / 2, 156, 8, '#d8c8a8', 'center');
+    text('L SPÉCIAL   HAUT + L UPPERCUT', W / 2, 168, 8, '#d8c8a8', 'center');
+    text('EN L\'AIR + L : PIED TOURNOYANT', W / 2, 180, 8, '#d8c8a8', 'center');
   } else {
-    text('A SPÉCIAL   HAUT + A UPPERCUT', W / 2, 160, 8, '#d8c8a8', 'center');
+    text('A SPÉCIAL   HAUT + A UPPERCUT', W / 2, 152, 8, '#d8c8a8', 'center');
+    text('EN L\'AIR + A : PIED TOURNOYANT', W / 2, 164, 8, '#d8c8a8', 'center');
+    text('BAS + ARRIÈRE : GARDE BASSE', W / 2, 176, 8, '#d8c8a8', 'center');
   }
 }
 
