@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v25';
+const VERSION = 'v26';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1117,7 +1117,7 @@ function updThrow(f) {
     o.rotAng = -d * phi; o.dir = d === 1 ? -1 : 1;
     if (t === T1) {
       setState(o, 'fall'); o.air = true; o.vx = -d * 5.6; o.vy = -4.5; o.rotAng = null;
-      o.hp = Math.max(0, o.hp - 13); o.lagT = 32; o.flash = 3;
+      o.hp = Math.max(0, o.hp - dmgK(13)); o.lagT = 32; o.flash = 3;
       G.shake = 6; sfx('heavy');
     }
   } else {
@@ -1127,7 +1127,7 @@ function updThrow(f) {
     o.rotAng = -d * phi * 1.15; o.dir = d === 1 ? -1 : 1;
     if (t === T1) {
       setState(o, 'fall'); o.air = true; o.vx = -d * 1.2; o.vy = 2.5; o.rotAng = null;
-      o.hp = Math.max(0, o.hp - 15); o.lagT = 32; o.flash = 3;
+      o.hp = Math.max(0, o.hp - dmgK(15)); o.lagT = 32; o.flash = 3;
       G.shake = 9; sfx('heavy');
     }
   }
@@ -1157,7 +1157,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   if (isBlocking(def, fromX, data)) {
     setState(def, def.ctl.held.d ? 'cblock' : 'block'); def.bstun = data.bstun; def.vx = away * data.push;
     const chip = projectile ? data.chip : (data.knock ? 1 : 0);
-    if (chip) { def.hp = Math.max(1, def.hp - chip); def.lagT = 30; }
+    if (chip) { def.hp = Math.max(1, def.hp - dmgK(chip)); def.lagT = 30; }
     G.freeze = 5; addSpark(sx, sy, 'block'); sfx('block');
     return;
   }
@@ -1174,7 +1174,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
   }
-  def.hp = Math.max(0, def.hp - data.dmg); def.lagT = 32;
+  def.hp = Math.max(0, def.hp - dmgK(data.dmg)); def.lagT = 32;
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
     setState(def, 'fall'); def.air = true; def.vy = -4.8; def.vx = away * 2.3;
@@ -1285,22 +1285,42 @@ function endRound(winner) {
 }
 
 /* ---------------- Boucle principale ---------------- */
+// ---------- Options (enregistrées dans le navigateur) ----------
+const OPT = { zoom: true, energy: 1 };
+try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt') || '{}')); } catch (e) {}
+const saveOpt = () => { try { localStorage.setItem('sf2opt', JSON.stringify(OPT)); } catch (e) {} };
+// Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
+const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
 function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
 function stepMoves() {
   if (edge(pctl, 'l')) { G.mpage = ((G.mpage || 0) + MOVES.length - 1) % MOVES.length; sfx('beep'); }
   if (edge(pctl, 'r')) { G.mpage = ((G.mpage || 0) + 1) % MOVES.length; sfx('beep'); }
   if (backPress(pctl) || edge(pctl, 'start')) { G.showMoves = false; sfx('beep'); }
 }
+const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
+function stepOptions() {
+  if (edge(pctl, 'u') || edge(pctl, 'd')) { G.ocur = (G.ocur + (edge(pctl, 'u') ? 2 : 1)) % 3; sfx('beep'); }
+  const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = okPress(pctl);
+  if (backPress(pctl) || (ok && G.ocur === 2)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.ocur === 0 && (l || r || ok)) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
+  if (G.ocur === 1 && (l || r || ok)) {
+    OPT.energy = l ? Math.max(1, OPT.energy - 1) : r ? Math.min(3, OPT.energy + 1) : OPT.energy % 3 + 1;
+    saveOpt(); sfx('select');
+  }
+}
 function stepPause() {
   if (G.showMoves) { stepMoves(); return; }
-  if (edge(pctl, 'u')) { G.pcur = (G.pcur + 2) % 3; sfx('beep'); }
-  if (edge(pctl, 'd')) { G.pcur = (G.pcur + 1) % 3; sfx('beep'); }
+  if (G.showOpts) { stepOptions(); return; }
+  const n = PAUSE_ITEMS.length;
+  if (edge(pctl, 'u')) { G.pcur = (G.pcur + n - 1) % n; sfx('beep'); }
+  if (edge(pctl, 'd')) { G.pcur = (G.pcur + 1) % n; sfx('beep'); }
   if (backPress(pctl)) { G.paused = false; return; }
   if (okPress(pctl)) {
     sfx('select');
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mpage = 0; }
-    else { G.paused = false; G.scene = 'select'; G.t = 0; }
+    else if (G.pcur === 2) { G.paused = false; G.scene = 'select'; G.t = 0; }
+    else { G.showOpts = true; G.ocur = 0; }
   }
 }
 function step() {
@@ -1310,7 +1330,7 @@ function step() {
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
     if (G.paused) { stepPause(); tap = null; return; }
-    if (edge(pctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; sfx('select'); tap = null; return; }
+    if (edge(pctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; G.showOpts = false; sfx('select'); tap = null; return; }
   }
 
   switch (G.scene) {
@@ -1577,8 +1597,8 @@ function drawFight() {
   const [a, b] = G.f;
   // Caméra : zoom de 100 % (distance de départ) à 120 % quand les combattants se rapprochent
   const dist = Math.abs(a.x - b.x), D0 = 160, D1 = 50;
-  const zt = 1 + .2 * Math.max(0, Math.min(1, (D0 - dist) / (D0 - D1)));
-  G.zoom = (G.zoom || 1) + (zt - (G.zoom || 1)) * .08;
+  const zt = OPT.zoom ? 1 + .2 * Math.max(0, Math.min(1, (D0 - dist) / (D0 - D1))) : 1;
+  G.zoom = (G.zoom || 1) + (zt - (G.zoom || 1)) * .16;
   const z = G.zoom, vw = W / z, vh = H / z;
   const left = Math.max(0, Math.min(W - vw, (a.x + b.x) / 2 - vw / 2)), top = H - vh;
   ctx.save();
@@ -1674,15 +1694,41 @@ function drawMoves() {
   if (!isTouch) text('PC: J=Y  K=B  L=A  SPACE=X  ENTER=START', CX, 182, 8, '#9a8a70', 'center');
   text(isTouch ? '< >: PAGE    B: BACK' : '< >: PAGE    ESC: BACK', CX, 198, 8, '#d8c8a8', 'center');
 }
+function drawStar(x, y, r, on) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fillStyle = on ? '#ffd23a' : '#3a2e44'; ctx.fill();
+}
+function panel(y0, h, title) {
+  R(CX - 100, y0, 200, h, 'rgba(20,10,30,.92)');
+  R(CX - 100, y0, 200, 2, '#ffd23a'); R(CX - 100, y0 + h - 2, 200, 2, '#ffd23a');
+  text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
+}
+function drawOptions() {
+  panel(44, 128, 'OPTIONS');
+  const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84;
+  if (c < 2) text('>', x0 - 4, 78 + c * 24, 8, '#ffd23a', 'right');
+  text('ZOOM IN GAME', x0, 78, 8, col(0), 'left');
+  const bx = CX + 64;                                         // case à cocher
+  R(bx, 76, 12, 12, col(0)); R(bx + 2, 78, 8, 8, '#140a1e');
+  if (OPT.zoom) R(bx + 3, 79, 6, 6, '#5ae06a');
+  text('FIGHTERS ENERGY', x0, 102, 8, col(1), 'left');
+  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 106, 5.5, i < OPT.energy);
+  text((c === 2 ? '> ' : '') + 'BACK' + (c === 2 ? ' <' : ''), CX, 134, 8, col(2), 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 156, 8, '#7a6a80', 'center');
+}
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
   if (G.showMoves) { drawMoves(); return; }
-  R(CX - 90, 50, 180, 104, 'rgba(20,10,30,.9)');
-  R(CX - 90, 50, 180, 2, '#ffd23a'); R(CX - 90, 152, 180, 2, '#ffd23a');
-  text('PAUSE', CX, 62, 16, '#ffd23a', 'center');
-  ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT'].forEach((t, i) => {
+  if (G.showOpts) { drawOptions(); return; }
+  panel(40, 136, 'PAUSE');
+  PAUSE_ITEMS.forEach((t, i) => {
     const sel = G.pcur === i;
-    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 92 + i * 18, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
   });
 }
 
