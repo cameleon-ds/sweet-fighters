@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v16';
+const VERSION = 'v17';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -312,7 +312,10 @@ const POSES = {
   throwS:  [6,-51, 4,-43, 1,-27, 12,-35, 19,-25, 10,-33, 17,-23, 10,-13, 14,0, -9,-12, -14,0],
   throwT:  [-2,-56, -2,-48, -1,-30, -6,-60, -12,-68, -4,-58, -10,-66, 7,-15, 11,0, -9,-14, -13,0],
   tuck:    [2,-46, 1,-40, 0,-30, 8,-38, 10,-44, 4,-36, 8,-42, 9,-34, 5,-26, 4,-31, -1,-24],
-  rupper:  [5,-56, 3,-48, 1,-30, 12,-60, 19,-74, -4,-44, -2,-38, 8,-15, 12,0, -8,-14, -12,0],
+  rup0:    [4,-38, 2,-31, -1,-15, 10,-24, 14,-31, -2,-22, 4,-18, 12,-10, 13,0, -8,-4, -16,0],
+  rup1:    [4,-48, 3,-40, 0,-24, 9,-34, 13,-40, 8,-44, 14,-56, 10,-12, 12,0, -7,-8, -12,0],
+  rup2:    [5,-56, 3,-48, 1,-30, 9,-42, 13,-48, 11,-62, 18,-77, 8,-15, 12,0, -8,-14, -12,0],
+  rup3:    [4,-54, 2,-46, 0,-29, 9,-40, 13,-46, 8,-52, 12,-60, 8,-15, 12,0, -8,-14, -12,0],
   win:     [1,-57, 0,-49, 0,-30, 6,-58, 8,-71, -6,-40, -2,-32, 5,-15, 7,0, -6,-15, -8,0],
   fall:    [-14,-40, -9,-36, 2,-26, -6,-44, -12,-50, -14,-30, -18,-26, 10,-30, 18,-36, 12,-22, 20,-24],
   down:    [-24,-6, -17,-6, 0,-5, -14,-12, -8,-14, -20,-3, -26,-2, 9,-9, 18,-3, 10,-4, 20,-2],
@@ -392,16 +395,17 @@ function shoeP(q, dir, dark) {
   sR(x0 + 1, y - 3, 1, 1, '#d8d8d0');                          // œillet
 }
 function footP(q, dir, skin) {
-  const x0 = Math.round(q[0]) - (dir > 0 ? 1 : 3);
-  sR(x0, Math.round(q[1]) - 2, 5, 2, skin[1]);
-  sR(x0 + (dir > 0 ? 0 : 1), Math.round(q[1]) - 2, 4, 1, skin[2]);
+  const x0 = Math.round(q[0]) - (dir > 0 ? 1 : 3), y = Math.round(q[1]);
+  sR(x0 + (dir > 0 ? 0 : 2), y - 3, 3, 1, skin[1]);          // cheville
+  sR(x0, y - 2, 5, 2, skin[1]);                              // pied (plante = dernière ligne)
+  sR(x0 + (dir > 0 ? 0 : 1), y - 2, 4, 1, skin[2]);          // reflet
 }
 
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   const dir = f.state === 'tatsu' && f.t >= 4 && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = false;   // tout en vue 3/4 de face
+  const backView = f.state === 'rupper';   // l'uppercut accroupi est vu de dos, bras proche levé
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
@@ -459,10 +463,11 @@ function drawFighter(f, x = f.x, y = f.y) {
     fist(hd, dir, Gl, S);
   };
   const leg = (k, ft, near) => {
-    const Lg = near ? legs : dim(legs), S = near ? sk : dim(sk);
+    const soft = pal => [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour)
+    const Lg = near ? soft(legs) : dim(legs), S = near ? soft(sk) : dim(sk);
     limbT(p, k, 7, 5, .8, Lg);
     // la jambe s'arrête à la cheville : rien ne dépasse sous le pied / la semelle
-    const ank = add(ft, [0, d.shoes ? -3.5 : -2.5]);
+    const ank = add(ft, [0, d.shoes ? -4 : -4]);
     if (d.torn) {
       limbT(k, ank, 4, 3, 1, S);
       const cut = mix(k, ank, .45);
@@ -471,7 +476,7 @@ function drawFighter(f, x = f.x, y = f.y) {
         sR(cut[0] - 2, cut[1] + 2, 1, 1, Lg[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, Lg[1]);
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
-    } else limbT(k, ank, 5.5, 4.5, .8, Lg);
+    } else limbT(k, ank, 5.5, 3.5, .8, Lg);
     if (d.shoes) shoeP(ft, dir, !near); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
@@ -484,7 +489,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const bob = f.state === 'idle' && ((G.frame / 18 | 0) + f.id) % 2 ? 1 : 0;
   if (guard && f.state !== 'parry') {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
-    const e1 = add(sdA, [dir * 4, 1 + bob]), h1 = add(sdA, [dir * 8.5, -.5 + bob]);
+    const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 4, -4]);   // bras avant plié, poing devant la poitrine
     arm(sdA, e1, h1, true);
   } else arm(sdA, fe, fh, !backView);
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
@@ -601,7 +606,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   let src = SPR;
   if (f.state === 'jump' && f.roll && f.t > 3) {
     // roulade : rotation complète autour du centre du corps, en basse résolution
-    const ang = dir * Math.min(1, (f.t - 3) / 34) * Math.PI * 2;
+    const ang = f.roll * dir * Math.min(1, (f.t - 3) / 34) * Math.PI * 2;   // avant ou arrière
     const cx = OX, cy = OY - 30 * K;
     rx.setTransform(1, 0, 0, 1, 0, 0); rx.clearRect(0, 0, ROLLC.width, ROLLC.height);
     rx.imageSmoothingEnabled = false;
@@ -829,7 +834,7 @@ function poseOf(f) {
     case 'ckick': return f.t < 6 || f.t >= 12 ? 'crouch' : 'ckick';
     case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
     case 'jump': return f.roll && f.t > 3 ? 'tuck' : 'jump';
-    case 'rupper': return f.t < 4 ? 'crouch' : 'rupper';
+    case 'rupper': return f.t < 4 ? 'rup0' : f.t < 9 ? 'rup1' : f.t < 17 ? 'rup2' : 'rup3';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
@@ -891,7 +896,7 @@ function updFighter(f, o) {
         f.jumpQ = (f.jumpQ || 0) + 1;
         if (f.jumpQ >= 4) {
           f.jumpQ = 0;
-          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = !!fwd;
+          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = fwd ? 1 : back ? -1 : 0;
           f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir; break;
         }
       } else f.jumpQ = 0;
