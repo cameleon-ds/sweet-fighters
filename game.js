@@ -4,6 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
+const VERSION = 'v7';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1166,6 +1167,7 @@ function drawTitle() {
   const fa = { def: DEFS[0], dir: 1, state: 'idle', id: 0, flash: 0, t: 0, x: 0, y: 0 };
   const fb = { def: DEFS[1], dir: -1, state: 'idle', id: 1, flash: 0, t: 0, x: 0, y: 0 };
   drawFighter(fa, CX - 160, 196); drawFighter(fb, CX + 160, 196);
+  text(VERSION, W - 6, H - 12, 8, '#9a8a70', 'right');
   if ((G.frame >> 5) % 2 === 0) text(isTouch ? 'APPUIE SUR A' : 'APPUIE SUR ENTRÉE', W / 2, 122, 8, '#ffffff', 'center');
   if (!isTouch) {
     text('FLÈCHES : DÉPLACER   BAS : S\'ACCROUPIR', W / 2, 144, 8, '#d8c8a8', 'center');
