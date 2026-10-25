@@ -5,12 +5,14 @@ Jeu de combat en pixel art, jouable sur navigateur (PC et mobile en paysage).
 ## Tester en local
 Double-clique sur `index.html` : le jeu s'ouvre dans ton navigateur.
 
-## Contrôles PC
-- Flèches : se déplacer
-- J : poing (Y) · K : pied (X) · Espace : saut (B)
-- L : boule d'énergie (A) · Haut + L : uppercut
-- Maintenir la direction opposée à l'adversaire : garde
-
 ## Contrôles mobile (paysage)
-Stick à gauche, boutons Y / X / A / B à droite.
-Pour forcer l'affichage tactile sur PC : `index.html?touch`
+- Stick : se déplacer · haut = saut · bas = s'accroupir · bas + arrière = garde basse
+- Y : poing · B : pied · A : boule d'énergie · haut + A : uppercut
+- En l'air + A : coup de pied tournoyant
+- X : contre. Appuyé juste avant le coup adverse, l'adversaire est bloqué une demi-seconde.
+  Pendant ce temps : Y = prise qui le renverse, B = prise qui le projette de l'autre côté.
+
+## Contrôles PC
+- Flèches : se déplacer / sauter / s'accroupir
+- J : poing · K : pied · L : spécial · Espace : contre
+- Menus : Entrée valide, Échap revient en arrière
