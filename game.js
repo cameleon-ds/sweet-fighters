@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v51';
+const VERSION = 'v52';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1697,9 +1697,17 @@ function aiInput(f, o) {
 }
 
 /* ---------------- Déroulé des rounds ---------------- */
-function startMatch(pick, stage) {
+// 2e couleur quand le CPU prend le même personnage
+const ALT = [
+  { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'] },                                                   // Kaito : t-shirt noir
+  { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#2e2e34', '#4e4e58', '#76767e', '#a6a6b0'] }, // John : t-shirt bleu, jean gris
+];
+const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
+function startMatch(p1, p2, stage) {
+  if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
+  G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  G.f = [makeFighter(DEFS[pick], 0, SW / 2 - 80, 1, false), makeFighter(DEFS[1 - pick], 1, SW / 2 + 80, -1, true)];
+  G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, true)];
   G.f[0].ctl = pctl;
   G.round = 1;
   startRound();
@@ -1827,18 +1835,20 @@ function step() {
         if (sl !== (G.sel || 0)) { G.sel = sl; sfx('beep'); }
       }
       if (G.t > 10 && okPress(pctl)) {
-        if (ROSTER[G.sel || 0] != null) { G.pick = ROSTER[G.sel || 0]; G.scene = 'stage'; G.t = 0; sfx('select'); }
-        else sfx('block');
+        const c = ROSTER[G.sel || 0];
+        if (c == null) sfx('block');
+        else if (!G.selPhase) { G.p1 = c; G.selPhase = 1; sfx('select'); }                 // 1) mon personnage
+        else { G.p2 = c; G.selPhase = 0; G.scene = 'stage'; G.t = 0; sfx('select'); }    // 2) le CPU
       }
-      else if (G.t > 10 && backPress(pctl)) { goTitle(); sfx('beep'); }
+      else if (G.t > 10 && backPress(pctl)) { if (G.selPhase) { G.selPhase = 0; sfx('beep'); } else { goTitle(); sfx('beep'); } }
       break;
     }
     case 'stage': {
       G.t++;
       if (edge(pctl, 'l') && (G.scur || 0) > 0) { G.scur = 0; sfx('beep'); }
       if (edge(pctl, 'r') && (G.scur || 0) < 1) { G.scur = 1; sfx('beep'); }
-      if (G.t > 10 && okPress(pctl)) { startMatch(G.pick, STAGES[G.scur || 0][0]); sfx('select'); }
-      else if (G.t > 10 && backPress(pctl)) { G.scene = 'select'; G.t = 0; sfx('beep'); }
+      if (G.t > 10 && okPress(pctl)) { startMatch(G.p1, G.p2, STAGES[G.scur || 0][0]); sfx('select'); }
+      else if (G.t > 10 && backPress(pctl)) { G.scene = 'select'; G.selPhase = 1; G.t = 0; sfx('beep'); }
       break;
     }
     case 'intro': case 'fight': case 'ko': case 'timeup':
@@ -1846,8 +1856,15 @@ function step() {
       break;
     case 'over':
       G.t++;
-      if (G.t > 60 && okPress(pctl)) { G.scene = 'select'; G.t = 0; sfx('select'); }
-      else if (G.t > 60 && backPress(pctl)) { goTitle(); sfx('beep'); }
+      if (G.t > 30) {
+        const m = navStep(), oc = Math.max(0, Math.min(1, (G.ocurOver || 0) + m));
+        if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
+        if (okPress(pctl)) {
+          sfx('select');
+          if ((G.ocurOver || 0) === 0) startMatch(G.p1, G.p2, G.stage);       // RETRY : mêmes personnages, même stage
+          else { G.scene = 'select'; G.selPhase = 0; G.t = 0; }
+        }
+      }
       break;
   }
   tap = null;
@@ -1967,7 +1984,7 @@ function stepFight() {
     const w = G.winner;
     if (w && G.t > 100 && !w.air && [...NEUTRAL, 'land'].includes(w.state)) { setState(w, 'win'); w.vx = 0; }
     if (G.t > 260) {
-      if (G.f.some(f => f.wins >= 2)) { G.scene = 'over'; G.t = 0; }
+      if (G.f.some(f => f.wins >= 2)) { G.scene = 'over'; G.t = 0; G.ocurOver = 0; }
       else { G.round++; startRound(); }
     }
   }
@@ -2018,12 +2035,15 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg'].map(src => { const im = new Image(); im.src = src + '?v=49'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
+const PORTRAIT_FACE = [1, -1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 const ROSTER = [0, 1, null, null, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
-function drawPortrait(i, x, y, sz, border, flip) {
+function drawPortrait(i, x, y, sz, border, look = 1, hurt = false) {   // look : 1 = regarde à droite, -1 = à gauche
   R(x - 2, y - 2, sz + 4, sz + 4, '#000');
   R(x - 1, y - 1, sz + 2, sz + 2, border || '#c8c8d0');
-  const im = i == null ? null : PORTRAITS[i];
+  const im = i == null ? null : (hurt ? PORTRAITS_HURT : PORTRAITS)[i];
+  const flip = i != null && PORTRAIT_FACE[i] !== look;
   if (im && im.complete && im.naturalWidth) {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     if (flip) { ctx.translate(x + sz, y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0, sz, sz); }
@@ -2048,8 +2068,8 @@ function drawBar(x, w, f, left) {
 function drawHUD() {
   const [a, b] = G.f;
   const PS = 26, bx = 6 + PS + 4, bw = Math.round(CX - 24 - bx);
-  drawPortrait(DEFS.indexOf(a.def), 6, 4, PS, '#5ac8ff');
-  drawPortrait(DEFS.indexOf(b.def), W - 6 - PS, 4, PS, '#ff7a6a', true);
+  drawPortrait(a.def.idx, 6, 4, PS, '#5ac8ff', 1);
+  drawPortrait(b.def.idx, W - 6 - PS, 4, PS, '#ff7a6a', -1);
   drawBar(bx, bw, a, true);
   drawBar(W - bx - bw, bw, b, false);
   // Badge K.O.
@@ -2344,27 +2364,26 @@ function drawTitle() {
 function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
-  text('SELECT YOUR FIGHTER', CX, 6, 8, '#ffd23a', 'center');
-  const sel = G.sel || 0, pi = ROSTER[sel];
-  // grands portraits : 1P à gauche, CPU à droite
+  const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
+  text(ph === 0 ? 'SELECT YOUR FIGHTER' : 'SELECT CPU FIGHTER', CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
+  const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
   const BS = 74, y0 = 20;
-  drawPortrait(pi, CX - 22 - BS, y0, BS, '#5ac8ff');
+  drawPortrait(p1, CX - 22 - BS, y0, BS, '#5ac8ff', 1);
   text('1P', CX - 22 - BS, y0 + BS + 4, 8, '#5ac8ff', 'left');
-  text(pi == null ? '???' : DEFS[pi].name, CX - 22, y0 + BS + 4, 8, '#ffffff', 'right');
-  const cpu = pi == null ? null : 1 - pi;
-  drawPortrait(cpu, CX + 22, y0, BS, '#ff7a6a', true);
+  text(p1 == null ? '???' : DEFS[p1].name, CX - 22, y0 + BS + 4, 8, '#ffffff', 'right');
+  drawPortrait(p2, CX + 22, y0, BS, '#ff7a6a', -1);
   text('CPU', CX + 22 + BS, y0 + BS + 4, 8, '#ff7a6a', 'right');
-  text(cpu == null ? '???' : DEFS[cpu].name, CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
+  text(p2 == null ? '???' : DEFS[p2].name + (p2 === G.p1 ? ' 2P' : ''), CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
   text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
-  // grille 4 x 2
+  // grille 4 x 2 : tous regardent à droite
   const S = 34, gap = 4, gx = CX - (4 * S + 3 * gap) / 2, gy = 120;
   for (let i = 0; i < 8; i++) {
     const x = gx + (i % 4) * (S + gap), y = gy + (i >> 2) * (S + gap);
     const on = i === sel, blink = (G.frame >> 3) % 2;
-    drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
-    if (on) text('1P', x + 1, y - 1, 8, '#5ac8ff', 'left');
+    drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : (ph ? '#ff3a2a' : '#ff6a1a')) : '#5a4a60', 1);
+    if (on) text(ph ? 'CPU' : '1P', x + 1, y - 1, 8, ph ? '#ff7a6a' : '#5ac8ff', 'left');
   }
-  if (pi == null) text('COMING SOON', CX, 196, 8, '#9a8aa0', 'center');
+  if (hov == null) text('COMING SOON', CX, 196, 8, '#9a8aa0', 'center');
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
 }
 
@@ -2386,13 +2405,26 @@ function drawStageSelect() {
   text(isTouch ? '< >: CHOOSE   A: FIGHT   B: BACK' : '< >: CHOOSE   ENTER: FIGHT   ESC: BACK', CX, 200, 8, '#d8c8a8', 'center');
 }
 
+// Écran de fin de combat : les deux visages, le perdant blessé ; RETRY / SELECT CHARACTER
 function drawOver() {
-  drawFight();
-  R(0, 0, W, H, 'rgba(0,0,0,.45)');
-  const p = G.f.find(f => !f.cpu);
-  const won = p ? p.wins >= 2 : true;
-  bigMsg(won ? 'YOU WIN!' : 'YOU LOSE...', 24, won ? '#ffd23a' : '#ff5a4a', 80);
-  if (G.t > 60 && (G.frame >> 5) % 2 === 0) text(isTouch ? 'A: REMATCH   B: TITLE' : 'ENTER: REMATCH   ESC: TITLE', W / 2, 124, 8, '#ffffff', 'center');
+  R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
+  R(0, 0, W, H, 'rgba(6,2,10,.78)');
+  const [a, b] = G.f, aw = a.wins >= 2, bw = b.wins >= 2;
+  const k = Math.min(1, G.t / 25), BS = Math.min(96, Math.round((W - 80) / 2 - 20)), y0 = 22;
+  const lx = Math.round(CX - 18 - BS - (1 - k) * 60), rx = Math.round(CX + 18 + (1 - k) * 60);
+  drawPortrait(a.def.idx, lx, y0, BS, aw ? '#ffd23a' : '#5a4a60', 1, !aw);
+  drawPortrait(b.def.idx, rx, y0, BS, bw ? '#ffd23a' : '#5a4a60', -1, !bw);
+  text(a.def.name, lx + BS / 2, y0 + BS + 6, 8, '#ffffff', 'center');
+  text(b.def.name, rx + BS / 2, y0 + BS + 6, 8, '#ffffff', 'center');
+  text(aw ? 'WINNER' : 'LOSER', lx + BS / 2, y0 + BS + 17, 8, aw ? '#ffd23a' : '#9a6a6a', 'center');
+  text(bw ? 'WINNER' : 'LOSER', rx + BS / 2, y0 + BS + 17, 8, bw ? '#ffd23a' : '#9a6a6a', 'center');
+  text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
+  const won = a.cpu === false ? aw : bw;
+  if (G.t > 20) text(won ? 'YOU WIN!' : 'YOU LOSE...', CX, 4, 8, won ? '#ffd23a' : '#ff5a4a', 'center');
+  if (G.t > 30) ['RETRY', 'SELECT CHARACTER'].forEach((m, i) => {
+    const sel = (G.ocurOver || 0) === i;
+    text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+  });
 }
 
 function render() {
