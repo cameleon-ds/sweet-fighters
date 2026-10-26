@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v48';
+const VERSION = 'v49';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1687,8 +1687,18 @@ function step() {
     }
     case 'select': {
       G.t++;
-      if (pctl.buf.l === 8 || pctl.buf.r === 8) { G.pick = 1 - G.pick; sfx('beep'); }
-      if (G.t > 10 && okPress(pctl)) { startMatch(G.pick); sfx('select'); }
+      {
+        let sl = G.sel || 0;
+        if (edge(pctl, 'l') && sl % 4 > 0) sl--;
+        if (edge(pctl, 'r') && sl % 4 < 3) sl++;
+        if (edge(pctl, 'u') && sl > 3) sl -= 4;
+        if (edge(pctl, 'd') && sl < 4) sl += 4;
+        if (sl !== (G.sel || 0)) { G.sel = sl; sfx('beep'); }
+      }
+      if (G.t > 10 && okPress(pctl)) {
+        if (ROSTER[G.sel || 0] != null) { G.pick = ROSTER[G.sel || 0]; startMatch(G.pick); sfx('select'); }
+        else sfx('block');
+      }
       else if (G.t > 10 && backPress(pctl)) { goTitle(); sfx('beep'); }
       break;
     }
@@ -1868,6 +1878,23 @@ function drawSpark(s) {
   if (s.t < 4) disc(s.x, s.y, 4 - s.t, col[0]);
 }
 
+// ---------- Portraits et grille de sélection (8 cases) ----------
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg'].map(src => { const im = new Image(); im.src = src + '?v=49'; return im; });
+const ROSTER = [0, 1, null, null, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
+function drawPortrait(i, x, y, sz, border, flip) {
+  R(x - 2, y - 2, sz + 4, sz + 4, '#000');
+  R(x - 1, y - 1, sz + 2, sz + 2, border || '#c8c8d0');
+  const im = i == null ? null : PORTRAITS[i];
+  if (im && im.complete && im.naturalWidth) {
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    if (flip) { ctx.translate(x + sz, y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0, sz, sz); }
+    else ctx.drawImage(im, x, y, sz, sz);
+    ctx.restore();
+  } else {
+    R(x, y, sz, sz, '#000');
+    text('?', x + sz / 2, y + sz / 2 - (sz >= 40 ? 8 : 4), sz >= 40 ? 16 : 8, '#ffffff', 'center');
+  }
+}
 function drawBar(x, w, f, left) {
   R(x - 2, 9, w + 4, 11, '#000');
   R(x - 1, 10, w + 2, 9, '#c8c8d0');
@@ -1881,9 +1908,11 @@ function drawBar(x, w, f, left) {
 
 function drawHUD() {
   const [a, b] = G.f;
-  const bw = Math.round(CX - 42);
-  drawBar(16, bw, a, true);
-  drawBar(W - 16 - bw, bw, b, false);
+  const PS = 26, bx = 6 + PS + 4, bw = Math.round(CX - 24 - bx);
+  drawPortrait(DEFS.indexOf(a.def), 6, 4, PS, '#5ac8ff');
+  drawPortrait(DEFS.indexOf(b.def), W - 6 - PS, 4, PS, '#ff7a6a', true);
+  drawBar(bx, bw, a, true);
+  drawBar(W - bx - bw, bw, b, false);
   // Badge K.O.
   const flash = (a.hp < 25 || b.hp < 25) && (G.frame >> 4) % 2;
   R(CX - 22, 7, 44, 15, '#000');
@@ -1892,12 +1921,12 @@ function drawHUD() {
   // Chrono
   text(String(G.timer).padStart(2, '0'), CX, 26, 16, '#ffffff', 'center');
   // Noms + victoires
-  text(a.def.name, 16, 24, 8, '#ffffff', 'left');
-  text(b.def.name, W - 16, 24, 8, '#ffffff', 'right');
-  if (a.cpu === false) text('1P', 16, 35, 8, '#5ac8ff', 'left');
-  text('CPU', W - 16, 35, 8, '#ff7a6a', 'right');
-  for (let i = 0; i < a.wins; i++) drawMedal(40 + i * 12, 38);
-  for (let i = 0; i < b.wins; i++) drawMedal(W - 48 - i * 12, 38);
+  text(a.def.name, bx, 24, 8, '#ffffff', 'left');
+  text(b.def.name, W - bx, 24, 8, '#ffffff', 'right');
+  if (a.cpu === false) text('1P', 6, 35, 8, '#5ac8ff', 'left');
+  text('CPU', W - 6, 35, 8, '#ff7a6a', 'right');
+  for (let i = 0; i < a.wins; i++) drawMedal(bx + 18 + i * 12, 38);
+  for (let i = 0; i < b.wins; i++) drawMedal(W - bx - 26 - i * 12, 38);
 }
 function drawMedal(x, y) {
   disc(x, y, 4, OUT); disc(x, y, 3, '#e8a820'); R(x - 1, y - 2, 2, 2, '#fff2a8');
@@ -2170,23 +2199,29 @@ function drawTitle() {
 
 function drawSelect() {
   ctx.drawImage(BG, -EXT, 0);
-  R(0, 0, W, H, 'rgba(10,4,16,.6)');
-  text('SELECT YOUR FIGHTER', W / 2, 18, 8, '#ffd23a', 'center');
-  [0, 1].forEach(i => {
-    const x = i === 0 ? CX - 96 : CX + 6, sel = G.pick === i;
-    R(x, 40, 90, 140, sel ? ((G.frame >> 3) % 2 ? '#ffd23a' : '#ff6a1a') : '#3a2a3a');
-    R(x + 3, 43, 84, 134, '#1a1020');
-    R(x + 3, 43, 84, 134, sel ? 'rgba(80,40,120,.6)' : 'rgba(30,20,40,.6)');
-    ctx.save();
-    ctx.translate(x + 45, 174);
-    ctx.scale(1.35, 1.35);
-    const f = { def: DEFS[i], dir: i === 0 ? 1 : -1, state: sel ? 'idle' : 'idle', id: i, flash: 0, t: 0 };
-    drawFighter(f, 0, 0);
-    ctx.restore();
-    text(DEFS[i].name, x + 45, 186, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
-    if (sel) text('1P', x + 45, 30, 8, '#5ac8ff', 'center');
-  });
-  text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', W / 2, 202, 8, '#d8c8a8', 'center');
+  R(0, 0, W, H, 'rgba(8,4,14,.78)');
+  text('SELECT YOUR FIGHTER', CX, 6, 8, '#ffd23a', 'center');
+  const sel = G.sel || 0, pi = ROSTER[sel];
+  // grands portraits : 1P à gauche, CPU à droite
+  const BS = 74, y0 = 20;
+  drawPortrait(pi, CX - 22 - BS, y0, BS, '#5ac8ff');
+  text('1P', CX - 22 - BS, y0 + BS + 4, 8, '#5ac8ff', 'left');
+  text(pi == null ? '???' : DEFS[pi].name, CX - 22, y0 + BS + 4, 8, '#ffffff', 'right');
+  const cpu = pi == null ? null : 1 - pi;
+  drawPortrait(cpu, CX + 22, y0, BS, '#ff7a6a', true);
+  text('CPU', CX + 22 + BS, y0 + BS + 4, 8, '#ff7a6a', 'right');
+  text(cpu == null ? '???' : DEFS[cpu].name, CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
+  text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
+  // grille 4 x 2
+  const S = 34, gap = 4, gx = CX - (4 * S + 3 * gap) / 2, gy = 120;
+  for (let i = 0; i < 8; i++) {
+    const x = gx + (i % 4) * (S + gap), y = gy + (i >> 2) * (S + gap);
+    const on = i === sel, blink = (G.frame >> 3) % 2;
+    drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
+    if (on) text('1P', x + 1, y - 1, 8, '#5ac8ff', 'left');
+  }
+  if (pi == null) text('COMING SOON', CX, 196, 8, '#9a8aa0', 'center');
+  text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
 }
 
 function drawOver() {
