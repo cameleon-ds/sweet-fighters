@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v32';
+const VERSION = 'v33';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -752,6 +752,8 @@ let tap = null; // dernier tap en coordonnées canvas
 })();
 
 // Bouton « Continuer » de l'écran portrait (rotation verrouillée)
+const ROT_EL = document.getElementById('rotate');
+const rotateShown = () => !!ROT_EL && getComputedStyle(ROT_EL).display !== 'none';
 document.getElementById('rotateOk').addEventListener('click', () => { document.body.classList.add('rotok'); resize(); });
 
 let fsTried = false;
@@ -1421,6 +1423,8 @@ function step() {
 
   switch (G.scene) {
     case 'title': {
+      // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
+      if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
       if (G.showOpts) { stepOptions(); break; }
