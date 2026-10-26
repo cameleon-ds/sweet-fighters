@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v49';
+const VERSION = 'v50';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -29,7 +29,7 @@ function resize() {
   if (nw !== W) {
     const old = W; W = nw; CX = W / 2; SW = W + 2 * EXT;
     cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false;
-    if (typeof makeBG === 'function') BG = makeBG();
+    if (typeof makeBG === 'function') { BGS.dojo = makeBG(); BGS.city = makeCityBG(); BG = BGS[(typeof G !== 'undefined' && G.stage) || 'dojo']; }
     if (typeof G !== 'undefined' && G.f) G.f.forEach(f => { f.x += (W - old) / 2; });
     if (typeof G !== 'undefined' && G.props) G.props.forEach(p => { p.x += (W - old) / 2; });
   }
@@ -206,6 +206,79 @@ function makeBG() {
   return c;
 }
 let BG = null;
+const BGS = {};
+
+/* ---------------- Décor 2 : la ville la nuit (style Streets of Rage) ---------------- */
+function makeCityBG() {
+  seed = 4242;
+  const W = SW, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const F = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x | 0, y | 0, w | 0, h | 0); };
+  // ciel de nuit
+  const sky = g.createLinearGradient(0, 0, 0, 120);
+  sky.addColorStop(0, '#06041a'); sky.addColorStop(.6, '#1c0f3a'); sky.addColorStop(1, '#3a1a4a');
+  g.fillStyle = sky; g.fillRect(0, 0, W, 132);
+  for (let i = 0; i < 120; i++) F(rnd() * W, rnd() * 60, 1, 1, rnd() < .3 ? '#fff6d8' : '#8a7ab0');
+  // lune
+  g.fillStyle = '#f4ecc8'; g.beginPath(); g.arc(W * .72, 26, 9, 0, 7); g.fill();
+  g.fillStyle = '#1c0f3a'; g.beginPath(); g.arc(W * .72 + 4, 23, 8, 0, 7); g.fill();
+  // gratte-ciel lointains
+  for (let x = -10; x < W; ) {
+    const w = 16 + rnd() * 26 | 0, h = 40 + rnd() * 60 | 0;
+    F(x, 132 - h, w, h, '#120c2a');
+    for (let wy = 132 - h + 4; wy < 126; wy += 5) for (let wx = x + 3; wx < x + w - 3; wx += 4) if (rnd() < .28) F(wx, wy, 2, 2, rnd() < .5 ? '#d8b04a' : '#6a5a9a');
+    x += w + (rnd() * 4 | 0);
+  }
+  // immeubles de briques au premier plan du fond
+  for (let x = -20; x < W; ) {
+    const w = 70 + rnd() * 50 | 0, top = 20 + rnd() * 40 | 0, br = rnd() < .5 ? '#4a2228' : '#3a2632';
+    F(x, top, w, 132 - top, br);
+    for (let yy = top; yy < 132; yy += 3) for (let xx = x + ((yy / 3) % 2) * 4; xx < x + w; xx += 8) F(xx, yy, 1, 1, '#2a1218');
+    F(x, top, w, 3, '#2a1418'); F(x, top + 3, w, 1, '#5a3038');
+    for (let wy = top + 10; wy < 104; wy += 18) for (let wx = x + 8; wx < x + w - 12; wx += 18) {
+      const lit = rnd() < .45;
+      F(wx - 1, wy - 1, 12, 13, '#1a0c10');
+      F(wx, wy, 10, 11, lit ? '#e8b85a' : '#241830');
+      if (lit) { F(wx, wy, 10, 2, '#fff0b0'); F(wx + 4, wy, 2, 11, '#a87a30'); }
+      else F(wx + 4, wy, 2, 11, '#1a0c10');
+    }
+    // escalier de secours
+    if (rnd() < .5) { const ex = x + w - 22; for (let ey = top + 22; ey < 110; ey += 18) { F(ex, ey, 18, 2, '#141418'); F(ex, ey - 8, 1, 8, '#141418'); F(ex + 17, ey - 8, 1, 8, '#141418'); } }
+    x += w + 6;
+  }
+  // enseignes néon
+  const neon = (x, y, txt, col) => {
+    g.save(); g.font = '8px "Press Start 2P", monospace'; g.textBaseline = 'top';
+    g.shadowColor = col; g.shadowBlur = 8; g.fillStyle = col; g.fillText(txt, x, y);
+    g.shadowBlur = 0; g.fillStyle = '#ffffff'; g.globalAlpha = .55; g.fillText(txt, x, y); g.restore();
+  };
+  for (let x = 60; x < W - 60; x += 230) { neon(x, 70, 'BAR', '#ff3aa8'); neon(x + 110, 54, 'HOTEL', '#3af0ff'); }
+  // trottoir et rue
+  F(0, 124, W, 8, '#2a2630'); F(0, 124, W, 1, '#4a4450');            // bas des façades
+  const top = 132, bot = 196;
+  for (let y = top; y < bot; y++) {
+    const k = (y - top) / (bot - top);
+    F(0, y, W, 1, `rgb(${70 + k * 30 | 0},${68 + k * 28 | 0},${80 + k * 30 | 0})`);
+  }
+  for (let y = top + 6, s0 = 10; y < bot; y += s0, s0 += 2) F(0, y, W, 1, '#3e3a48');          // joints des dalles
+  for (let x = 0; x < W; x += 28) for (let y = top; y < bot; y += 12) F(x + ((y / 12) % 2) * 14, y, 1, 12, '#4a4656');
+  F(0, bot, W, 3, '#8a8698'); F(0, bot + 3, W, 2, '#3a3644');          // bordure
+  F(0, bot + 5, W, H - bot - 5, '#16161e');                            // chaussée
+  for (let x = 0; x < W; x += 40) F(x, 210, 20, 2, '#d8c040');
+  // réverbères
+  for (let x = 40; x < W; x += 170) {
+    F(x, 40, 3, 92, '#18181e'); F(x, 40, 16, 3, '#18181e'); F(x + 12, 43, 8, 3, '#2a2a34');
+    const lg = g.createRadialGradient(x + 16, 50, 1, x + 16, 120, 70);
+    lg.addColorStop(0, 'rgba(255,220,140,.35)'); lg.addColorStop(1, 'rgba(255,220,140,0)');
+    g.fillStyle = lg; g.beginPath(); g.moveTo(x + 12, 46); g.lineTo(x - 30, 196); g.lineTo(x + 62, 196); g.lineTo(x + 20, 46); g.fill();
+    F(x + 13, 46, 6, 2, '#fff2c0');
+  }
+  // bouche d'incendie
+  for (let x = 120; x < W; x += 260) { F(x, 122, 6, 10, '#b8261c'); F(x - 1, 120, 8, 3, '#d8382a'); F(x - 2, 125, 10, 2, '#8a140e'); }
+  return c;
+}
+
 
 /* ---------------- Personnages (designs originaux, pixel art « gros pixels ») ---------------- */
 // Têtes 9x9 de profil (regard vers la droite).
@@ -870,7 +943,7 @@ function menuStickDirs() {
   else if (Math.abs(x) > Math.abs(y) * 1.4) { if (x < 0) o.l = true; else o.r = true; }
   return o;
 }
-const inMenu = () => G.paused || ['title', 'select', 'over'].includes(G.scene);
+const inMenu = () => G.paused || ['title', 'select', 'stage', 'over'].includes(G.scene);
 function readPlayer() {
   const st = inMenu() ? menuStickDirs() : stickDirs();
   const K = k => keys.has(k) || latched.has(k);
@@ -1268,11 +1341,15 @@ function updThrow(f) {
 }
 /* ---------- Objets du décor : chaise et vases (cassables, lançables avec X) ---------- */
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
-const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30] };
+const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [6, 17], cone: [16, 22], trash: [20, 28] };
 function makeProps() {
   const c = SW / 2;
-  return [['crate', c - 268, 0], ['vase', c - 236, 0], ['pot', c - 196, 0], ['chair', c - 145, 0],
-          ['pot', c + 135, 0], ['tallvase', c + 178, 1], ['vase', c + 214, 2], ['crate', c + 262, 0]]
+  const list = G.stage === 'city'
+    ? [['trash', c - 266, 0], ['bottle', c - 238, 0], ['cone', c - 196, 0], ['bottle', c - 146, 0],
+       ['bottle', c + 140, 0], ['cone', c + 182, 0], ['bottle', c + 228, 0], ['trash', c + 262, 0]]
+    : [['crate', c - 268, 0], ['vase', c - 236, 0], ['pot', c - 196, 0], ['chair', c - 145, 0],
+       ['pot', c + 135, 0], ['tallvase', c + 178, 1], ['vase', c + 214, 2], ['crate', c + 262, 0]];
+  return list
     .map(([type, x, v]) => ({ type, x, y: GROUND, v, alive: true, held: null, fly: null }));
 }
 const propBox = p => { const [w, h] = PROP_DIM[p.type]; return [p.x - w / 2, p.y - h, p.x + w / 2, p.y]; };
@@ -1296,7 +1373,7 @@ function aimProp(p, owner, target) {
 function breakProp(p, x = p.x, y = p.y - 10) {
   if (!p.alive) return;
   p.alive = false; p.held = null; p.fly = null;
-  const cols = p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v];
+  const cols = p.type === 'bottle' ? ['#2a7a2a', '#5ac85a', '#1a4a1a', '#c8f0c8'] : p.type === 'cone' ? ['#ff6a1a', '#ffffff', '#c84a0a'] : p.type === 'trash' ? ['#7a7a88', '#a8a8b8', '#4a4a56', '#3a6a2a'] : p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v];
   for (let i = 0; i < 14; i++) G.shards.push({ x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 10,
     vx: (Math.random() - .5) * 5, vy: -1.5 - Math.random() * 3.5, col: cols[i % cols.length], s: 1 + (Math.random() * 3 | 0), t: 0 });
   sfx('crash'); G.shake = Math.max(G.shake, 2);
@@ -1362,6 +1439,21 @@ function drawProp(p, x, y) {
     F(-16, -22, 32, 5, w); F(-16, -22, 32, 1, l); F(-16, -18, 32, 1, d);   // assise
     F(-15, -17, 3, 17, d); F(12, -17, 3, 17, d);          // pieds avant
     F(-12, -8, 24, 1, d);
+  } else if (p.type === 'bottle') {
+    const g1 = '#1e6a24', g2 = '#3aa040', g3 = '#9ae0a0';
+    F(-1, -17, 2, 2, '#c8a030'); F(-1, -15, 2, 4, g1); F(-2, -11, 4, 2, g1);   // capsule + goulot
+    F(-3, -9, 6, 9, g1); F(-2, -9, 2, 9, g2); F(-1, -8, 1, 6, g3);
+    F(-3, -6, 6, 3, '#e8d8a0'); F(-2, -5, 3, 1, '#b8261c');                     // étiquette
+  } else if (p.type === 'cone') {
+    const o = '#ff6a1a', od = '#c84a0a';
+    for (let r = 0; r < 19; r++) { const w = 1 + Math.round(r * 5.5 / 19); F(-w, -21 + r, w * 2 + 1, 1, (r > 6 && r < 10) || (r > 13 && r < 16) ? '#f0f0f0' : o); F(w, -21 + r, 1, 1, od); }
+    F(-8, -3, 17, 3, '#2a2a30'); F(-8, -3, 17, 1, '#4a4a54');
+  } else if (p.type === 'trash') {
+    const m = '#8a8a98', md = '#4a4a56', ml = '#c0c0cc';
+    F(-9, -24, 18, 24, m); F(-9, -24, 2, 24, md); F(7, -24, 2, 24, md);
+    for (let x = -5; x <= 5; x += 4) F(x, -22, 1, 20, md);
+    F(-10, -28, 20, 4, md); F(-10, -28, 20, 1, ml); F(-3, -30, 6, 2, md);   // couvercle
+    F(-6, -32, 3, 4, '#3a7a2a');                                               // sac qui dépasse
   } else if (p.type === 'crate') {
     const w = '#9a6a38', d = '#5a3418', l = '#c08a50';
     F(-11, -20, 22, 20, w); F(-11, -20, 22, 1, l);
@@ -1402,6 +1494,22 @@ function drawShards() {
     R(s.x, s.y, s.s, s.s, s.col);
   }
 }
+// Sang : gouttes projetées qui tachent le sol (désactivable dans les options)
+function spawnBlood(x, y, away, dmg) {
+  if (!OPT.blood) return;
+  const n = 5 + Math.min(10, dmg | 0);
+  for (let i = 0; i < n; i++) G.blood.push({ x, y: y + (Math.random() - .5) * 8, vx: away * (.8 + Math.random() * 2.6) + (Math.random() - .5),
+    vy: -1.2 - Math.random() * 2.6, s: Math.random() < .3 ? 2 : 1, gy: GROUND - 3 + Math.random() * 9, t: 0 });
+}
+function updBlood() {
+  for (const d of G.blood) {
+    d.t++; d.vy += .28; d.x += d.vx; d.y += d.vy;
+    if (d.y >= d.gy) { d.dead = true; if (G.stains.length < 160) G.stains.push({ x: d.x, y: d.gy, w: 1 + (Math.random() * 3 | 0) + d.s, a: 1 }); }
+  }
+  G.blood = G.blood.filter(d => !d.dead);
+}
+function drawStains() { for (const s of G.stains || []) { R(s.x - s.w / 2, s.y, s.w, 1, '#6a0a0a'); if (s.w > 2) R(s.x - s.w / 2 + 1, s.y - 1, s.w - 2, 1, '#8a1010'); } }
+function drawBlood() { for (const d of G.blood || []) R(d.x, d.y, d.s + 1, d.s, d.s > 1 ? '#a01010' : '#c81818'); }
 function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 
 const CLASH_HIT = { dmg: 14, knock: true, stun: 24, bstun: 20, push: 5.5, chip: 0, sfx: 'heavy' };
@@ -1477,6 +1585,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
   }
   def.hp = Math.max(0, def.hp - dmgK(data.dmg)); def.lagT = 32;
+  spawnBlood(sx, sy, away, data.dmg);
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
     setState(def, 'fall'); def.air = true; def.vy = -4.8; def.vx = away * 2.3;
@@ -1568,7 +1677,8 @@ function aiInput(f, o) {
 }
 
 /* ---------------- Déroulé des rounds ---------------- */
-function startMatch(pick) {
+function startMatch(pick, stage) {
+  G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
   G.f = [makeFighter(DEFS[pick], 0, SW / 2 - 80, 1, false), makeFighter(DEFS[1 - pick], 1, SW / 2 + 80, -1, true)];
   G.f[0].ctl = pctl;
   G.round = 1;
@@ -1582,7 +1692,7 @@ function startRound() {
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
-  G.props = makeProps(); G.shards = []; G.slowAll = 0; G.camL = EXT; G.zoom = 1;
+  G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -1595,9 +1705,9 @@ function endRound(winner) {
 
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
-const OPT = { zoom: true, energy: 1, diff: 1 };
-try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt') || '{}')); } catch (e) {}
-const saveOpt = () => { try { localStorage.setItem('sf2opt', JSON.stringify(OPT)); } catch (e) {} };
+const OPT = { zoom: true, energy: 1, diff: 1, blood: true };
+try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}   // nouvelle clé : zoom et sang activés par défaut
+const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
 const DIFFS = ['EASY', 'NORMAL', 'HARD'];
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
@@ -1621,9 +1731,10 @@ function stepMoves() {
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  const m = navStep(), oc = Math.max(0, Math.min(3, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
+  const m = navStep(), oc = Math.max(0, Math.min(4, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
-  if (backPress(pctl) || (ok && G.ocur === 3)) { G.showOpts = false; sfx('beep'); return; }
+  if (backPress(pctl) || (ok && G.ocur === 4)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.ocur === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
   if (G.ocur === 2 && (l || r || ok)) {
     OPT.diff = l ? Math.max(0, OPT.diff - 1) : r ? Math.min(2, OPT.diff + 1) : (OPT.diff + 1) % 3;
     saveOpt(); sfx('select');
@@ -1696,10 +1807,18 @@ function step() {
         if (sl !== (G.sel || 0)) { G.sel = sl; sfx('beep'); }
       }
       if (G.t > 10 && okPress(pctl)) {
-        if (ROSTER[G.sel || 0] != null) { G.pick = ROSTER[G.sel || 0]; startMatch(G.pick); sfx('select'); }
+        if (ROSTER[G.sel || 0] != null) { G.pick = ROSTER[G.sel || 0]; G.scene = 'stage'; G.t = 0; sfx('select'); }
         else sfx('block');
       }
       else if (G.t > 10 && backPress(pctl)) { goTitle(); sfx('beep'); }
+      break;
+    }
+    case 'stage': {
+      G.t++;
+      if (edge(pctl, 'l') && (G.scur || 0) > 0) { G.scur = 0; sfx('beep'); }
+      if (edge(pctl, 'r') && (G.scur || 0) < 1) { G.scur = 1; sfx('beep'); }
+      if (G.t > 10 && okPress(pctl)) { startMatch(G.pick, STAGES[G.scur || 0][0]); sfx('select'); }
+      else if (G.t > 10 && backPress(pctl)) { G.scene = 'select'; G.t = 0; sfx('beep'); }
       break;
     }
     case 'intro': case 'fight': case 'ko': case 'timeup':
@@ -1806,7 +1925,7 @@ function stepFight() {
     }
   }
 
-  updProps();
+  updProps(); updBlood();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -2008,6 +2127,7 @@ function drawFight() {
     const k = Math.min(1, G.darkT / 10, (60 - G.darkT) / 6 + .2);
     R(left - 10, top - 10, vw + 20, vh + 20, `rgba(6,4,18,${.62 * k})`);
   }
+  drawStains();
   drawProps();
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
@@ -2028,7 +2148,7 @@ function drawFight() {
     ctx.restore();
     disc(cx, cy, r | 0, pal[2]); disc(cx, cy, Math.max(1, r * .55) | 0, pal[0]);
   });
-  drawShards();
+  drawShards(); drawBlood();
   G.sparks.forEach(drawSpark);
   if (G.flashT > 0) {
     // éclat en étoile qui jaillit du point d'impact : grandit très vite en tournant puis s'efface
@@ -2123,19 +2243,18 @@ function panel(y0, h, title) {
   text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
-  panel(36, 146, 'OPTIONS');
-  const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84;
-  if (c < 3) text('>', x0 - 4, 68 + c * 22, 8, '#ffd23a', 'right');
-  text('ZOOM IN GAME', x0, 68, 8, col(0), 'left');
-  const bx = CX + 64;                                         // case à cocher
-  R(bx, 66, 12, 12, col(0)); R(bx + 2, 68, 8, 8, '#140a1e');
-  if (OPT.zoom) R(bx + 3, 69, 6, 6, '#5ae06a');
-  text('FIGHTERS ENERGY', x0, 90, 8, col(1), 'left');
-  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 94, 5.5, i < OPT.energy);
-  text('DIFFICULTY', x0, 112, 8, col(2), 'left');
-  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, 112, 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
-  text((c === 3 ? '> ' : '') + 'BACK' + (c === 3 ? ' <' : ''), CX, 140, 8, col(3), 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 164, 8, '#7a6a80', 'center');
+  panel(28, 162, 'OPTIONS');
+  const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84, bx = CX + 64;
+  const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
+  if (c < 4) text('>', x0 - 4, 58 + c * 20, 8, '#ffd23a', 'right');
+  text('ZOOM IN GAME', x0, 58, 8, col(0), 'left'); box(58, OPT.zoom, 0);
+  text('FIGHTERS ENERGY', x0, 78, 8, col(1), 'left');
+  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 82, 5.5, i < OPT.energy);
+  text('DIFFICULTY', x0, 98, 8, col(2), 'left');
+  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, 98, 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
+  text('BLOOD', x0, 118, 8, col(3), 'left'); box(118, OPT.blood, 3);
+  text((c === 4 ? '> ' : '') + 'BACK' + (c === 4 ? ' <' : ''), CX, 146, 8, col(4), 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 170, 8, '#7a6a80', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
@@ -2150,6 +2269,14 @@ function drawPause() {
 
 const LOGO = new Image();
 LOGO.src = 'logo.png?v=25';
+const TITLE_IMG = new Image();
+TITLE_IMG.src = 'title.jpg?v=50';
+function drawCover(img, al, sc = 1) {   // image plein écran (recadrée)
+  if (!img.complete || !img.naturalWidth) return;
+  const k = Math.max(W / img.naturalWidth, H / img.naturalHeight) * sc, w = img.naturalWidth * k, h = img.naturalHeight * k;
+  ctx.save(); ctx.globalAlpha = al; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, CX - w / 2, H / 2 - h / 2, w, h); ctx.restore();
+}
 const SRG = new Image();
 SRG.src = 'srg.jpg?v=25';
 const SPLASH = 110;   // durée du logo Super Rocket Games (fondu, 1 s, fondu)
@@ -2169,17 +2296,14 @@ function drawTitle() {
     drawImg(SRG, CX, H / 2, Math.min(300, W - 40), al);
     return;
   }
-  // 3) après appui : le décor apparaît derrière le menu
-  if (G.tstate === 1) {
-    const k = Math.min(1, (G.tmenu || 0) / 30);
-    ctx.save(); ctx.globalAlpha = k; ctx.drawImage(BG, -EXT, 0); R(0, 0, W, H, 'rgba(10,4,16,.5)'); ctx.restore();
-  }
-  // 2) logo Sweet Fighters : grand dézoom + fondu, sur fond noir
+  // 2) mur de briques avec le logo graffiti : dézoom + fondu
   const L = t - SPLASH;
-  const k = Math.min(1, L / 30), ease = 1 - Math.pow(1 - k, 3);
-  const mk = G.tstate === 1 ? Math.min(1, (G.tmenu || 0) / 20) : 0;   // le logo remonte un peu pour laisser la place au menu
-  const sc = (2.2 - 1.2 * ease) * (1 - .1 * mk), al = Math.min(1, L / 18);
-  if (!drawImg(LOGO, CX, 86 - 8 * mk, 244 * sc, al)) text('SWEET FIGHTERS', CX, 70, 16, '#ff7a3a', 'center');
+  const k = Math.min(1, L / 40), ease = 1 - Math.pow(1 - k, 3);
+  drawCover(TITLE_IMG, Math.min(1, L / 25), 1.25 - .25 * ease);
+  if (!TITLE_IMG.complete) text('SWEET FIGHTERS', CX, 70, 16, '#ff7a3a', 'center');
+  // bandeau sombre en bas pour la lisibilité
+  const gb = ctx.createLinearGradient(0, 140, 0, H); gb.addColorStop(0, 'rgba(0,0,0,0)'); gb.addColorStop(1, 'rgba(0,0,0,.75)');
+  ctx.fillStyle = gb; ctx.fillRect(0, 140, W, H - 140);
   if (G.showMoves) { drawMoves(); return; }
   if (G.showOpts) { R(0, 0, W, H, 'rgba(0,0,0,.55)'); drawOptions(); return; }
   if (G.tstate !== 1) {
@@ -2187,7 +2311,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 160 + i * 11, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
     });
   }
   if (L > 30) {
@@ -2198,8 +2322,8 @@ function drawTitle() {
 }
 
 function drawSelect() {
-  ctx.drawImage(BG, -EXT, 0);
-  R(0, 0, W, H, 'rgba(8,4,14,.78)');
+  R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
+  R(0, 0, W, H, 'rgba(8,4,14,.72)');
   text('SELECT YOUR FIGHTER', CX, 6, 8, '#ffd23a', 'center');
   const sel = G.sel || 0, pi = ROSTER[sel];
   // grands portraits : 1P à gauche, CPU à droite
@@ -2224,6 +2348,24 @@ function drawSelect() {
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
 }
 
+const STAGES = [['dojo', 'DOJO'], ['city', 'CITY NIGHT']];
+function drawStageSelect() {
+  R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
+  R(0, 0, W, H, 'rgba(8,4,14,.72)');
+  text('SELECT STAGE', CX, 14, 8, '#ffd23a', 'center');
+  const cw = Math.min(170, (W - 40) / 2 - 6), ch = Math.round(cw * 9 / 16);
+  STAGES.forEach(([id, name], i) => {
+    const x = CX - cw - 6 + i * (cw + 12), y = 54, on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
+    R(x - 3, y - 3, cw + 6, ch + 6, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
+    R(x - 1, y - 1, cw + 2, ch + 2, '#000');
+    const bg = BGS[id];
+    if (bg) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bg, (bg.width - bg.height * 16 / 9) / 2, 0, bg.height * 16 / 9, bg.height, x, y, cw, ch); ctx.restore(); }
+    if (!on) R(x, y, cw, ch, 'rgba(0,0,0,.45)');
+    text(name, x + cw / 2, y + ch + 10, 8, on ? '#ffffff' : '#9a8aa0', 'center');
+  });
+  text(isTouch ? '< >: CHOOSE   A: FIGHT   B: BACK' : '< >: CHOOSE   ENTER: FIGHT   ESC: BACK', CX, 200, 8, '#d8c8a8', 'center');
+}
+
 function drawOver() {
   drawFight();
   R(0, 0, W, H, 'rgba(0,0,0,.45)');
@@ -2239,6 +2381,7 @@ function render() {
   switch (G.scene) {
     case 'title': drawTitle(); break;
     case 'select': drawSelect(); break;
+    case 'stage': drawStageSelect(); break;
     case 'over': drawOver(); break;
     default: drawFight(); if (G.paused) drawPause();
   }
@@ -2246,7 +2389,7 @@ function render() {
 }
 
 resize();
-if (!BG) BG = makeBG();
+if (!BG) { BGS.dojo = makeBG(); BGS.city = makeCityBG(); BG = BGS.dojo; }
 
 let last = performance.now(), acc = 0;
 function loop(now) {
