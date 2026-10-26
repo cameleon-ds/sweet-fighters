@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v29';
+const VERSION = 'v30';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -854,7 +854,7 @@ function makeFighter(def, id, x, dir, cpu) {
   };
 }
 
-function setState(f, s) { f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
+function setState(f, s) { if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
 function poseOf(f) {
@@ -1025,9 +1025,26 @@ function updFighter(f, o) {
       f.vx *= .8;
       if (!f.ko && f.t >= 40) { setState(f, 'getup'); f.invuln = 22; }
       break;
-    case 'getup': if (f.t >= 16) setState(f, 'idle'); break;
+    case 'getup':
+      if (f.t >= 16) {
+        // plus de la moitié de l'énergie perdue : se relève étourdi 4 secondes
+        if (f.hp <= 50 && G.frame - (f.dizzyEnd || -9999) > 480) { setState(f, 'stunned'); f.stun = 240; f.dizzy = true; f.mash = 0; f.mashShow = 0; }
+        else setState(f, 'idle');
+      }
+      break;
     case 'parry': f.vx = 0; if (f.t >= 22) setState(f, 'idle'); break;
-    case 'stunned': f.vx *= .8; if (f.t >= f.stun) setState(f, 'idle'); break;
+    case 'stunned':
+      f.vx *= .8;
+      if (f.dizzy) {
+        // marteler les boutons pour sortir plus vite de l'étourdissement
+        let n = 0;
+        if (f.cpu) { if (Math.random() < [.05, .12, .22][OPT.diff]) n = 1; }
+        else for (const b of [...BTNS, 'l', 'r', 'u', 'd']) if (edge(c, b)) n++;
+        if (n) { f.t += 9 * n; f.mash += n; f.mashShow = 40; }
+        if (f.mashShow > 0) f.mashShow--;
+      }
+      if (f.t >= f.stun) { setState(f, 'idle'); if (f.dizzy) { f.dizzy = false; f.dizzyEnd = G.frame; } }
+      break;
     case 'throw': f.vx = 0; updThrow(f); if (f.t >= 38) { f.rotAng = null; f.victim = null; setState(f, 'idle'); } break;
     case 'held': return;   // positionné par le lanceur
   }
@@ -1139,6 +1156,32 @@ function updThrow(f) {
 }
 function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 
+const CLASH_HIT = { dmg: 14, knock: true, stun: 24, bstun: 20, push: 5.5, chip: 0, sfx: 'heavy' };
+function startClash(f, o) {
+  G.clash = { f: [f, o], g: [0, 0], t: 0 };
+  [f, o].forEach(x => { setState(x, 'parry'); x.vx = 0; x.slowT = 0; x.counterT = 0; x.mashShow = 0; });
+  G.darkT = 50; G.flashT = 12; G.boltX = (f.x + o.x) / 2; G.boltY = f.y - 60; G.shake = 4;
+  addPopup((f.x + o.x) / 2, f.y - 108, 'CLASH! MASH!', '#ffd23a'); sfx('parry');
+}
+function stepClash() {
+  const C = G.clash; C.t++; G.darkT = 50;
+  C.f.forEach((f, i) => {
+    f.t = Math.min(f.t, 8);   // reste figé en garde, au ralenti
+    if (f.cpu) { if (Math.random() < [.075, .11, .155][OPT.diff]) C.g[i] += 6; }
+    else for (const b of BTNS) if (edge(f.ctl, b)) { C.g[i] += 6; break; }
+  });
+  if (G.flashT > 0) G.flashT--;
+  const win = C.g[0] >= 100 ? 0 : C.g[1] >= 100 ? 1 : C.t > 300 ? (C.g[0] >= C.g[1] ? 0 : 1) : -1;
+  if (win < 0) return;
+  const w = C.f[win], l = C.f[1 - win];
+  G.clash = null; G.darkT = 20;
+  setState(w, 'special'); w.fired = true; w.chargeT = 0; w.charged = false; w.t = 12;
+  setState(l, 'idle'); l.invuln = 0;
+  const sx = l.x - w.dir * 10, sy = l.y - 60;
+  addSpark(sx, sy, 'fb', w.def.fb); G.flashT = 12; G.boltX = sx; G.boltY = sy;
+  applyHit(w, l, CLASH_HIT, sx, sy, w.x, true);
+  addPopup(w.x, w.y - 100, 'CLASH WIN!', '#ffd23a');
+}
 function applyHit(att, def, data, sx, sy, fromX, projectile) {
   // coups de pied bas enchaînés : le 3e qui touche d'affilée fait tomber l'adversaire
   if (att.state === 'ckick' && !projectile && !(def.state === 'parry' && def.t <= 12) && !isBlocking(def, fromX, data)) {
@@ -1211,6 +1254,7 @@ function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
 function press(a, b, up) { a.press = b; a.pressU = !!up; a.pressFrames = 2; }
 function lowAttack(a, b) { a.hold = { d: true }; a.holdT = 10; press(a, b); }
 function aiInput(f, o) {
+  const dk = [.45, 1, 1.7][OPT.diff], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l', back = dx > 0 ? 'l' : 'r';
   if (a.holdT > 0) { a.holdT--; Object.assign(held, a.hold); }
@@ -1219,10 +1263,13 @@ function aiInput(f, o) {
     if (--a.pressFrames <= 0) { a.press = null; a.pressU = false; }
   }
   if (!G.fighting) return held;
+  // contré : tente de contrer le contre (X) selon la difficulté
+  if (f.slowT > 38 && o.counterT > 0) { if (!a.clashTried) { a.clashTried = true; if (Math.random() < [.15, .35, .6][OPT.diff]) press(a, 'x'); } }
+  else if (!f.slowT) a.clashTried = false;
   const neutral = NEUTRAL.includes(f.state);
   if (f.state === 'jump' && !f.airAtk && !a.press) {
-    if (dist < 120 && f.vy > -3 && Math.random() < .06) press(a, 's');
-    else if (dist < 70 && Math.random() < .12) press(a, 'k');
+    if (dist < 120 && f.vy > -3 && rnd() < .06) press(a, 's');
+    else if (dist < 70 && rnd() < .12) press(a, 'k');
   }
   const fb = o.fb;
 
@@ -1234,18 +1281,18 @@ function aiInput(f, o) {
     else if (!f.fb) press(a, 's');
   }
   if (!fb) a.reacted = false;
-  if (neutral && o.air && dist < 90 && o.vy > -2 && Math.random() < .05) lowAttack(a, 'p');
-  if (neutral && o.air && dist < 80 && o.vy > -1.5 && Math.random() < .08) press(a, 's', true);
-  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && Math.random() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
-  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 3 && dist < 95 && Math.random() < .07) press(a, 'x');
-  if (['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && f.hasHit && !a.press && Math.random() < .35) press(a, comboReady(f, o) && Math.random() < .5 ? 's' : (Math.random() < .5 ? 'p' : 'k'));
-  if (neutral && dist > 60 && dist < 130 && !a.press && Math.random() < .012) { a.hold = { [back]: true }; a.holdT = 3; press(a, 's'); }
-  if (neutral && f.counterT > 0 && o.slowT > 0 && dist < 80 && !a.press) press(a, Math.random() < .5 ? 'p' : 'k');
-  if (neutral && o.state === 'ckick' && o.t < 6 && dist < 95 && Math.random() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
-  if (neutral && o.state === 'tatsu' && dist < 110 && Math.random() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
+  if (neutral && o.air && dist < 90 && o.vy > -2 && rnd() < .05) lowAttack(a, 'p');
+  if (neutral && o.air && dist < 80 && o.vy > -1.5 && rnd() < .08) press(a, 's', true);
+  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 5 && dist < 95 && rnd() < .12) { a.hold = { [back]: true }; a.holdT = 22; }
+  if (neutral && ['punch', 'kick', 'cpunch'].includes(o.state) && o.t < 3 && dist < 95 && rnd() < .07) press(a, 'x');
+  if (['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && f.hasHit && !a.press && rnd() < .35) press(a, comboReady(f, o) && rnd() < .5 ? 's' : (rnd() < .5 ? 'p' : 'k'));
+  if (neutral && dist > 60 && dist < 130 && !a.press && rnd() < .012) { a.hold = { [back]: true }; a.holdT = 3; press(a, 's'); }
+  if (neutral && f.counterT > 0 && o.slowT > 0 && dist < 80 && !a.press) press(a, rnd() < .5 ? 'p' : 'k');
+  if (neutral && o.state === 'ckick' && o.t < 6 && dist < 95 && rnd() < .35) { a.hold = { [back]: true, d: true }; a.holdT = 26; }
+  if (neutral && o.state === 'tatsu' && dist < 110 && rnd() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
 
   if (--a.cd <= 0 && neutral && !a.press) {
-    a.cd = 10 + (Math.random() * 20 | 0);
+    a.cd = (10 + (Math.random() * 20 | 0)) * [1.6, 1, .6][OPT.diff];
     const r = Math.random();
     if (dist > 150) {
       if (r < .35 && !f.fb) press(a, 's');
@@ -1281,7 +1328,8 @@ function startMatch(pick) {
 function startRound() {
   const [a, b] = G.f;
   [[a, CX - 80, 1], [b, CX + 80, -1]].forEach(([f, x, d]) => {
-    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0 });
+    G.clash = null;
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
@@ -1297,10 +1345,11 @@ function endRound(winner) {
 
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
-const OPT = { zoom: true, energy: 1 };
+const OPT = { zoom: true, energy: 1, diff: 1 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt') || '{}')); } catch (e) {}
 const saveOpt = () => { try { localStorage.setItem('sf2opt', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
+const DIFFS = ['EASY', 'NORMAL', 'HARD'];
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
 const TITLE_ITEMS = ['SELECT CHARACTER', 'VIEW COMMANDS', 'OPTIONS'];
 function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
@@ -1322,9 +1371,13 @@ function stepMoves() {
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  const m = navStep(), oc = Math.max(0, Math.min(2, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
+  const m = navStep(), oc = Math.max(0, Math.min(3, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
-  if (backPress(pctl) || (ok && G.ocur === 2)) { G.showOpts = false; sfx('beep'); return; }
+  if (backPress(pctl) || (ok && G.ocur === 3)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.ocur === 2 && (l || r || ok)) {
+    OPT.diff = l ? Math.max(0, OPT.diff - 1) : r ? Math.min(2, OPT.diff + 1) : (OPT.diff + 1) % 3;
+    saveOpt(); sfx('select');
+  }
   if (G.ocur === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
   if (G.ocur === 1 && (l || r || ok)) {
     OPT.energy = l ? Math.max(1, OPT.energy - 1) : r ? Math.min(3, OPT.energy + 1) : OPT.energy % 3 + 1;
@@ -1419,6 +1472,11 @@ function stepFight() {
   if (G.scene === 'ko' && G.t < 60 && G.t % 2) return; // ralenti du K.O.
 
   // ralenti : un combattant sous l'effet du contre n'avance qu'une image sur trois
+  // Contre contre contre : les deux au ralenti, chacun remplit sa jauge en martelant
+  if (G.clash) { stepClash(); return; }
+  for (const [f, o] of [[a, b], [b, a]]) {
+    if (f.slowT > 35 && o.counterT > 0 && G.fighting && take(f.ctl, 'x')) { startClash(f, o); return; }
+  }
   [[a, b], [b, a]].forEach(([f, o]) => {
     if (f.slowT > 0) { f.slowT--; if (G.frame % 3) return; }
     updFighter(f, o);
@@ -1583,6 +1641,28 @@ function drawMedal(x, y) {
 
 function bigMsg(s, size, col, y = 84) { text(s, W / 2, y, size, col, 'center', '#3a0a04'); }
 
+// Étourdi : étoiles qui tournent au-dessus de la tête + jauge de martelage
+function drawDizzy(f) {
+  const hx = f.x + f.dir * 4 + Math.sin(G.frame * .15) * 2, hy = f.y - 90;
+  for (let i = 0; i < 3; i++) {
+    const a = G.frame * .12 + i * Math.PI * 2 / 3, x = hx + Math.cos(a) * 13, y = hy + Math.sin(a) * 4;
+    drawStar(x, y, Math.sin(a) > 0 ? 4 : 3, true);
+  }
+  if (f.mashShow > 0 || f.mash > 0) {
+    const k = Math.min(1, f.t / f.stun);
+    R(hx - 16, hy - 13, 32, 5, '#1a1020'); R(hx - 15, hy - 12, Math.round(30 * k), 3, k > .7 ? '#5ae06a' : '#ffd23a');
+  }
+}
+// Jauges du duel de contres, chacune du côté de son combattant
+function drawClash() {
+  const C = G.clash;
+  C.f.forEach((f, i) => {
+    const k = Math.min(1, C.g[i] / 100), x = f.x - f.dir * 26, y0 = f.y - 96, h = 60;
+    R(x - 4, y0 - 1, 8, h + 2, '#1a1020');
+    R(x - 3, y0 + h - Math.round(h * k), 6, Math.round(h * k), f.def.fb[2]);
+    if (!f.cpu && (G.frame >> 3) % 2) text('MASH!', x, y0 - 12, 8, '#ffffff', 'center');
+  });
+}
 // Flammes sur un combattant (enchaînement final) : couleur de l'attaquant
 function drawBurn(f) {
   const pal = f.burnPal || f.def.fb, lying = f.state === 'fall' || f.state === 'down' || f.state === 'held';
@@ -1636,8 +1716,9 @@ function drawFight() {
   }
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
-  order.forEach(f => drawFighter(f));
-  G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); });
+  order.forEach(f => drawFighter(f, f.dizzy ? f.x + Math.round(Math.sin(G.frame * .15) * 2) : f.x));
+  G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
+  if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
@@ -1701,7 +1782,8 @@ const MOVES = [
   { title: 'SPECIALS & COUNTER', lines: [
     ['A', 'FIREBALL'], ['HOLD A 3S', 'MAX FIREBALL (2X SIZE)'], ['UP + A', 'UPPERCUT'],
     ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
-    ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'] ] },
+    ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
+    ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
@@ -1745,17 +1827,19 @@ function panel(y0, h, title) {
   text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
-  panel(44, 128, 'OPTIONS');
+  panel(36, 146, 'OPTIONS');
   const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84;
-  if (c < 2) text('>', x0 - 4, 78 + c * 24, 8, '#ffd23a', 'right');
-  text('ZOOM IN GAME', x0, 78, 8, col(0), 'left');
+  if (c < 3) text('>', x0 - 4, 68 + c * 22, 8, '#ffd23a', 'right');
+  text('ZOOM IN GAME', x0, 68, 8, col(0), 'left');
   const bx = CX + 64;                                         // case à cocher
-  R(bx, 76, 12, 12, col(0)); R(bx + 2, 78, 8, 8, '#140a1e');
-  if (OPT.zoom) R(bx + 3, 79, 6, 6, '#5ae06a');
-  text('FIGHTERS ENERGY', x0, 102, 8, col(1), 'left');
-  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 106, 5.5, i < OPT.energy);
-  text((c === 2 ? '> ' : '') + 'BACK' + (c === 2 ? ' <' : ''), CX, 134, 8, col(2), 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 156, 8, '#7a6a80', 'center');
+  R(bx, 66, 12, 12, col(0)); R(bx + 2, 68, 8, 8, '#140a1e');
+  if (OPT.zoom) R(bx + 3, 69, 6, 6, '#5ae06a');
+  text('FIGHTERS ENERGY', x0, 90, 8, col(1), 'left');
+  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 94, 5.5, i < OPT.energy);
+  text('DIFFICULTY', x0, 112, 8, col(2), 'left');
+  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, 112, 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
+  text((c === 3 ? '> ' : '') + 'BACK' + (c === 3 ? ' <' : ''), CX, 140, 8, col(3), 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 164, 8, '#7a6a80', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
