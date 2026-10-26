@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v44';
+const VERSION = 'v45';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -547,8 +547,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(sh, fwd, 6), add(sh, fwd, 3), add(at(.6), fwd, 2.5), add(wa, fwd, 2), add(wa, fwd, 4.5), add(at(.75), fwd, 5), add(at(.3), fwd, 6.5)], top[1]);
     sPoly([add(sh, fwd, -5), add(sh, fwd, -1), add(at(.3), fwd, -1.5), add(at(.32), fwd, -5)], top[3]);
     for (let t = .1; t <= .85; t += .12) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, top[1]); }
-    const bl1 = add(at(.35), fwd, -3); sR(bl1[0], bl1[1], 2, 1, top[1]);
-    const bl2 = add(at(.35), fwd, 2.5); sR(bl2[0], bl2[1], 2, 1, top[1]);
+    const bl1 = add(at(.35), fwd, -3); sR(bl1[0] - (dir < 0 ? 1 : 0), bl1[1], 2, 1, top[1]);
+    const bl2 = add(at(.35), fwd, 2.5); sR(bl2[0] - (dir < 0 ? 1 : 0), bl2[1], 2, 1, top[1]);
   } else {
     sPoly([add(sh, fwd, -5.5), add(sh, fwd, -2.5), add(at(.6), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -4), add(at(.6), fwd, -5), add(at(.25), fwd, -6)], top[1]);
     sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
@@ -556,7 +556,7 @@ function drawFighter(f, x = f.x, y = f.y) {
       // t-shirt moulant : ombre sous les pectoraux, ligne centrale des abdos
       for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
       for (let t = .48; t <= .85; t += .1) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, top[1]); }
-      const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0], a1[1], 2, 1, top[1]); sR(a2[0], a2[1], 2, 1, top[1]);
+      const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0] - (dir < 0 ? 1 : 0), a1[1], 2, 1, top[1]); sR(a2[0] - (dir < 0 ? 1 : 0), a2[1], 2, 1, top[1]);
     } else {
       // veste ouverte en V : torse nu visible
       sPoly([add(sh, fwd, -1), add(sh, fwd, 4.5), add(at(.55), fwd, 1.5)], sk[2]);
@@ -582,8 +582,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(c1, fwd, .5), add(sh, fwd, .5), add(at(.18), fwd, .5)], sk[3]);   // reflet pectoral gauche
     sPoly([add(sh, fwd, 2), add(c2, fwd, -.8), add(at(.16), fwd, 2.2)], sk[3]);  // reflet pectoral droit
     for (let t = .05; t <= .3; t += .06) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, sk[1]); }  // sillon
-    const pl = add(at(.22), fwd, -1); sR(pl[0], pl[1], 2, 1, sk[1]);
-    const pr = add(at(.22), fwd, 2.5); sR(pr[0], pr[1], 2, 1, sk[1]);
+    const pl = add(at(.22), fwd, -1); sR(pl[0] - (dir < 0 ? 1 : 0), pl[1], 2, 1, sk[1]);
+    const pr = add(at(.22), fwd, 2.5); sR(pr[0] - (dir < 0 ? 1 : 0), pr[1], 2, 1, sk[1]);
   }
 
 
@@ -937,7 +937,7 @@ function poseOf(f) {
     case 'crouch': return 'crouch';
     case 'cblock': return 'cblock';
     case 'cpunch': return f.t < 3 || f.t >= 8 ? 'crouch' : 'cpunch';
-    case 'ckick': return f.t < 6 || f.t >= 12 ? 'crouch' : 'ckick';
+    case 'ckick': return f.t < 2 || f.t >= 10 ? 'crouch' : 'ckick';   // jambe tendue pendant les images actives (visible à l'impact)
     case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
     case 'gtatsu': return f.t >= 6 && f.t < 54 ? 'tatsu' : 'kick0';
     case 'flame': return f.t < 5 ? 'special0' : 'special1';
