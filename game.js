@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v26';
+const VERSION = 'v27';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -807,11 +807,11 @@ const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
 function ctlUpdate(c, held) {
   c.prev = c.held; c.held = held;
   for (const b of [...BTNS, 'start', 'back', 'l', 'r', 'u', 'd']) {
-    if (held[b] && !c.prev[b]) { c.buf[b] = (b === 'p' || b === 'k' || b === 's') ? 14 : 8; c.ord = c.ord || {}; c.n = (c.n || 0) + 1; c.ord[b] = c.n; }
-    else if (c.buf[b] > 0 && !(G.freeze > 0)) c.buf[b]--;   // le tampon ne s'use pas pendant l'arrêt sur impact
+    if (held[b] && !c.prev[b]) { const atk = b === 'p' || b === 'k' || b === 's'; if (atk && c.buf[b] > 0) { c.q = c.q || {}; c.q[b] = Math.min(2, (c.q[b] || 0) + 1); } c.buf[b] = atk ? 14 : 8; c.ord = c.ord || {}; c.n = (c.n || 0) + 1; c.ord[b] = c.n; }
+    else if (c.buf[b] > 0 && !(G.freeze > 0)) { if (--c.buf[b] === 0 && c.q) c.q[b] = 0; }   // le tampon ne s'use pas pendant l'arrêt sur impact
   }
 }
-function take(c, b) { if (c.buf[b] > 0) { c.buf[b] = 0; return true; } return false; }
+function take(c, b) { if (c.buf[b] > 0) { c.buf[b] = 0; if (c.q && c.q[b] > 0) { c.q[b]--; c.buf[b] = 14; } return true; } return false; }
 const edge = (c, b) => !!(c.held[b] && !c.prev[b]);
 // Menus : A (ou Entrée) valide, B (ou Échap) revient en arrière
 const okPress = c => edge(c, 's') || edge(c, 'start');
@@ -911,6 +911,10 @@ function updFighter(f, o) {
   const c = f.ctl, h = c.held;
   const fwd = f.dir > 0 ? h.r : h.l, back = f.dir > 0 ? h.l : h.r;
   f.t++;
+  if (f.restT > 0) {   // temps d'arrêt : seul le coup qui termine un enchaînement reste possible
+    f.restT--;
+    for (const b of ['p', 'k', 's']) if (c.buf[b] > 0 && !(o.state === 'hit' && FINISHERS.includes((f.combo || '') + b))) { c.buf[b] = 0; if (c.q) c.q[b] = 0; }
+  }
   if (f.invuln > 0) f.invuln--;
   if (f.flash > 0) f.flash--;
   if (f.counterT > 0) f.counterT--;
@@ -1170,6 +1174,13 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     if (FINISHERS.includes(att.combo)) { finisher = true; att.combo = ''; data = Object.assign({}, data, { knock: true, dmg: data.dmg + 8 }); }
     else if (att.combo.length >= 4) att.combo = att.combo.slice(-3);
   }
+  // 3 coups d'affilée max, puis petit temps d'arrêt (sauf pour finir un enchaînement de la liste)
+  if (!projectile && att.state !== 'gtatsu' && att.state !== 'ckick') {
+    att.run = def.state === 'hit' && G.frame - (att.runLast || -999) < 50 ? (att.run || 0) + 1 : 1;
+    att.runLast = G.frame;
+    if (finisher) { att.run = 0; att.restT = 0; }
+    else if (att.run >= 3) { att.restT = 30; att.run = 0; }
+  }
   if (att.state === 'gtatsu' && !projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
@@ -1270,7 +1281,7 @@ function startMatch(pick) {
 function startRound() {
   const [a, b] = G.f;
   [[a, CX - 80, 1], [b, CX + 80, -1]].forEach(([f, x, d]) => {
-    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '' });
+    Object.assign(f, { x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
