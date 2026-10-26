@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v38';
+const VERSION = 'v39';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -324,6 +324,9 @@ const POSES = {
   throwS:  [6,-51, 4,-43, 1,-27, 12,-35, 19,-25, 10,-33, 17,-23, 10,-13, 14,0, -9,-12, -14,0],
   throwT:  [-2,-56, -2,-48, -1,-30, -6,-60, -12,-68, -4,-58, -10,-66, 7,-15, 11,0, -9,-14, -13,0],
   tuck:    [2,-46, 1,-40, 0,-30, 8,-38, 10,-44, 4,-36, 8,-42, 9,-34, 5,-26, 4,-31, -1,-24],
+  urB:     [5,-56, 3,-48, 1,-30, 9,-42, 13,-48, 11,-62, 18,-77, 8,-24, 6,-11, -3,-14, -6,-1],   // shoryuken : montée vue de dos, poing levé
+  turnA:   [4,-56, 2,-48, 0,-31, 9,-44, 12,-50, 8,-54, 12,-62, 8,-26, 6,-14, -3,-16, -6,-4],   // rotation au sommet (encore de dos)
+  turnB:   [3,-57, 1,-49, 0,-32, 7,-54, 10,-62, -4,-44, -3,-40, 8,-28, 6,-18, 0,-24, -5,-14],  // rotation (déjà de face)
   rup0:    [4,-38, 2,-31, -1,-15, 10,-24, 14,-31, -2,-22, 4,-18, 12,-10, 13,0, -8,-4, -16,0],
   rup1:    [4,-48, 3,-40, 0,-24, 9,-34, 13,-40, 8,-44, 14,-56, 10,-12, 12,0, -7,-8, -12,0],
   rup2:    [5,-56, 3,-48, 1,-30, 9,-42, 13,-48, 11,-62, 18,-77, 8,-15, 12,0, -8,-14, -12,0],
@@ -418,7 +421,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const spinning = (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54);
   const dir = spinning && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = f.state === 'rupper';   // l'uppercut accroupi est vu de dos, bras proche levé
+  const backView = f.state === 'rupper' || (f.state === 'uppercut' && (f.apexT == null || f.t - f.apexT < 4));   // l'uppercut accroupi est vu de dos, bras proche levé
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
@@ -850,7 +853,7 @@ const ATK = {
   flame:    { dur: 26, act: [6, 12], box: [14, -80, 54, -48], dmg: 10, stun: 18, bstun: 12, push: 3.0, sfx: 'heavy' },
   gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
-  uppercut: { act: [3, 15], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
+  uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
@@ -899,7 +902,14 @@ function poseOf(f) {
     case 'fkick': return f.t < 9 || f.t >= 17 ? 'fkick0' : 'fkick1';
     case 'special': return f.t < 12 ? 'special0' : 'special1';
     case 'pthrow': return f.t < 7 ? 'special0' : 'special1';
-    case 'uppercut': return f.t < 3 ? 'upper0' : (f.vy < 0 ? 'upper1' : 'upper2');
+    case 'uppercut': {
+      // accroupi, le poing monte, envol de dos ; au sommet il se retourne et redescend de face
+      if (f.t < 3) return 'rup0';
+      if (f.t < 6) return 'rup1';
+      if (f.apexT == null) return 'urB';
+      const dt = f.t - f.apexT;
+      return dt < 4 ? 'turnA' : dt < 8 ? 'turnB' : 'upper2';
+    }
     case 'land': case 'getup': return 'upper0';
     case 'hit': return 'hit';
     case 'fall': return 'fall';
@@ -949,7 +959,7 @@ function updFighter(f, o) {
       // 4e coup d'un enchaînement Y Y B / B B Y : A = frappe enflammée
       if (comboReady(f, o) && take(c, 's')) { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); break; }
       if (take(c, 's')) {
-        if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 9; break; }
+        if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
         if (back) { setState(f, 'gtatsu'); f.vx = 0; f.spinN = 0; sfx('upper'); break; }   // arrière + A : tornade au sol x4
         if (!f.fb) { setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
       }
@@ -1022,10 +1032,12 @@ function updFighter(f, o) {
       break;
     case 'uppercut':
       // trajectoire en courbe : d'abord vers l'avant, puis de plus en plus vers le haut
-      if (f.t === 3) { f.air = true; sfx('upper'); }
-      if (f.t >= 3 && f.t <= 8) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 3]; }
-      else if (f.t === 9) { f.vy = -8.4; f.vx = 2.4 * f.dir; }
-      else if (f.t > 9 && f.vy < 0) f.vx *= .86;
+      if (f.t === 0) f.apexT = null;
+      if (f.t === 5) { f.air = true; sfx('upper'); }
+      if (f.t >= 5 && f.t <= 10) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 5]; }
+      else if (f.t === 11) { f.vy = -7.7; f.vx = 2.4 * f.dir; }
+      else if (f.t > 11 && f.vy < 0) f.vx *= .86;
+      if (f.t > 11 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
       break;
     case 'jump':
       if (!f.airAtk && live) {
