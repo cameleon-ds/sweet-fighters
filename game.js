@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v33';
+const VERSION = 'v34';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1507,8 +1507,10 @@ function stepFight() {
   for (let i = 0; i < G.fbs.length; i++) for (let j = i + 1; j < G.fbs.length; j++) {
     const p = G.fbs[i], q = G.fbs[j];
     if (p.alive && q.alive && p.owner !== q.owner && Math.abs(p.x - q.x) < 14 * Math.max(p.sc, q.sc) && Math.abs(p.y - q.y) < 14 * Math.max(p.sc, q.sc)) {
-      p.alive = q.alive = false;
-      addSpark((p.x + q.x) / 2, p.y, 'fb', p.owner.def.fb); sfx('block');
+      // la grosse boule de feu (MAX) traverse la petite et continue sa route
+      if (p.sc > q.sc) q.alive = false; else if (q.sc > p.sc) p.alive = false; else p.alive = q.alive = false;
+      const big = p.sc > q.sc ? p : q.sc > p.sc ? q : p;
+      addSpark((p.x + q.x) / 2, p.y, 'fb', big.owner.def.fb); sfx('block');
     }
   }
   for (const fb of G.fbs) {
