@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v53';
+const VERSION = 'v54';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -982,7 +982,81 @@ function readPlayer() {
     back: K('back'),
   };
   latched.clear();
+  const rm = readRemote(1);   // manette smartphone du joueur 1
+  for (const b in rm) if (rm[b]) r[b] = true;
   return r;
+}
+
+/* ---------------- Manettes smartphone (PeerJS / WebRTC) ---------------- */
+// Le PC crée un « peer » ; chaque téléphone scanne un QR code (Player 1 / Player 2), ouvre controller.html
+// et envoie l'état de ses boutons directement au PC.
+const NET = { peer: null, id: null, status: 'off', rem: { 1: null, 2: null } };
+function remDirs(r, menu) {
+  const x = r.x || 0, y = r.y || 0, m = Math.hypot(x, y), o = { l: false, r: false, u: false, d: false };
+  if (menu) {
+    if (m < .55) return o;
+    if (Math.abs(y) > Math.abs(x) * 1.4) { if (y < 0) o.u = true; else o.d = true; }
+    else if (Math.abs(x) > Math.abs(y) * 1.4) { if (x < 0) o.l = true; else o.r = true; }
+    return o;
+  }
+  if (m < .15) return o;
+  const ax = Math.abs(x) / m, ay = Math.abs(y) / m;
+  return { l: ax > .38 && x < 0, r: ax > .38 && x > 0, u: ay > .38 && y < 0, d: ay > .38 && y > 0 };
+}
+function readRemote(p) {
+  const r = NET.rem[p], o = {};
+  if (!r || !r.open) return o;
+  Object.assign(o, remDirs(r, inMenu()));
+  for (const b of ['p', 'k', 's', 'x', 'start']) o[b] = !!(r.held[b] || r.tap[b]);
+  r.tap = {};
+  return o;
+}
+const remoteOn = p => !!(NET.rem[p] && NET.rem[p].open);
+function netStart() {
+  if (NET.peer || typeof Peer === 'undefined') return;
+  const id = 'sf2-' + Math.random().toString(36).slice(2, 10);
+  NET.status = 'connecting';
+  try { NET.peer = new Peer(id); } catch (e) { NET.status = 'error'; return; }
+  NET.peer.on('open', pid => { NET.id = pid; NET.status = 'ready'; makeQRs(); });
+  NET.peer.on('error', () => { NET.status = 'error'; });
+  NET.peer.on('disconnected', () => { try { NET.peer.reconnect(); } catch (e) {} });
+  NET.peer.on('connection', conn => {
+    const p = (conn.metadata && conn.metadata.p) === 2 ? 2 : 1;
+    if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { try { NET.rem[p].conn.close(); } catch (e) {} }
+    const r = NET.rem[p] = { conn, open: false, held: {}, tap: {}, x: 0, y: 0 };
+    conn.on('open', () => { r.open = true; sfx('select'); try { conn.send({ t: 'hi', p }); } catch (e) {} });
+    conn.on('data', m => {
+      if (!m || m.t !== 'in') return;
+      for (const b of ['p', 'k', 's', 'x', 'start']) { const v = !!(b === 'x' ? m.bx : m[b]); if (v && !r.held[b]) r.tap[b] = true; r.held[b] = v; }
+      r.x = +m.x || 0; r.y = +m.y || 0;
+    });
+    conn.on('close', () => { r.open = false; });
+  });
+}
+const QR = { 1: null, 2: null };
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p, location.href).href; }
+function makeQRs() {
+  if (typeof qrcode === 'undefined' || !NET.id) return;
+  for (const p of [1, 2]) {
+    const q = qrcode(0, 'M'); q.addData(controllerURL(p)); q.make();
+    const n = q.getModuleCount(), c = document.createElement('canvas'), m = 2, pad = 3;
+    c.width = c.height = (n + pad * 2) * m;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) g.fillRect((x + pad) * m, (y + pad) * m, m, m);
+    QR[p] = c;
+  }
+}
+function drawQRs() {
+  if (isTouch) return;
+  for (const p of [1, 2]) {
+    const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', on = remoteOn(p);
+    const sz = q ? q.width : 74, x = p === 1 ? 6 : W - 6 - sz, y = 36;
+    text('PLAYER ' + p, x + sz / 2, y - 12, 8, col, 'center');
+    if (q) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = on ? .35 : 1; ctx.drawImage(q, x, y); ctx.restore(); }
+    else { R(x, y, sz, sz, '#111'); text(NET.status === 'error' ? 'OFFLINE' : '...', x + sz / 2, y + sz / 2 - 4, 8, '#9a8aa0', 'center'); }
+    text(on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
+    if (!on) text('TO PLAY', x + sz / 2, y + sz + 14, 8, '#d8c8a8', 'center');
+  }
 }
 
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
@@ -1026,6 +1100,7 @@ const G = {
   pick: 0, freeze: 0, shake: 0, flashT: 0, darkT: 0, boltX: 0, boltY: 0, f: [], fbs: [], sparks: [], popups: [], msg: null, winner: null, fighting: false,
 };
 const pctl = makeCtl();
+const p2ctl = makeCtl();   // manette smartphone du joueur 2
 
 function makeFighter(def, id, x, dir, cpu) {
   return {
@@ -1763,7 +1838,9 @@ function startMatch(p1, p2, stage) {
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, true)];
+  const vs2 = remoteOn(2);   // 2e manette connectée : joueur 2 humain au lieu du CPU
+  G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, !vs2)];
+  if (vs2) G.f[1].ctl = p2ctl;
   G.f[0].ctl = pctl;
   G.round = 1;
   startRound();
@@ -1847,11 +1924,12 @@ function stepPause() {
 function step() {
   G.frame++;
   ctlUpdate(pctl, readPlayer());
+  ctlUpdate(p2ctl, readRemote(2));
 
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
     if (G.paused) { stepPause(); tap = null; return; }
-    if (edge(pctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; G.showOpts = false; sfx('select'); tap = null; return; }
+    if (edge(pctl, 'start') || edge(p2ctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; G.showOpts = false; sfx('select'); tap = null; return; }
   }
 
   switch (G.scene) {
@@ -1882,15 +1960,17 @@ function step() {
     }
     case 'select': {
       G.t++;
+      netStart();   // prépare les QR codes des manettes smartphone
+      const sc = G.selPhase && remoteOn(2) ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
       {
         let sl = G.sel || 0;
-        if (edge(pctl, 'l') && sl % 4 > 0) sl--;
-        if (edge(pctl, 'r') && sl % 4 < 3) sl++;
-        if (edge(pctl, 'u') && sl > 3) sl -= 4;
-        if (edge(pctl, 'd') && sl < 4) sl += 4;
+        if (edge(sc, 'l') && sl % 4 > 0) sl--;
+        if (edge(sc, 'r') && sl % 4 < 3) sl++;
+        if (edge(sc, 'u') && sl > 3) sl -= 4;
+        if (edge(sc, 'd') && sl < 4) sl += 4;
         if (sl !== (G.sel || 0)) { G.sel = sl; sfx('beep'); }
       }
-      if (G.t > 10 && okPress(pctl)) {
+      if (G.t > 10 && (okPress(sc) || (sc !== pctl && okPress(pctl)))) {
         const c = ROSTER[G.sel || 0];
         if (c == null) sfx('block');
         else if (!G.selPhase) { G.p1 = c; G.selPhase = 1; sfx('select'); }                 // 1) mon personnage
@@ -2139,7 +2219,7 @@ function drawHUD() {
   text(a.def.name, bx, 24, 8, '#ffffff', 'left');
   text(b.def.name, W - bx, 24, 8, '#ffffff', 'right');
   if (a.cpu === false) text('1P', 6, 35, 8, '#5ac8ff', 'left');
-  text('CPU', W - 6, 35, 8, '#ff7a6a', 'right');
+  text(b.cpu ? 'CPU' : '2P', W - 6, 35, 8, '#ff7a6a', 'right');
   for (let i = 0; i < a.wins; i++) drawMedal(bx + 18 + i * 12, 38);
   for (let i = 0; i < b.wins; i++) drawMedal(W - bx - 26 - i * 12, 38);
 }
@@ -2421,14 +2501,16 @@ function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
-  text(ph === 0 ? 'SELECT YOUR FIGHTER' : 'SELECT CPU FIGHTER', CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
+  const two = remoteOn(2), L2 = two ? '2P' : 'CPU';
+  text(ph === 0 ? (two ? 'PLAYER 1: SELECT FIGHTER' : 'SELECT YOUR FIGHTER') : (two ? 'PLAYER 2: SELECT FIGHTER' : 'SELECT CPU FIGHTER'), CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
+  drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
   const BS = 74, y0 = 20;
   drawPortrait(p1, CX - 22 - BS, y0, BS, '#5ac8ff', 1);
   text('1P', CX - 22 - BS, y0 + BS + 4, 8, '#5ac8ff', 'left');
   text(p1 == null ? '???' : DEFS[p1].name, CX - 22, y0 + BS + 4, 8, '#ffffff', 'right');
   drawPortrait(p2, CX + 22, y0, BS, '#ff7a6a', -1);
-  text('CPU', CX + 22 + BS, y0 + BS + 4, 8, '#ff7a6a', 'right');
+  text(L2, CX + 22 + BS, y0 + BS + 4, 8, '#ff7a6a', 'right');
   text(p2 == null ? '???' : DEFS[p2].name + (p2 === G.p1 ? ' 2P' : ''), CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
   text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
   // grille 4 x 2 : tous regardent à droite
@@ -2437,7 +2519,7 @@ function drawSelect() {
     const x = gx + (i % 4) * (S + gap), y = gy + (i >> 2) * (S + gap);
     const on = i === sel, blink = (G.frame >> 3) % 2;
     drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : (ph ? '#ff3a2a' : '#ff6a1a')) : '#5a4a60', 1);
-    if (on) text(ph ? 'CPU' : '1P', x + 1, y - 1, 8, ph ? '#ff7a6a' : '#5ac8ff', 'left');
+    if (on) text(ph ? L2 : '1P', x + 1, y - 1, 8, ph ? '#ff7a6a' : '#5ac8ff', 'left');
   }
   if (hov == null) text('COMING SOON', CX, 196, 8, '#9a8aa0', 'center');
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
@@ -2512,5 +2594,5 @@ if (document.fonts && document.fonts.load) {
 } else go();
 
 // Accès debug pour les tests
-window.__SF = G;
+window.__SF = G; window.__NET = NET; window.__mkqr = () => makeQRs();
 })();

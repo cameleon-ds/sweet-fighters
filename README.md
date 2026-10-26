@@ -18,3 +18,8 @@ Double-click `index.html`.
 
 ## PC controls
 - Arrows: move · J: punch · K: kick · L: special · Space: counter · Enter: start/confirm · Esc: back
+
+## Phone controllers (2 players on PC)
+On the character select screen (PC), scan the left QR code for Player 1 and the right one for Player 2.
+Each phone opens `controller.html` (stick + Y/X/B/A + START) and talks to the PC directly through WebRTC (PeerJS).
+When Player 2's phone is connected, Player 2 picks the second fighter and plays instead of the CPU.
