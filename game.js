@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v52';
+const VERSION = 'v53';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1363,7 +1363,7 @@ function updThrow(f) {
 }
 /* ---------- Objets du décor : chaise et vases (cassables, lançables avec X) ---------- */
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
-const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [6, 17], cone: [16, 22], trash: [20, 28] };
+const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38] };
 function makeProps() {
   const X = f => Math.round(SW * f);
   const list = G.stage === 'city'
@@ -1449,51 +1449,107 @@ function updProps() {
   if (G.shards) G.shards = G.shards.filter(s => s.t < 55);
 }
 const VASE_COLS = [['#2e5a9a', '#e8eef6', '#1e3a6a'], ['#b8261c', '#e8c070', '#7a140e'], ['#2a7a5a', '#d8e8d0', '#1a4a36']];
+// Palettes 5 tons : [contour, ombre, moyen, clair, reflet]
+const PP = {
+  wood:  ['#2a1608', '#5a3418', '#8a5a30', '#b07a44', '#d8a468'],
+  woodL: ['#3a2010', '#6a4220', '#9a6a38', '#c08a50', '#e6b47a'],
+  blue:  ['#0c1630', '#1e3a6a', '#2e5a9a', '#5a8ad0', '#c8dcf4'],
+  red:   ['#3a0806', '#7a140e', '#b8261c', '#e0503a', '#ffb090'],
+  green: ['#0a2a1c', '#1a4a36', '#2a7a5a', '#4aa880', '#c0ecd4'],
+  white: ['#5a6070', '#a0a8b8', '#d8dee8', '#f4f6fa', '#ffffff'],
+  gold:  ['#4a3006', '#8a6014', '#c8a030', '#e8c860', '#fff0b0'],
+  terra: ['#3a1406', '#7a3a18', '#b8642e', '#d88a4a', '#f4b880'],
+  leaf:  ['#0e2a0e', '#1e4a1a', '#3e7a2a', '#5c9a3a', '#9ad06a'],
+  glass: ['#062a0a', '#0e4a16', '#1e7a28', '#3aa848', '#c8f4c8'],
+  cone:  ['#5a1a04', '#a8380a', '#e85a14', '#ff8a3a', '#ffd0a0'],
+  metal: ['#24242c', '#4a4a56', '#7a7a88', '#a8a8b8', '#e0e0ec'],
+};
 function drawProp(p, x, y) {
   const F = (px, py, w, h, c) => R(x + px, y + py, w, h, c);
-  if (p.type === 'chair') {
-    const w = '#8a5a30', d = '#5a3418', l = '#b07a44';
-    F(-13, -46, 3, 46, d); F(10, -46, 3, 46, d);          // montants du dossier
-    F(-13, -46, 26, 4, w); F(-13, -46, 26, 1, l); F(-13, -43, 26, 1, d);   // haut du dossier
-    F(-10, -38, 20, 2, w); F(-10, -32, 20, 2, w); F(-10, -26, 20, 2, w);   // barreaux
-    F(-16, -22, 32, 5, w); F(-16, -22, 32, 1, l); F(-16, -18, 32, 1, d);   // assise
-    F(-15, -17, 3, 17, d); F(12, -17, 3, 17, d);          // pieds avant
-    F(-12, -8, 24, 1, d);
-  } else if (p.type === 'bottle') {
-    const g1 = '#1e6a24', g2 = '#3aa040', g3 = '#9ae0a0';
-    F(-1, -17, 2, 2, '#c8a030'); F(-1, -15, 2, 4, g1); F(-2, -11, 4, 2, g1);   // capsule + goulot
-    F(-3, -9, 6, 9, g1); F(-2, -9, 2, 9, g2); F(-1, -8, 1, 6, g3);
-    F(-3, -6, 6, 3, '#e8d8a0'); F(-2, -5, 3, 1, '#b8261c');                     // étiquette
-  } else if (p.type === 'cone') {
-    const o = '#ff6a1a', od = '#c84a0a';
-    for (let r = 0; r < 19; r++) { const w = 1 + Math.round(r * 5.5 / 19); F(-w, -21 + r, w * 2 + 1, 1, (r > 6 && r < 10) || (r > 13 && r < 16) ? '#f0f0f0' : o); F(w, -21 + r, 1, 1, od); }
-    F(-8, -3, 17, 3, '#2a2a30'); F(-8, -3, 17, 1, '#4a4a54');
-  } else if (p.type === 'trash') {
-    const m = '#8a8a98', md = '#4a4a56', ml = '#c0c0cc';
-    F(-9, -24, 18, 24, m); F(-9, -24, 2, 24, md); F(7, -24, 2, 24, md);
-    for (let x = -5; x <= 5; x += 4) F(x, -22, 1, 20, md);
-    F(-10, -28, 20, 4, md); F(-10, -28, 20, 1, ml); F(-3, -30, 6, 2, md);   // couvercle
-    F(-6, -32, 3, 4, '#3a7a2a');                                               // sac qui dépasse
-  } else if (p.type === 'crate') {
-    const w = '#9a6a38', d = '#5a3418', l = '#c08a50';
-    F(-11, -20, 22, 20, w); F(-11, -20, 22, 1, l);
-    F(-11, -20, 2, 20, d); F(9, -20, 2, 20, d); F(-11, -1, 22, 1, d); F(-11, -11, 22, 1, d);
-    for (let i = 0; i < 16; i++) F(-8 + i, -18 + Math.round(i * 16 / 16), 2, 1, d);   // planche en diagonale
-  } else if (p.type === 'pot') {
-    const t = '#b8642e', td = '#7a3a18', g1 = '#3e7a2a', g2 = '#5c9a3a';
-    F(-8, -13, 16, 2, td); F(-7, -11, 14, 11, t); F(-7, -11, 1, 11, td); F(5, -11, 2, 11, '#d07a40'); F(-6, -1, 12, 1, td);
-    const leaf = (x0, y0, dx, n, c) => { for (let i = 0; i < n; i++) F(x0 + Math.round(dx * i), y0 - i, 2, 1, c); };
-    leaf(-1, -14, -.7, 14, g1); leaf(0, -14, .6, 16, g2); leaf(-2, -14, -1.3, 9, g2); leaf(1, -14, 1.2, 10, g1); leaf(0, -14, 0, 12, g1);
+  // ligne horizontale d'un volume cylindrique éclairé par la gauche
+  const cylRow = (py, w, pal) => {
+    for (let px = -w; px <= w; px++) {
+      const t = (px + w) / (2 * w || 1);
+      const c = Math.abs(px) === w ? pal[0] : t < .16 ? pal[2] : t < .34 ? pal[3] : t < .4 ? pal[4] : t < .62 ? pal[2] : t < .84 ? pal[1] : pal[0];
+      F(px, py, 1, 1, c);
+    }
+  };
+  const box = (x0, y0, w, h, pal) => {   // planche/pièce de bois avec relief
+    F(x0, y0, w, h, pal[2]); F(x0, y0, w, 1, pal[3]); F(x0, y0, 1, h, pal[3]);
+    F(x0, y0 + h - 1, w, 1, pal[1]); F(x0 + w - 1, y0, 1, h, pal[1]);
+  };
+  const T = p.type;
+  if (T === 'chair') {
+    const P = PP.wood, L = PP.woodL;
+    box(10, -46, 3, 46, P); F(10, -46, 3, 46, P[1]); F(11, -46, 1, 46, P[2]);          // montant arrière droit (dans l'ombre)
+    box(-13, -46, 3, 46, L);                                                             // montant arrière gauche
+    box(-13, -47, 26, 5, L); F(-12, -47, 24, 1, L[4]); F(-13, -43, 26, 1, P[0]);        // haut du dossier
+    for (const yy of [-38, -32, -26]) { box(-10, yy, 20, 2, L); F(-10, yy + 2, 20, 1, P[0]); }   // barreaux + ombre portée
+    F(-16, -22, 32, 3, L[3]); F(-16, -22, 32, 1, L[4]);                                  // dessus de l'assise
+    F(-16, -19, 32, 3, P[2]); F(-16, -17, 32, 1, P[1]); F(-16, -16, 32, 1, P[0]);        // tranche avant
+    F(-14, -15, 28, 2, 'rgba(0,0,0,.35)');                                               // ombre sous l'assise
+    box(-15, -16, 3, 16, L); box(12, -16, 3, 16, P); F(13, -16, 1, 16, P[1]);           // pieds avant
+    F(-12, -7, 24, 2, P[1]); F(-12, -7, 24, 1, P[2]);                                    // traverse
+  } else if (T === 'crate') {
+    const P = PP.woodL, D = PP.wood;
+    // dessus (vue légèrement plongeante) et côté droit dans l'ombre
+    F(-11, -24, 22, 4, P[3]); F(-9, -25, 22, 1, P[4]); F(-11, -24, 1, 4, P[2]);
+    for (let i = 0; i < 4; i++) F(11 + (i > 1 ? 1 : 0), -24 + i, 2, 24 - i, D[1]);
+    F(13, -22, 1, 22, D[0]);
+    F(-11, -20, 22, 20, P[2]);
+    for (const yy of [-20, -13, -6]) { F(-11, yy, 22, 1, P[3]); F(-11, yy + 6, 22, 1, D[1]); }   // 3 planches
+    F(-11, -20, 2, 20, D[2]); F(9, -20, 2, 20, D[1]); F(-11, -20, 1, 20, P[4]);
+    for (let i = 0; i < 16; i++) { F(-8 + i, -19 + i, 2, 1, D[1]); F(-8 + i, -18 + i, 2, 1, D[0]); }   // traverse diagonale
+    for (const [nx, ny] of [[-10, -19], [8, -19], [-10, -2], [8, -2]]) F(nx, ny, 1, 1, '#c8c8d0');      // clous
+    F(-11, -1, 24, 1, D[0]);
+  } else if (T === 'pot') {
+    const P = PP.terra, G2 = PP.leaf;
+    // feuillage en dégradé (arrière sombre, avant clair)
+    const leaf = (x0, y0, dx, n, pal) => { for (let i = 0; i < n; i++) { const xx = x0 + Math.round(dx * i); F(xx, y0 - i, 2, 1, i < n / 3 ? pal[1] : i < n * .75 ? pal[2] : pal[3]); F(xx + 1, y0 - i, 1, 1, pal[0]); } };
+    leaf(-1, -14, -.9, 15, G2); leaf(1, -14, .9, 16, G2); leaf(-2, -14, -1.6, 10, G2); leaf(2, -14, 1.5, 11, G2);
+    leaf(0, -14, -.3, 18, G2); leaf(0, -14, .35, 17, G2);
+    for (let i = 0; i < 5; i++) F(-3 + i, -16 - (i % 2) * 3, 1, 1, G2[4]);
+    F(-9, -15, 18, 3, P[3]); F(-9, -15, 18, 1, P[4]); F(-9, -13, 18, 1, P[1]); F(-9, -15, 1, 3, P[0]); F(8, -15, 1, 3, P[0]);   // rebord
+    F(-6, -14, 12, 1, '#2a1406');                                                         // terre
+    for (let r = 0; r < 12; r++) cylRow(-12 + r, 7 - Math.round(r / 6), P);
+    F(-5, -1, 10, 1, P[0]);
+  } else if (T === 'bottle') {
+    const P = PP.glass, h = 24;
+    F(-1, -24, 3, 2, '#e0c040'); F(-1, -24, 3, 1, '#fff0a0'); F(1, -23, 1, 1, '#8a6a10');   // capsule
+    for (let r = 0; r < 6; r++) cylRow(-22 + r, 1, P);                                    // goulot
+    for (let r = 0; r < 3; r++) cylRow(-16 + r, 2 + r, P);                                // épaule
+    for (let r = 0; r < 13; r++) cylRow(-13 + r, 4, P);                                   // corps
+    for (let r = 0; r < 5; r++) { const yy = -10 + r; for (let px = -4; px <= 4; px++) F(px, yy, 1, 1, Math.abs(px) === 4 ? '#6a5a30' : px < -1 ? '#fff4c8' : px < 2 ? '#e8d8a0' : '#b8a670'); }   // étiquette
+    F(-2, -9, 4, 2, '#b8261c'); F(-2, -9, 4, 1, '#e04a3a');
+    F(-3, -1, 7, 1, P[0]);
+  } else if (T === 'cone') {
+    const P = PP.cone, W5 = PP.white;
+    F(-11, -4, 22, 4, '#1a1a20'); F(-11, -4, 22, 1, '#4a4a56'); F(-11, -4, 1, 4, '#3a3a44'); F(10, -4, 1, 4, '#0a0a0e');   // socle
+    for (let r = 0; r < 26; r++) {
+      const w = 1 + Math.round(r * 7.5 / 26), stripe = (r > 8 && r < 13) || (r > 17 && r < 21);
+      cylRow(-30 + r, w, stripe ? W5 : P);
+    }
+    F(-1, -31, 3, 1, P[1]);
+  } else if (T === 'trash') {
+    const P = PP.metal;
+    for (let r = 0; r < 30; r++) cylRow(-30 + r, 12 - (r < 2 ? 0 : Math.round(r / 15)), P);
+    for (const xx of [-7, -2, 3, 8]) for (let r = 0; r < 26; r++) F(xx, -27 + r, 1, 1, P[1]);   // nervures
+    F(-12, -16, 25, 1, P[1]); F(-12, -15, 25, 1, P[4]);                                   // cerclage
+    F(-13, -34, 27, 4, P[3]); F(-13, -34, 27, 1, P[4]); F(-13, -31, 27, 1, P[0]); F(-13, -34, 1, 4, P[1]); F(13, -34, 1, 4, P[0]);   // couvercle
+    F(-4, -36, 9, 2, P[2]); F(-4, -36, 9, 1, P[4]); F(-4, -35, 1, 1, P[0]); F(4, -35, 1, 1, P[0]);   // poignée
+    F(-9, -38, 5, 5, '#2a5a1a'); F(-8, -38, 2, 2, '#4a8a2a'); F(-9, -34, 5, 1, '#123a0a');       // sac poubelle qui dépasse
+    F(-12, -1, 25, 1, P[0]);
   } else {
-    const [c, hi, dk] = VASE_COLS[p.v], tall = p.type === 'tallvase', h = tall ? 30 : 22;
+    const pal = [PP.blue, PP.red, PP.green][p.v] || PP.blue, tall = T === 'tallvase', h = tall ? 30 : 22;
     for (let r = 0; r < h; r++) {
       const t = r / h;
-      const wv = tall ? (t < .15 ? 3 : t < .25 ? 2 : Math.round(2 + Math.sin((t - .25) / .75 * Math.PI) * 5))
-                      : (t < .12 ? 3 : t < .22 ? 2 : Math.round(2 + Math.sin((t - .22) / .78 * Math.PI) * 4.5));
-      F(-wv, -h + r, wv * 2 + 1, 1, r % 9 === 4 ? hi : c);
-      F(-wv, -h + r, 1, 1, dk); F(wv - 1, -h + r, 1, 1, hi);
+      const wv = tall ? (t < .1 ? 3 : t < .22 ? 2 : Math.round(2 + Math.sin((t - .22) / .78 * Math.PI) * 5.5))
+                      : (t < .1 ? 3 : t < .2 ? 2 : Math.round(2 + Math.sin((t - .2) / .8 * Math.PI) * 4.8));
+      const band = (r % 10 === 5 || r % 10 === 6) && t > .25;
+      cylRow(-h + r, wv, band ? PP.gold : pal);
     }
-    F(-3, -h, 7, 1, dk);
+    F(-3, -h, 7, 1, pal[0]); F(-2, -h + 1, 5, 1, '#0a0a10');   // ouverture
+    F(-3, -1, 7, 1, pal[0]);
   }
 }
 function drawProps() {
@@ -1699,8 +1755,8 @@ function aiInput(f, o) {
 /* ---------------- Déroulé des rounds ---------------- */
 // 2e couleur quand le CPU prend le même personnage
 const ALT = [
-  { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'] },                                                   // Kaito : t-shirt noir
-  { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#2e2e34', '#4e4e58', '#76767e', '#a6a6b0'] }, // John : t-shirt bleu, jean gris
+  { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
+  { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
