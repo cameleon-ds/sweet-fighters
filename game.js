@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v30';
+const VERSION = 'v31';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -784,8 +784,17 @@ function stickDirs() {
   const H = ax > 0.38, V = ay > 0.38;                // secteurs de 67,5° : diagonales comprises
   return { l: H && x < 0, r: H && x > 0, u: V && y < 0, d: V && y > 0 };
 }
+// Menus : stick moins sensible (60 %) — il faut pousser franchement, une seule direction à la fois
+function menuStickDirs() {
+  const x = touch.x, y = touch.y, m = Math.hypot(x, y), o = { l: false, r: false, u: false, d: false };
+  if (m < 0.55) return o;
+  if (Math.abs(y) > Math.abs(x) * 1.4) { if (y < 0) o.u = true; else o.d = true; }
+  else if (Math.abs(x) > Math.abs(y) * 1.4) { if (x < 0) o.l = true; else o.r = true; }
+  return o;
+}
+const inMenu = () => G.paused || ['title', 'select', 'over'].includes(G.scene);
 function readPlayer() {
-  const st = stickDirs();
+  const st = inMenu() ? menuStickDirs() : stickDirs();
   const K = k => keys.has(k) || latched.has(k);
   const r = {
     l: K('l') || st.l,
@@ -1358,7 +1367,7 @@ const navHold = { u: 0, d: 0 };
 function nav(b) {
   if (!pctl.held[b]) { navHold[b] = 0; return false; }
   const n = ++navHold[b];
-  return n === 1 || (n > 18 && (n - 18) % 9 === 0);
+  return n === 1 || (n > 30 && (n - 30) % 15 === 0);
 }
 function navStep() { const u = nav('u'), d = nav('d'); return d ? 1 : u ? -1 : 0; }
 const MOVE_ROWS = [];
