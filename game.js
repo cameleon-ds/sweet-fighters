@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v37';
+const VERSION = 'v38';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1021,7 +1021,11 @@ function updFighter(f, o) {
       if (f.t >= 40) setState(f, 'idle');
       break;
     case 'uppercut':
-      if (f.t === 3) { f.vy = -8.6; f.vx = 1.6 * f.dir; f.air = true; sfx('upper'); }
+      // trajectoire en courbe : d'abord vers l'avant, puis de plus en plus vers le haut
+      if (f.t === 3) { f.air = true; sfx('upper'); }
+      if (f.t >= 3 && f.t <= 8) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 3]; }
+      else if (f.t === 9) { f.vy = -8.4; f.vx = 2.4 * f.dir; }
+      else if (f.t > 9 && f.vy < 0) f.vx *= .86;
       break;
     case 'jump':
       if (!f.airAtk && live) {
