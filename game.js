@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v45';
+const VERSION = 'v46';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -283,7 +283,7 @@ const DEFS = [
     top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],                 // t-shirt rouge
     legs:  ['#16264a', '#2a4478', '#4a6eac', '#82a8dc'],                 // jean bleu
     belt:  ['#2e180a', '#4e2c14', '#704220', '#9a6436'],                 // ceinture cuir
-    glove: ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],                 // mains nues
+    glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],                 // gants noirs (comme Kaito)
     fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
 ];
 
