@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v54';
+const VERSION = 'v55';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1866,7 +1866,7 @@ function endRound(winner) {
 
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
-const OPT = { zoom: true, energy: 1, diff: 1, blood: true };
+const OPT = { zoom: true, energy: 1, diff: 1, blood: true, music: 3 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}   // nouvelle clé : zoom et sang activés par défaut
 const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
@@ -1892,9 +1892,13 @@ function stepMoves() {
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  const m = navStep(), oc = Math.max(0, Math.min(4, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
+  const m = navStep(), oc = Math.max(0, Math.min(5, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
-  if (backPress(pctl) || (ok && G.ocur === 4)) { G.showOpts = false; sfx('beep'); return; }
+  if (backPress(pctl) || (ok && G.ocur === 5)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.ocur === 4 && (l || r || ok)) {
+    OPT.music = l ? Math.max(0, OPT.music - 1) : r ? Math.min(4, OPT.music + 1) : (OPT.music + 1) % 5;
+    saveOpt(); sfx('select');
+  }
   if (G.ocur === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
   if (G.ocur === 2 && (l || r || ok)) {
     OPT.diff = l ? Math.max(0, OPT.diff - 1) : r ? Math.min(2, OPT.diff + 1) : (OPT.diff + 1) % 3;
@@ -1921,7 +1925,38 @@ function stepPause() {
     else { G.showOpts = true; G.ocur = 0; }
   }
 }
+/* ---------------- Musiques ---------------- */
+const BGM = new Audio(); BGM.loop = true; BGM.preload = 'auto';
+const MUSIC = { title: 'music/music_title.mp3', select: 'music/music_select.mp3', dojo: 'music/music_dojo.mp3', city: 'music/music_city.mp3' };
+let bgmKey = null, bgmUnlocked = false;
+function musicWanted() {
+  if (G.scene === 'title') return 'title';
+  if (G.scene === 'select' || G.scene === 'stage' || G.scene === 'over') return 'select';
+  return G.stage === 'city' ? 'city' : 'dojo';
+}
+function updateMusic() {
+  const want = musicWanted();
+  if (want !== bgmKey) {
+    bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0;
+    if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {});
+  }
+  const vol = OPT.music / 4 * .75 * (G.paused ? .35 : 1);
+  BGM.volume = Math.max(0, Math.min(1, vol));
+  if (OPT.music === 0 && !BGM.paused) BGM.pause();
+  else if (OPT.music > 0 && bgmUnlocked && BGM.paused && BGM.src) BGM.play().catch(() => {});
+}
+// Les navigateurs n'autorisent le son qu'après une action de l'utilisateur
+const unlockAudio = () => {
+  if (bgmUnlocked) return;
+  bgmUnlocked = true;
+  if (!BGM.src) { bgmKey = musicWanted(); BGM.src = MUSIC[bgmKey] + '?v=55'; }
+  if (OPT.music > 0) BGM.play().catch(() => { bgmUnlocked = false; });
+};
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.pause(); });
+
 function step() {
+  updateMusic();
   G.frame++;
   ctlUpdate(pctl, readPlayer());
   ctlUpdate(p2ctl, readRemote(2));
@@ -2419,18 +2454,22 @@ function panel(y0, h, title) {
   text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
-  panel(28, 162, 'OPTIONS');
+  panel(24, 170, 'OPTIONS');
   const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84, bx = CX + 64;
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
-  if (c < 4) text('>', x0 - 4, 58 + c * 20, 8, '#ffd23a', 'right');
-  text('ZOOM IN GAME', x0, 58, 8, col(0), 'left'); box(58, OPT.zoom, 0);
-  text('FIGHTERS ENERGY', x0, 78, 8, col(1), 'left');
-  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, 82, 5.5, i < OPT.energy);
-  text('DIFFICULTY', x0, 98, 8, col(2), 'left');
-  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, 98, 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
-  text('BLOOD', x0, 118, 8, col(3), 'left'); box(118, OPT.blood, 3);
-  text((c === 4 ? '> ' : '') + 'BACK' + (c === 4 ? ' <' : ''), CX, 146, 8, col(4), 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 170, 8, '#7a6a80', 'center');
+  const Y = i => 52 + i * 18;
+  if (c < 5) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
+  text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
+  text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
+  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
+  text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
+  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, Y(2), 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
+  text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
+  text('MUSIC', x0, Y(4), 8, col(4), 'left');
+  if (OPT.music === 0) text('OFF', CX + 62, Y(4), 8, '#ff5a4a', 'center');
+  else for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, Y(4) + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < OPT.music ? '#5ae06a' : '#3a2e44');
+  text((c === 5 ? '> ' : '') + 'BACK' + (c === 5 ? ' <' : ''), CX, 150, 8, col(5), 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 176, 8, '#7a6a80', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
@@ -2594,5 +2633,5 @@ if (document.fonts && document.fonts.load) {
 } else go();
 
 // Accès debug pour les tests
-window.__SF = G; window.__NET = NET; window.__mkqr = () => makeQRs();
+window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__mkqr = () => makeQRs();
 })();
