@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v47';
+const VERSION = 'v48';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -496,13 +496,13 @@ function drawFighter(f, x = f.x, y = f.y) {
     }
   };
   // Bras : lead = bras avant (celui qui frappe), rear = bras arrière
-  const arm = (s0, e, hd, near) => {
+  const arm = (s0, e, hd, near, fd = dir) => {
     const S = near ? sk : dim(sk), T = near ? top : dim(top), Gl = near ? d.glove : dim(d.glove);
     limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
     limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, T);
     limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, S);
     if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
-    fist(hd, dir, Gl, S);
+    fist(hd, fd, Gl, S);
   };
   const leg = (k, ft, near) => {
     const soft = pal => [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour)
@@ -539,7 +539,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
     const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 4, -4]);   // bras avant plié, poing devant la poitrine
     arm(sdA, e1, h1, true);
-  } else if (!fullBack) arm(sdA, fe, fh, !backView);
+  } else if (fullBack) arm(sdB, be, bh, false);   // de dos : le bras plié passe derrière le dos
+  else arm(sdA, fe, fh, !backView);
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
 
   // ---- Torse ----
@@ -646,7 +647,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
 
   // ---- Plan avant ----
-  if (fullBack) { drawBraid(); drawBand(); arm(sdB, be, bh, true); arm(sdA, fe, fh, true); }
+  if (fullBack) { drawBraid(); drawBand(); arm(sdA, fe, fh, true, -dir); }   // poing levé : doigts tournés vers l'intérieur
   else if (backView) { drawBraid(); drawBand(); arm(sdB, be, bh, true); }
   else {
     // Vue de face : en garde, le bras proche reste sur le côté gauche du corps
