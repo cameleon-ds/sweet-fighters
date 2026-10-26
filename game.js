@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v42';
+const VERSION = 'v43';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -440,7 +440,9 @@ function drawFighter(f, x = f.x, y = f.y) {
   const fwd = [uy * dir, -ux * dir];
   const sh = add(n, [ux, uy], 1);
   // épaules écartées : avant (côté adversaire) et arrière (côté caméra)
-  const sdA = add(sh, fwd, 3.5), sdB = add(sh, fwd, -4.5);
+  // marche : les épaules suivent les bras (l'épaule du bras qui avance avance aussi), le buste pivote
+  const rs = f.state === 'walk' ? -Math.sin(f.walkPh || 0) : 0, RK = 2.6;
+  const sdA = add(add(sh, fwd, 3.5 + RK * rs), [0, .7 * rs]), sdB = add(add(sh, fwd, -4.5 - RK * rs), [0, -.7 * rs]);
 
   const drawBand = () => {
     if (!d.band) return;
@@ -520,8 +522,8 @@ function drawFighter(f, x = f.x, y = f.y) {
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
   const tw = 1.15;   // torse plus large (on le voit de 3/4)
-  const torso = [add(sh, fwd, 6 * tw), add(at(.3), fwd, 6.5 * tw), add(at(.75), fwd, 5 * tw), add(wa, fwd, 4.5 * tw),
-                 add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw), add(at(.25), fwd, -6 * tw), add(sh, fwd, -5.5 * tw)];
+  const torso = [add(add(sh, fwd, 6 * tw + RK * rs), [0, .7 * rs]), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
+                 add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(add(sh, fwd, -5.5 * tw - RK * rs), [0, -.7 * rs])];
   sPoly(grow(torso, .6), top[0]);
   sPoly(torso, top[2]);
   if (backView) {
@@ -911,7 +913,9 @@ function poseOf(f) {
       // l'image suit la distance parcourue : les pieds ne glissent pas, quelle que soit la vitesse
       const step = WALK_A * 4 * K * UP / WALK_N;   // distance à l'écran entre deux images
       const i = Math.floor(f.t * Math.abs(f.vx) / step) % WALK_N;
-      return 'wk' + (f.vx * f.dir < 0 ? (WALK_N - i) % WALK_N : i);
+      const wi = f.vx * f.dir < 0 ? (WALK_N - i) % WALK_N : i;
+      f.walkPh = wi / WALK_N * Math.PI * 2;
+      return 'wk' + wi;
     }
     case 'block': return 'block';
     case 'crouch': return 'crouch';
