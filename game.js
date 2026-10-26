@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v46';
+const VERSION = 'v47';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -324,6 +324,9 @@ const POSES = {
   throwS:  [6,-51, 4,-43, 1,-27, 12,-35, 19,-25, 10,-33, 17,-23, 10,-13, 14,0, -9,-12, -14,0],
   throwT:  [-2,-56, -2,-48, -1,-30, -6,-60, -12,-68, -4,-58, -10,-66, 7,-15, 11,0, -9,-14, -13,0],
   tuck:    [2,-46, 1,-40, 0,-30, 8,-38, 10,-44, 4,-36, 8,-42, 9,-34, 5,-26, 4,-31, -1,-24],
+  sho0:    [6,-38, 4,-31, 0,-15, 8,-24, 11,-18, -2,-25, 3,-28, 12,-10, 14,0, -8,-6, -16,0],   // shoryuken : accroupi, poing bas (de face)
+  sbk1:    [0,-57, 0,-49, 0,-31, 6,-62, 7,-75, -8,-41, -6,-47, 7,-23, 5,-11, -2,-17, -3,-2],  // montée, complètement de dos, genou levé
+  sbk2:    [0,-58, 0,-50, 0,-32, 6,-64, 6,-78, -8,-42, -7,-48, 6,-22, 4,-12, -1,-17, -2,-3],
   urB:     [5,-56, 3,-48, 1,-30, 9,-42, 13,-48, 11,-62, 18,-77, 8,-24, 6,-11, -3,-14, -6,-1],   // shoryuken : montée vue de dos, poing levé
   turnA:   [4,-56, 2,-48, 0,-31, 9,-44, 12,-50, 8,-54, 12,-62, 8,-26, 6,-14, -3,-16, -6,-4],   // rotation au sommet (encore de dos)
   turnB:   [3,-57, 1,-49, 0,-32, 7,-54, 10,-62, -4,-44, -3,-40, 8,-28, 6,-18, 0,-24, -5,-14],  // rotation (déjà de face)
@@ -421,7 +424,9 @@ function drawFighter(f, x = f.x, y = f.y) {
   const spinning = (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54);
   const dir = spinning && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
-  const backView = f.state === 'rupper' || (f.state === 'uppercut' && (f.apexT == null || f.t - f.apexT < 4));   // l'uppercut accroupi est vu de dos, bras proche levé
+  const upRise = f.state === 'uppercut' && (f.apexT == null || f.t - f.apexT < 4);
+  const backView = f.state === 'rupper' || (upRise && f.t >= 3);
+  const fullBack = upRise && f.t >= 6;   // shoryuken en montée : complètement de dos, bras levé du côté de l'adversaire   // l'uppercut accroupi est vu de dos, bras proche levé
   sx.clearRect(0, 0, SPR.width, SPR.height);
   // Jambes plus courtes que le haut du corps (proportions trapues)
   const Q = P.slice(), LF = .82, px0 = Q[4], py0 = Q[5];
@@ -458,6 +463,10 @@ function drawFighter(f, x = f.x, y = f.y) {
   // en marchant, les deux épaules à la même hauteur (l'épaule du premier plan descend au niveau de l'autre)
   const shY = f.state === 'walk' ? Math.max(sdA[1], sdB[1]) + .5 : null;
   if (shY != null) { sdA[1] = shY; sdB[1] = shY; }
+  if (fullBack) {   // de dos : épaules symétriques, à la même hauteur
+    const a2 = add(sh, fwd, 5.5), b2 = add(sh, fwd, -5.5);
+    sdA[0] = a2[0]; sdA[1] = a2[1]; sdB[0] = b2[0]; sdB[1] = a2[1];
+  }
 
   const drawBand = () => {
     if (!d.band) return;
@@ -530,7 +539,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     // bras avant tendu devant, à hauteur d'épaule, bien à droite du torse
     const e1 = add(sdA, [dir * 3, 5 + bob]), h1 = add(e1, [dir * 4, -4]);   // bras avant plié, poing devant la poitrine
     arm(sdA, e1, h1, true);
-  } else arm(sdA, fe, fh, !backView);
+  } else if (!fullBack) arm(sdA, fe, fh, !backView);
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
 
   // ---- Torse ----
@@ -540,9 +549,21 @@ function drawFighter(f, x = f.x, y = f.y) {
   const torso = [add(sh, fwd, 6 * tw + RK * rs), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
                  add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(sh, fwd, -5.5 * tw - RK * rs)];
   if (shY != null) { torso[0][1] = Math.max(torso[0][1], shY - 1); torso[7][1] = Math.max(torso[7][1], shY - 1); }
+  if (fullBack) {
+    const T2 = [add(sh, fwd, 7), add(at(.3), fwd, 7.5), add(at(.75), fwd, 5.5), add(wa, fwd, 4.8),
+                add(wa, fwd, -4.8), add(at(.75), fwd, -5.5), add(at(.3), fwd, -7.5), add(sh, fwd, -7)];
+    for (let i = 0; i < 8; i++) torso[i] = T2[i];
+  }
   sPoly(grow(torso, .6), top[0]);
   sPoly(torso, top[2]);
-  if (backView) {
+  if (fullBack) {
+    // dos vu de face : deux omoplates, colonne au centre, flancs dans l'ombre
+    sPoly([add(sh, fwd, 7), add(sh, fwd, 5), add(at(.7), fwd, 4), add(wa, fwd, 3.5), add(wa, fwd, 4.8), add(at(.75), fwd, 5.5), add(at(.3), fwd, 7.5)], top[1]);
+    sPoly([add(sh, fwd, -7), add(sh, fwd, -5), add(at(.7), fwd, -4), add(wa, fwd, -3.5), add(wa, fwd, -4.8), add(at(.75), fwd, -5.5), add(at(.3), fwd, -7.5)], top[1]);
+    sPoly([add(sh, fwd, 1.5), add(sh, fwd, 5), add(at(.3), fwd, 4.5), add(at(.36), fwd, 1.5)], top[3]);
+    sPoly([add(sh, fwd, -1.5), add(sh, fwd, -5), add(at(.3), fwd, -4.5), add(at(.36), fwd, -1.5)], top[3]);
+    for (let t = .1; t <= .85; t += .12) { const q = at(t); sR(q[0], q[1], 1, 1, top[1]); }
+  } else if (backView) {
     // Dos : omoplates éclairées, colonne vertébrale, flanc avant dans l'ombre
     sPoly([add(sh, fwd, 6), add(sh, fwd, 3), add(at(.6), fwd, 2.5), add(wa, fwd, 2), add(wa, fwd, 4.5), add(at(.75), fwd, 5), add(at(.3), fwd, 6.5)], top[1]);
     sPoly([add(sh, fwd, -5), add(sh, fwd, -1), add(at(.3), fwd, -1.5), add(at(.32), fwd, -5)], top[3]);
@@ -625,7 +646,8 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
 
   // ---- Plan avant ----
-  if (backView) { drawBraid(); drawBand(); arm(sdB, be, bh, true); }
+  if (fullBack) { drawBraid(); drawBand(); arm(sdB, be, bh, true); arm(sdA, fe, fh, true); }
+  else if (backView) { drawBraid(); drawBand(); arm(sdB, be, bh, true); }
   else {
     // Vue de face : en garde, le bras proche reste sur le côté gauche du corps
     // (coude vers le bas, poing devant les côtes) pour dégager pectoraux et abdos.
@@ -953,9 +975,9 @@ function poseOf(f) {
     case 'pthrow': return f.t < 7 ? 'special0' : 'special1';
     case 'uppercut': {
       // accroupi, le poing monte, envol de dos ; au sommet il se retourne et redescend de face
-      if (f.t < 3) return 'rup0';
+      if (f.t < 3) return 'sho0';
       if (f.t < 6) return 'rup1';
-      if (f.apexT == null) return 'urB';
+      if (f.apexT == null) return f.t < 12 ? 'sbk1' : 'sbk2';
       const dt = f.t - f.apexT;
       return dt < 4 ? 'turnA' : dt < 8 ? 'turnB' : 'upper2';
     }
