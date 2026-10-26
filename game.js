@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v31';
+const VERSION = 'v32';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -863,6 +863,7 @@ function makeFighter(def, id, x, dir, cpu) {
   };
 }
 
+const chargeMax = f => f.hp <= 80 ? 60 : 120;
 function setState(f, s) { if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
@@ -998,7 +999,7 @@ function updFighter(f, o) {
         if (h.s && f.t >= 6 && live) {
           // A maintenu : position de charge
           f.chargeT = (f.chargeT || 0) + 1; f.t = Math.min(f.t, 10);
-          if (f.chargeT === 180) {   // 3 secondes : charge maximale
+          if (f.chargeT === chargeMax(f)) {   // 2 s (1 s si l'énergie est à 80 % ou moins) : charge maximale
             f.charged = true; G.darkT = 60; G.flashT = 12;
             G.boltX = f.x - f.dir * 14; G.boltY = f.y - 44; sfx('parry');
             addPopup(f.x, f.y - 100, 'MAX!', '#ffd23a');
@@ -1732,7 +1733,7 @@ function drawFight() {
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
-    const pal = f.def.fb, k = Math.min(1, f.chargeT / 180);
+    const pal = f.def.fb, k = Math.min(1, f.chargeT / chargeMax(f));
     const cx = f.x - f.dir * 14, cy = f.y - 44;
     const r = 3 + k * 7 + (f.charged ? Math.sin(G.frame * .6) * 2 : 0);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -1789,7 +1790,7 @@ const MOVES = [
     ['BACK', 'BLOCK  -  DOWN+BACK: LOW BLOCK'], ['FWD + Y', 'LONG PUNCH'], ['FWD + B', 'LONG KICK'],
     ['DOWN + Y', 'RISING UPPERCUT'], ['DOWN + B x3', 'LOW KICKS (3RD KNOCKS DOWN)'] ] },
   { title: 'SPECIALS & COUNTER', lines: [
-    ['A', 'FIREBALL'], ['HOLD A 3S', 'MAX FIREBALL (2X SIZE)'], ['UP + A', 'UPPERCUT'],
+    ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'UPPERCUT'],
     ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['DIZZY', 'MASH ANY BUTTON'] ] },

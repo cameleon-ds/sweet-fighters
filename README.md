@@ -7,7 +7,7 @@ Double-click `index.html`.
 
 ## Mobile controls (landscape)
 - Stick: move · up = jump (forward/back = roll) · down = crouch · down + back = low block · back = block
-- Y: punch · B: kick · A: fireball (hold 3 s for a MAX fireball) · X: counter
+- Y: punch · B: kick · A: fireball (hold 2 s for a MAX fireball, 1 s when energy is 80% or less) · X: counter
 - Forward + Y: long punch · Forward + B: long kick
 - Down + Y: rising uppercut · Down + B x3: low kicks, the 3rd knocks down
 - Up + A: uppercut · Back + A: tornado kick x4 (4 hits in a row knock down, each spin can be countered)
