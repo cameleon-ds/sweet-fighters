@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v55';
+const VERSION = 'v56';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -799,21 +799,23 @@ function initAudio() {
     for (let i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
   } catch (e) { AC = null; }
 }
+// volume des bruitages (option SFX, 0 à 4 barres ; 4 = 100 %)
+const sfxVol = () => (typeof OPT === 'undefined' ? 4 : OPT.sfx) / 4;
 function tone(type, f0, f1, dur, vol) {
   const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t);
   o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  const v = Math.max(.0011, vol * sfxVol()); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
   o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur);
 }
 function noise(dur, vol, freq) {
   const t = AC.currentTime, s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
   s.buffer = NOISE; fl.type = 'bandpass'; fl.frequency.value = freq;
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  const v = Math.max(.0011, vol * sfxVol()); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
   s.connect(fl).connect(g).connect(AC.destination); s.start(t); s.stop(t + dur);
 }
 function sfx(n) {
-  if (!AC) return;
+  if (!AC || (typeof OPT !== 'undefined' && OPT.sfx === 0)) return;
   try {
     switch (n) {
       case 'whoosh': noise(.08, .22, 1800); break;
@@ -1866,7 +1868,7 @@ function endRound(winner) {
 
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
-const OPT = { zoom: true, energy: 1, diff: 1, blood: true, music: 3 };
+const OPT = { zoom: true, energy: 1, diff: 1, blood: true, music: 3, sfx: 4 };   // musique 75 %, bruitages 100 %
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}   // nouvelle clé : zoom et sang activés par défaut
 const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
@@ -1892,9 +1894,13 @@ function stepMoves() {
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  const m = navStep(), oc = Math.max(0, Math.min(5, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
+  const m = navStep(), oc = Math.max(0, Math.min(6, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
-  if (backPress(pctl) || (ok && G.ocur === 5)) { G.showOpts = false; sfx('beep'); return; }
+  if (backPress(pctl) || (ok && G.ocur === 6)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.ocur === 5 && (l || r || ok)) {
+    OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
+    saveOpt(); sfx('select');
+  }
   if (G.ocur === 4 && (l || r || ok)) {
     OPT.music = l ? Math.max(0, OPT.music - 1) : r ? Math.min(4, OPT.music + 1) : (OPT.music + 1) % 5;
     saveOpt(); sfx('select');
@@ -1940,7 +1946,7 @@ function updateMusic() {
     bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0;
     if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {});
   }
-  const vol = OPT.music / 4 * .75 * (G.paused ? .35 : 1);
+  const vol = OPT.music / 4 * (G.paused ? .35 : 1);
   BGM.volume = Math.max(0, Math.min(1, vol));
   if (OPT.music === 0 && !BGM.paused) BGM.pause();
   else if (OPT.music > 0 && bgmUnlocked && BGM.paused && BGM.src) BGM.play().catch(() => {});
@@ -2454,22 +2460,25 @@ function panel(y0, h, title) {
   text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
-  panel(24, 170, 'OPTIONS');
+  panel(20, 180, 'OPTIONS');
   const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84, bx = CX + 64;
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
-  const Y = i => 52 + i * 18;
-  if (c < 5) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
+  const bars = (y, v) => {
+    if (v === 0) { text('OFF', CX + 62, y, 8, '#ff5a4a', 'center'); return; }
+    for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
+  };
+  const Y = i => 46 + i * 17;
+  if (c < 6) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
   for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
   text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
   text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, Y(2), 8, ['#5ae06a', '#ffd23a', '#ff5a4a'][OPT.diff], 'center');
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
-  text('MUSIC', x0, Y(4), 8, col(4), 'left');
-  if (OPT.music === 0) text('OFF', CX + 62, Y(4), 8, '#ff5a4a', 'center');
-  else for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, Y(4) + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < OPT.music ? '#5ae06a' : '#3a2e44');
-  text((c === 5 ? '> ' : '') + 'BACK' + (c === 5 ? ' <' : ''), CX, 150, 8, col(5), 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 176, 8, '#7a6a80', 'center');
+  text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
+  text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
+  text((c === 6 ? '> ' : '') + 'BACK' + (c === 6 ? ' <' : ''), CX, 154, 8, col(6), 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 180, 8, '#7a6a80', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
