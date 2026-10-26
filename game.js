@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v40';
+const VERSION = 'v41';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -717,7 +717,9 @@ for (let i = 0; i < WALK_N; i++) {
   const L1 = leg(ph), L2 = leg(ph + Math.PI);
   const arm = (p, x0) => {                                   // bras pendant, balancier
     const sw = Math.sin(p);
-    return [x0 + 2.6 * sw, -38.5 + bob + Math.abs(sw) * .6, x0 + 1 + 6.2 * sw, -29.5 + bob + Math.abs(sw) * 1.8 - Math.max(0, sw) * 1.2];
+    const ex = x0 + 2.6 * sw, ey = -38.5 + bob + Math.abs(sw) * .6;
+    // coude plié à ~30 % : l'avant-bras part légèrement vers l'avant
+    return [ex, ey, ex + 4.6 + 2.4 * sw, ey + 7.3 - Math.max(0, sw) * 1.4];
   };
   const A1 = arm(ph + Math.PI, 2.5), A2 = arm(ph, -1.5);     // bras opposé à la jambe du même côté
   POSES['wk' + i] = [4, -57 + bob, 2, -49 + bob, .5, hipY, ...A1, ...A2, ...L1, ...L2].map(v => Math.round(v * 2) / 2);
