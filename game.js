@@ -4,11 +4,11 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v50';
+const VERSION = 'v51';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
-const EXT = 150;           // le décor dépasse de 150 px de chaque côté : la caméra défile
+const EXT = 50;            // le décor dépasse de 50 px de chaque côté : la caméra défile un peu
 let SW = 384 + 2 * EXT;    // largeur totale du décor
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
@@ -29,7 +29,7 @@ function resize() {
   if (nw !== W) {
     const old = W; W = nw; CX = W / 2; SW = W + 2 * EXT;
     cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false;
-    if (typeof makeBG === 'function') { BGS.dojo = makeBG(); BGS.city = makeCityBG(); BG = BGS[(typeof G !== 'undefined' && G.stage) || 'dojo']; }
+    if (typeof makeBG === 'function') { BGS.dojo = buildStageBG('dojo'); BGS.city = buildStageBG('city'); BG = BGS[(typeof G !== 'undefined' && G.stage) || 'dojo']; }
     if (typeof G !== 'undefined' && G.f) G.f.forEach(f => { f.x += (W - old) / 2; });
     if (typeof G !== 'undefined' && G.props) G.props.forEach(p => { p.x += (W - old) / 2; });
   }
@@ -207,6 +207,28 @@ function makeBG() {
 }
 let BG = null;
 const BGS = {};
+// Décors dessinés à partir des images (fidèles aux illustrations) : mis à l'échelle sur la largeur de la scène,
+// la ligne du sol de l'image est calée sur le sol du jeu
+const STAGE_IMG = { dojo: ['stage_dojo.jpg', 650], city: ['stage_city.jpg', 652] };
+const STAGE_PIC = {};
+for (const k in STAGE_IMG) {
+  const im = new Image();
+  im.onload = () => { BGS[k] = buildStageBG(k); if (typeof G !== 'undefined' && G.stage === k) BG = BGS[k]; };
+  im.src = STAGE_IMG[k][0] + '?v=51';
+  STAGE_PIC[k] = im;
+}
+function buildStageBG(k) {
+  const im = STAGE_PIC[k], floor = STAGE_IMG[k][1] / 768;
+  if (!im || !im.complete || !im.naturalWidth) return k === 'city' ? makeCityBG() : makeBG();
+  const c = document.createElement('canvas'); c.width = SW; c.height = H;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  const sc = Math.max(SW / im.naturalWidth, (H + 32) / im.naturalHeight), w = im.naturalWidth * sc, h = im.naturalHeight * sc;
+  let oy = Math.round(GROUND - floor * h);
+  oy = Math.min(0, Math.max(H - h, oy));
+  g.fillStyle = '#000'; g.fillRect(0, 0, SW, H);
+  g.drawImage(im, (SW - w) / 2, oy, w, h);
+  return c;
+}
 
 /* ---------------- Décor 2 : la ville la nuit (style Streets of Rage) ---------------- */
 function makeCityBG() {
@@ -1343,12 +1365,10 @@ function updThrow(f) {
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
 const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [6, 17], cone: [16, 22], trash: [20, 28] };
 function makeProps() {
-  const c = SW / 2;
+  const X = f => Math.round(SW * f);
   const list = G.stage === 'city'
-    ? [['trash', c - 266, 0], ['bottle', c - 238, 0], ['cone', c - 196, 0], ['bottle', c - 146, 0],
-       ['bottle', c + 140, 0], ['cone', c + 182, 0], ['bottle', c + 228, 0], ['trash', c + 262, 0]]
-    : [['crate', c - 268, 0], ['vase', c - 236, 0], ['pot', c - 196, 0], ['chair', c - 145, 0],
-       ['pot', c + 135, 0], ['tallvase', c + 178, 1], ['vase', c + 214, 2], ['crate', c + 262, 0]];
+    ? [['trash', X(.05), 0], ['bottle', X(.12), 0], ['cone', X(.2), 0], ['bottle', X(.8), 0], ['cone', X(.88), 0], ['trash', X(.95), 0]]
+    : [['crate', X(.05), 0], ['vase', X(.12), 0], ['chair', X(.2), 0], ['pot', X(.8), 0], ['tallvase', X(.88), 1], ['crate', X(.95), 0]];
   return list
     .map(([type, x, v]) => ({ type, x, y: GROUND, v, alive: true, held: null, fly: null }));
 }
@@ -2389,7 +2409,7 @@ function render() {
 }
 
 resize();
-if (!BG) { BGS.dojo = makeBG(); BGS.city = makeCityBG(); BG = BGS.dojo; }
+if (!BG) { BGS.dojo = buildStageBG('dojo'); BGS.city = buildStageBG('city'); BG = BGS.dojo; }
 
 let last = performance.now(), acc = 0;
 function loop(now) {
