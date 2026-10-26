@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v35';
+const VERSION = 'v36';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1180,10 +1180,11 @@ function updThrow(f) {
 }
 /* ---------- Objets du décor : chaise et vases (cassables, lançables avec X) ---------- */
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
-const PROP_DIM = { chair: [22, 34], vase: [12, 22], tallvase: [14, 30] };
+const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30] };
 function makeProps() {
   const c = SW / 2;
-  return [['vase', c - 228, 0], ['chair', c - 152, 0], ['tallvase', c + 158, 1], ['vase', c + 232, 2]]
+  return [['crate', c - 268, 0], ['vase', c - 236, 0], ['pot', c - 196, 0], ['chair', c - 145, 0],
+          ['pot', c + 135, 0], ['tallvase', c + 178, 1], ['vase', c + 214, 2], ['crate', c + 262, 0]]
     .map(([type, x, v]) => ({ type, x, y: GROUND, v, alive: true, held: null, fly: null }));
 }
 const propBox = p => { const [w, h] = PROP_DIM[p.type]; return [p.x - w / 2, p.y - h, p.x + w / 2, p.y]; };
@@ -1192,14 +1193,22 @@ function pickProp(f, p) { p.held = f; setState(f, 'pthrow'); f.vx = 0; sfx('whoo
 function launchProp(f, o) {
   const p = (G.props || []).find(q => q.held === f); if (!p) return;
   p.held = null; p.x = f.x + f.dir * 18; p.y = f.y - 58;
-  const dx = o.x - p.x, dy = (o.y - 50) - p.y, d = Math.hypot(dx, dy) || 1;
-  p.fly = { vx: dx / d * 7, vy: dy / d * 7 - 1.5, owner: f, target: o, rot: 0, t: 0 };
+  aimProp(p, f, o);
   sfx('whoosh');
+}
+const PGRAV = .28;
+// trajectoire en cloche (gravité) qui finit toujours sur la cible
+function aimProp(p, owner, target) {
+  const d = Math.abs(target.x - p.x);
+  const T = Math.max(26, Math.min(56, d / 5.5 + 14));
+  p.fly = { owner, target, T, t: 0, rot: (p.fly && p.fly.rot) || 0, vx: 0, vy: 0, spin: Math.sign(target.x - p.x) || 1 };
+  const ty = target.y - 46;
+  p.fly.vx = (target.x - p.x) / T; p.fly.vy = (ty - p.y) / T - .5 * PGRAV * T;
 }
 function breakProp(p, x = p.x, y = p.y - 10) {
   if (!p.alive) return;
   p.alive = false; p.held = null; p.fly = null;
-  const cols = p.type === 'chair' ? ['#8a5a30', '#6a4020', '#b07a44'] : VASE_COLS[p.v];
+  const cols = p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v];
   for (let i = 0; i < 14; i++) G.shards.push({ x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 10,
     vx: (Math.random() - .5) * 5, vy: -1.5 - Math.random() * 3.5, col: cols[i % cols.length], s: 1 + (Math.random() * 3 | 0), t: 0 });
   sfx('crash'); G.shake = Math.max(G.shake, 2);
@@ -1216,10 +1225,26 @@ function updProps() {
     if (p.fly) {
       // l'objet file vers l'adversaire, où qu'il soit (même en l'air)
       const F = p.fly, o = F.target, tx = o.x, ty = o.y - 46;
-      const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1, sp = 7.5;
-      F.vx += (dx / d * sp - F.vx) * .22; F.vy += (dy / d * sp - F.vy) * .22;
-      p.x += F.vx; p.y += F.vy; F.rot += .35 * Math.sign(F.vx || 1); F.t++;
-      if (d < 18 || F.t > 240) {
+      // courbe avec gravité, corrigée à chaque image pour suivre la cible (même en l'air)
+      const left = Math.max(1, F.T - F.t);
+      F.vx = (tx - p.x) / left;
+      F.vy += PGRAV; const vyNeed = (ty - p.y) / left - .5 * PGRAV * left;
+      F.vy += (vyNeed - F.vy) * (left < 8 ? 1 : .15);
+      p.x += F.vx; p.y += F.vy; F.rot += .3 * F.spin; F.t++;
+      const d = Math.hypot(tx - p.x, ty - p.y);
+      // renvoi : X au bon moment quand l'objet arrive
+      if (d < 70 && !F.deflected) {
+        const canX = NEUTRAL.includes(o.state) || o.state === 'parry';
+        if (o.cpu && !F.aiTried && d < 55) { F.aiTried = true; if (Math.random() < [.1, .25, .45][OPT.diff]) o.ctl.buf.x = 8; }
+        if (canX && (o.ctl.buf.x > 0 || (o.state === 'parry' && o.t <= 12)) && d < 60) {
+          take(o.ctl, 'x'); setState(o, 'parry'); o.vx = 0;
+          G.darkT = 14; G.flashT = 12; G.boltX = p.x; G.boltY = p.y; G.slowAll = 30; G.shake = 3;
+          addPopup(o.x, o.y - 100, 'REFLECT!', '#7af0ff'); sfx('parry');
+          const back = F.owner; aimProp(p, o, back); p.fly.deflected = false; p.fly.lastBy = o;
+          continue;
+        }
+      }
+      if (d < 16 || F.t >= F.T + 20) {
         breakProp(p, p.x, p.y);
         if (hurtbox(o)) applyHit(F.owner, o, PROP_HIT, p.x, p.y, F.owner.x, true);
       }
@@ -1231,7 +1256,6 @@ function updProps() {
       if (ab && ab[0] < box[2] && ab[2] > box[0]) { breakProp(p); break; }           // frappé
       if ((f.state === 'fall' || (f.state === 'down' && f.t < 6)) && Math.abs(f.x - p.x) < 24) { breakProp(p); break; }   // on tombe dessus
     }
-    if (p.alive) for (const fb of G.fbs) if (fb.alive && Math.abs(fb.x - p.x) < 10 * fb.sc + 6) breakProp(p);
   }
   for (const s of G.shards || []) {
     s.t++; s.vy += .3; s.x += s.vx; s.y += s.vy;
@@ -1244,12 +1268,22 @@ function drawProp(p, x, y) {
   const F = (px, py, w, h, c) => R(x + px, y + py, w, h, c);
   if (p.type === 'chair') {
     const w = '#8a5a30', d = '#5a3418', l = '#b07a44';
-    F(-9, -34, 3, 34, d); F(6, -34, 3, 34, d);          // montants du dossier
-    F(-9, -34, 18, 3, w); F(-9, -34, 18, 1, l);         // haut du dossier
-    F(-7, -27, 14, 2, w); F(-7, -22, 14, 2, w);          // barreaux
-    F(-11, -16, 22, 4, w); F(-11, -16, 22, 1, l); F(-11, -13, 22, 1, d);   // assise
-    F(-10, -12, 3, 12, d); F(7, -12, 3, 12, d);          // pieds
-    F(-8, -6, 16, 1, d);
+    F(-13, -46, 3, 46, d); F(10, -46, 3, 46, d);          // montants du dossier
+    F(-13, -46, 26, 4, w); F(-13, -46, 26, 1, l); F(-13, -43, 26, 1, d);   // haut du dossier
+    F(-10, -38, 20, 2, w); F(-10, -32, 20, 2, w); F(-10, -26, 20, 2, w);   // barreaux
+    F(-16, -22, 32, 5, w); F(-16, -22, 32, 1, l); F(-16, -18, 32, 1, d);   // assise
+    F(-15, -17, 3, 17, d); F(12, -17, 3, 17, d);          // pieds avant
+    F(-12, -8, 24, 1, d);
+  } else if (p.type === 'crate') {
+    const w = '#9a6a38', d = '#5a3418', l = '#c08a50';
+    F(-11, -20, 22, 20, w); F(-11, -20, 22, 1, l);
+    F(-11, -20, 2, 20, d); F(9, -20, 2, 20, d); F(-11, -1, 22, 1, d); F(-11, -11, 22, 1, d);
+    for (let i = 0; i < 16; i++) F(-8 + i, -18 + Math.round(i * 16 / 16), 2, 1, d);   // planche en diagonale
+  } else if (p.type === 'pot') {
+    const t = '#b8642e', td = '#7a3a18', g1 = '#3e7a2a', g2 = '#5c9a3a';
+    F(-8, -13, 16, 2, td); F(-7, -11, 14, 11, t); F(-7, -11, 1, 11, td); F(5, -11, 2, 11, '#d07a40'); F(-6, -1, 12, 1, td);
+    const leaf = (x0, y0, dx, n, c) => { for (let i = 0; i < n; i++) F(x0 + Math.round(dx * i), y0 - i, 2, 1, c); };
+    leaf(-1, -14, -.7, 14, g1); leaf(0, -14, .6, 16, g2); leaf(-2, -14, -1.3, 9, g2); leaf(1, -14, 1.2, 10, g1); leaf(0, -14, 0, 12, g1);
   } else {
     const [c, hi, dk] = VASE_COLS[p.v], tall = p.type === 'tallvase', h = tall ? 30 : 22;
     for (let r = 0; r < h; r++) {
@@ -1460,7 +1494,7 @@ function startRound() {
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
-  G.props = makeProps(); G.shards = []; G.camL = EXT; G.zoom = 1;
+  G.props = makeProps(); G.shards = []; G.slowAll = 0; G.camL = EXT; G.zoom = 1;
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -1599,6 +1633,7 @@ function stepFight() {
   if (G.shake > 0) G.shake *= .8;
   if (G.shake < .3) G.shake = 0;
   if (G.freeze > 0) { G.freeze--; return; }
+  if (G.slowAll > 0) { G.slowAll--; if (G.frame % 3) return; }   // ralenti général (renvoi d'objet)
   if (G.scene === 'ko' && G.t < 60 && G.t % 2) return; // ralenti du K.O.
 
   // ralenti : un combattant sous l'effet du contre n'avance qu'une image sur trois
@@ -1927,7 +1962,7 @@ const MOVES = [
     ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'UPPERCUT'],
     ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
-    ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['DIZZY', 'MASH ANY BUTTON'] ] },
+    ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
