@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v39';
+const VERSION = 'v40';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -701,6 +701,28 @@ function sfx(n) {
 const BTNS = ['p', 'k', 's', 'x'];
 const keys = new Set();
 const latched = new Set(); // appuis très brefs (entre deux frames)
+// Marche style Streets of Rage : buste droit, bras le long du corps qui balancent
+// à l'opposé des jambes, léger rebond. 8 images générées pour une animation fluide.
+const WALK_N = 8, WALK_A = 8.5;   // amplitude du pas (unités squelette)
+for (let i = 0; i < WALK_N; i++) {
+  const ph = i / WALK_N * Math.PI * 2;
+  const bob = -1.6 * (1 + Math.cos(2 * ph)) / 2;            // le corps monte quand les jambes se croisent
+  const hipY = -30 + bob;
+  const leg = p => {
+    const fx = WALK_A * Math.sin(p), lift = -6.5 * Math.max(0, Math.cos(p));   // pied qui avance = pied levé
+    const fy = lift;
+    const kx = fx * .5 + 2.5 - lift * .45, ky = (hipY + fy) / 2 + lift * .35;
+    return [kx, ky, fx, fy];
+  };
+  const L1 = leg(ph), L2 = leg(ph + Math.PI);
+  const arm = (p, x0) => {                                   // bras pendant, balancier
+    const sw = Math.sin(p);
+    return [x0 + 2.6 * sw, -38.5 + bob + Math.abs(sw) * .6, x0 + 1 + 6.2 * sw, -29.5 + bob + Math.abs(sw) * 1.8 - Math.max(0, sw) * 1.2];
+  };
+  const A1 = arm(ph + Math.PI, 2.5), A2 = arm(ph, -1.5);     // bras opposé à la jambe du même côté
+  POSES['wk' + i] = [4, -57 + bob, 2, -49 + bob, .5, hipY, ...A1, ...A2, ...L1, ...L2].map(v => Math.round(v * 2) / 2);
+}
+
 const KEYMAP = {
   ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd',
   KeyJ: 'p', KeyK: 'k', KeyL: 's', Space: 'x', KeyI: 'x', Enter: 'start', Escape: 'back', Backspace: 'back',
@@ -883,7 +905,12 @@ function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 function poseOf(f) {
   switch (f.state) {
     case 'idle': return ((G.frame / 18 | 0) + f.id) % 2 ? 'idle1' : 'idle0';
-    case 'walk': { const i = (f.t / 7 | 0) % 4; return ['walk0', 'walk1', 'walk2', 'walk3'][f.vx * f.dir < 0 ? 3 - i : i]; }
+    case 'walk': {
+      // l'image suit la distance parcourue : les pieds ne glissent pas, quelle que soit la vitesse
+      const step = WALK_A * 4 * K * UP / WALK_N;   // distance à l'écran entre deux images
+      const i = Math.floor(f.t * Math.abs(f.vx) / step) % WALK_N;
+      return 'wk' + (f.vx * f.dir < 0 ? (WALK_N - i) % WALK_N : i);
+    }
     case 'block': return 'block';
     case 'crouch': return 'crouch';
     case 'cblock': return 'cblock';
