@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v28';
+const VERSION = 'v29';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1302,7 +1302,8 @@ try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt') || '{}')); } 
 const saveOpt = () => { try { localStorage.setItem('sf2opt', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
-function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
+const TITLE_ITEMS = ['SELECT CHARACTER', 'VIEW COMMANDS', 'OPTIONS'];
+function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
 // Menus : un cran par appui ; stick maintenu = descend/monte ligne par ligne
 const navHold = { u: 0, d: 0 };
 function nav(b) {
@@ -1321,7 +1322,7 @@ function stepMoves() {
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  const m = navStep(); if (m) { G.ocur = (G.ocur + m + 3) % 3; sfx('beep'); }
+  const m = navStep(), oc = Math.max(0, Math.min(2, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
   if (backPress(pctl) || (ok && G.ocur === 2)) { G.showOpts = false; sfx('beep'); return; }
   if (G.ocur === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
@@ -1335,7 +1336,7 @@ function stepPause() {
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
-  if (m) { G.pcur = (G.pcur + m + n) % n; sfx('beep'); }
+  const pc = Math.max(0, Math.min(n - 1, G.pcur + m)); if (pc !== G.pcur) { G.pcur = pc; sfx('beep'); }
   if (backPress(pctl)) { G.paused = false; return; }
   if (edge(pctl, 's')) {
     sfx('select');
@@ -1359,19 +1360,22 @@ function step() {
     case 'title': {
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
+      if (G.showOpts) { stepOptions(); break; }
       const any = BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap;
       if (G.tstate !== 1) {
         if (G.t < SPLASH) { if (G.t > 10 && any) G.t = SPLASH; break; }          // passer le logo Super Rocket Games
         if (G.t > SPLASH + 20 && any) { G.tstate = 1; G.tcur = 0; G.tmenu = 0; sfx('select'); }
       } else {
         G.tmenu = (G.tmenu || 0) + 1;
-        if (navStep()) { G.tcur = 1 - (G.tcur || 0); sfx('beep'); }
-        if (tap) { if (tap.y > 166 && tap.y < 180) G.tcur = 0; else if (tap.y >= 180 && tap.y < 194) G.tcur = 1; else break; }
+        const tc = Math.max(0, Math.min(TITLE_ITEMS.length - 1, (G.tcur || 0) + navStep()));
+        if (tc !== (G.tcur || 0)) { G.tcur = tc; sfx('beep'); }
+        if (tap) { const i = Math.floor((tap.y - 159) / 11); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
           if ((G.tcur || 0) === 0) { G.scene = 'select'; G.t = 0; }
-          else { G.showMoves = true; G.mscroll = 0; }
+          else if (G.tcur === 1) { G.showMoves = true; G.mscroll = 0; }
+          else { G.showOpts = true; G.ocur = 0; }
         }
       }
       break;
@@ -1793,20 +1797,22 @@ function drawTitle() {
   // 2) logo Sweet Fighters : grand dézoom + fondu, sur fond noir
   const L = t - SPLASH;
   const k = Math.min(1, L / 30), ease = 1 - Math.pow(1 - k, 3);
-  const sc = 2.2 - 1.2 * ease, al = Math.min(1, L / 18);
-  if (!drawImg(LOGO, CX, 86, 244 * sc, al)) text('SWEET FIGHTERS', CX, 70, 16, '#ff7a3a', 'center');
+  const mk = G.tstate === 1 ? Math.min(1, (G.tmenu || 0) / 20) : 0;   // le logo remonte un peu pour laisser la place au menu
+  const sc = (2.2 - 1.2 * ease) * (1 - .1 * mk), al = Math.min(1, L / 18);
+  if (!drawImg(LOGO, CX, 86 - 8 * mk, 244 * sc, al)) text('SWEET FIGHTERS', CX, 70, 16, '#ff7a3a', 'center');
   if (G.showMoves) { drawMoves(); return; }
+  if (G.showOpts) { R(0, 0, W, H, 'rgba(0,0,0,.55)'); drawOptions(); return; }
   if (G.tstate !== 1) {
     if (L > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 176, 8, '#ffffff', 'center');
   } else {
-    ['SELECT CHARACTER', 'VIEW COMMANDS'].forEach((m, i) => {
+    TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 170 + i * 12, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 160 + i * 11, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
     });
   }
   if (L > 30) {
-    text('POWERED BY SUPER ROCKET GAMES', CX, 196, 8, '#c8b8a0', 'center');
-    text('ALL RIGHTS RESERVED 2026', CX, 206, 8, '#9a8a70', 'center');
+    text('POWERED BY SUPER ROCKET GAMES', CX, 197, 8, '#c8b8a0', 'center');
+    text('ALL RIGHTS RESERVED 2026', CX, 207, 8, '#9a8a70', 'center');
   }
   text(VERSION, W - 4, 4, 8, '#5a4a40', 'right');
 }
