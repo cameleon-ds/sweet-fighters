@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v43';
+const VERSION = 'v44';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -431,7 +431,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const lift = footBefore - Math.max(Q[17], Q[21]);
   for (let i = 1; i < Q.length; i += 2) Q[i] += lift;
   const pt = i => [OX + dir * Q[i * 2] * K, OY + Q[i * 2 + 1] * K];
-  const [h, n, p, fe, fh, be, bh, fk, ff, bk, bf] = [0,1,2,3,4,5,6,7,8,9,10].map(pt);
+  let [h, n, p, fe, fh, be, bh, fk, ff, bk, bf] = [0,1,2,3,4,5,6,7,8,9,10].map(pt);
   const sk = d.skin, top = d.top, legs = d.legs;
   const dim = pal => [pal[0], pal[0], pal[1], pal[1]];   // membre éloigné de la caméra, dans l'ombre
   const tshirt = d.style === 'tshirt';
@@ -442,7 +442,22 @@ function drawFighter(f, x = f.x, y = f.y) {
   // épaules écartées : avant (côté adversaire) et arrière (côté caméra)
   // marche : les épaules suivent les bras (l'épaule du bras qui avance avance aussi), le buste pivote
   const rs = f.state === 'walk' ? -Math.sin(f.walkPh || 0) : 0, RK = 2.6;
-  const sdA = add(add(sh, fwd, 3.5 + RK * rs), [0, .7 * rs]), sdB = add(add(sh, fwd, -4.5 - RK * rs), [0, -.7 * rs]);
+  const sdA = add(sh, fwd, 3.5 + RK * rs), sdB = add(sh, fwd, -4.5 - RK * rs);
+  if (f.state === 'walk') {
+    // épaule du premier plan abaissée au niveau de l'autre
+    sdB[1] = Math.max(sdB[1], sdA[1]);
+    // bras qui pivotent depuis l'épaule, à l'opposé de la jambe du même côté ; avant-bras plié
+    const ph = f.walkPh || 0, AMP = .5, BEND = .85, L1 = 6.6, L2 = 6.2;
+    const swingArm = (sd, th) => {
+      const e = [sd[0] + dir * L1 * Math.sin(th), sd[1] + L1 * Math.cos(th)];
+      return [e, [e[0] + dir * L2 * Math.sin(th + BEND), e[1] + L2 * Math.cos(th + BEND)]];
+    };
+    [fe, fh] = swingArm(sdA, -AMP * Math.sin(ph));
+    [be, bh] = swingArm(sdB, AMP * Math.sin(ph));
+  }
+  // en marchant, les deux épaules à la même hauteur (l'épaule du premier plan descend au niveau de l'autre)
+  const shY = f.state === 'walk' ? Math.max(sdA[1], sdB[1]) + .5 : null;
+  if (shY != null) { sdA[1] = shY; sdB[1] = shY; }
 
   const drawBand = () => {
     if (!d.band) return;
@@ -522,8 +537,9 @@ function drawFighter(f, x = f.x, y = f.y) {
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
   const tw = 1.15;   // torse plus large (on le voit de 3/4)
-  const torso = [add(add(sh, fwd, 6 * tw + RK * rs), [0, .7 * rs]), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
-                 add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(add(sh, fwd, -5.5 * tw - RK * rs), [0, -.7 * rs])];
+  const torso = [add(sh, fwd, 6 * tw + RK * rs), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
+                 add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(sh, fwd, -5.5 * tw - RK * rs)];
+  if (shY != null) { torso[0][1] = Math.max(torso[0][1], shY - 1); torso[7][1] = Math.max(torso[7][1], shY - 1); }
   sPoly(grow(torso, .6), top[0]);
   sPoly(torso, top[2]);
   if (backView) {
