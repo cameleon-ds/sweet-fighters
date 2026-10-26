@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v27';
+const VERSION = 'v28';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1303,33 +1303,44 @@ const saveOpt = () => { try { localStorage.setItem('sf2opt', JSON.stringify(OPT)
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
 function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.paused = false; }
+// Menus : un cran par appui ; stick maintenu = descend/monte ligne par ligne
+const navHold = { u: 0, d: 0 };
+function nav(b) {
+  if (!pctl.held[b]) { navHold[b] = 0; return false; }
+  const n = ++navHold[b];
+  return n === 1 || (n > 18 && (n - 18) % 9 === 0);
+}
+function navStep() { const u = nav('u'), d = nav('d'); return d ? 1 : u ? -1 : 0; }
+const MOVE_ROWS = [];
 function stepMoves() {
-  if (edge(pctl, 'l')) { G.mpage = ((G.mpage || 0) + MOVES.length - 1) % MOVES.length; sfx('beep'); }
-  if (edge(pctl, 'r')) { G.mpage = ((G.mpage || 0) + 1) % MOVES.length; sfx('beep'); }
-  if (backPress(pctl) || edge(pctl, 'start')) { G.showMoves = false; sfx('beep'); }
+  if (!MOVE_ROWS.length) MOVES.forEach((pg, i) => { if (i) MOVE_ROWS.push(['', '']); MOVE_ROWS.push(['#', pg.title]); pg.lines.forEach(l => MOVE_ROWS.push(l)); });
+  const maxS = Math.max(0, MOVE_ROWS.length * 14 - 128);
+  if (pctl.held.d) G.mscroll = Math.min(maxS, (G.mscroll || 0) + 1.5);
+  if (pctl.held.u) G.mscroll = Math.max(0, (G.mscroll || 0) - 1.5);
+  if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
 function stepOptions() {
-  if (edge(pctl, 'u') || edge(pctl, 'd')) { G.ocur = (G.ocur + (edge(pctl, 'u') ? 2 : 1)) % 3; sfx('beep'); }
-  const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = okPress(pctl);
+  const m = navStep(); if (m) { G.ocur = (G.ocur + m + 3) % 3; sfx('beep'); }
+  const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
   if (backPress(pctl) || (ok && G.ocur === 2)) { G.showOpts = false; sfx('beep'); return; }
-  if (G.ocur === 0 && (l || r || ok)) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
+  if (G.ocur === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
   if (G.ocur === 1 && (l || r || ok)) {
     OPT.energy = l ? Math.max(1, OPT.energy - 1) : r ? Math.min(3, OPT.energy + 1) : OPT.energy % 3 + 1;
     saveOpt(); sfx('select');
   }
 }
 function stepPause() {
+  if (edge(pctl, 'start')) { G.paused = false; G.showMoves = false; G.showOpts = false; sfx('beep'); return; }   // START = reprendre
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
-  const n = PAUSE_ITEMS.length;
-  if (edge(pctl, 'u')) { G.pcur = (G.pcur + n - 1) % n; sfx('beep'); }
-  if (edge(pctl, 'd')) { G.pcur = (G.pcur + 1) % n; sfx('beep'); }
+  const n = PAUSE_ITEMS.length, m = navStep();
+  if (m) { G.pcur = (G.pcur + m + n) % n; sfx('beep'); }
   if (backPress(pctl)) { G.paused = false; return; }
-  if (okPress(pctl)) {
+  if (edge(pctl, 's')) {
     sfx('select');
     if (G.pcur === 0) G.paused = false;
-    else if (G.pcur === 1) { G.showMoves = true; G.mpage = 0; }
+    else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
     else if (G.pcur === 2) { G.paused = false; G.scene = 'select'; G.t = 0; }
     else { G.showOpts = true; G.ocur = 0; }
   }
@@ -1354,13 +1365,13 @@ function step() {
         if (G.t > SPLASH + 20 && any) { G.tstate = 1; G.tcur = 0; G.tmenu = 0; sfx('select'); }
       } else {
         G.tmenu = (G.tmenu || 0) + 1;
-        if (edge(pctl, 'u') || edge(pctl, 'd')) { G.tcur = 1 - (G.tcur || 0); sfx('beep'); }
+        if (navStep()) { G.tcur = 1 - (G.tcur || 0); sfx('beep'); }
         if (tap) { if (tap.y > 166 && tap.y < 180) G.tcur = 0; else if (tap.y >= 180 && tap.y < 194) G.tcur = 1; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
           if ((G.tcur || 0) === 0) { G.scene = 'select'; G.t = 0; }
-          else { G.showMoves = true; G.mpage = 0; }
+          else { G.showMoves = true; G.mscroll = 0; }
         }
       }
       break;
@@ -1692,18 +1703,28 @@ const MOVES = [
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
 ];
 function drawMoves() {
-  R(0, 0, W, H, 'rgba(8,4,16,.88)');
-  const pg = MOVES[G.mpage || 0];
+  R(0, 0, W, H, 'rgba(8,4,16,.92)');
   text('MOVE LIST', CX, 10, 8, '#ff7a3a', 'center');
-  text(pg.title + '  ' + ((G.mpage || 0) + 1) + '/' + MOVES.length, CX, 24, 8, '#ffd23a', 'center');
-  const x0 = Math.max(16, CX - 168);
-  pg.lines.forEach(([k, v], i) => {
-    const y = 44 + i * 15;
+  const x0 = Math.max(16, CX - 168), top = 30, bot = 162, sc = G.mscroll || 0;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, top, W, bot - top); ctx.clip();
+  MOVE_ROWS.forEach(([k, v], i) => {
+    const y = top + 4 + i * 14 - sc;
+    const fa = Math.max(0, Math.min(1, (y - top + 2) / 8, (bot - 8 - y) / 8));   // fondu en haut et en bas
+    if (fa <= 0) return;
+    ctx.globalAlpha = fa;
+    if (k === '#') { R(x0, y + 10, 2 * CX - 2 * x0, 1, '#5a3a2a'); text(v, CX, y, 8, '#ffd23a', 'center'); return; }
     if (k) text(k, x0, y, 8, '#7af0ff', 'left');
-    text(v, k ? x0 + 112 : CX, y, 8, '#ffffff', k ? 'left' : 'center');
+    if (v) text(v, k ? x0 + 112 : CX, y, 8, '#ffffff', k ? 'left' : 'center');
   });
-  if (!isTouch) text('PC: J=Y  K=B  L=A  SPACE=X  ENTER=START', CX, 182, 8, '#9a8a70', 'center');
-  text(isTouch ? '< >: PAGE    B: BACK' : '< >: PAGE    ESC: BACK', CX, 198, 8, '#d8c8a8', 'center');
+  ctx.globalAlpha = 1; ctx.restore();
+  // ascenseur
+  const total = MOVE_ROWS.length * 14, view = bot - top;
+  if (total > view) {
+    const bh = Math.max(12, view * view / total), by = top + (view - bh) * (sc / Math.max(1, total - 128));
+    R(W - 8, top, 3, view, '#2a1e30'); R(W - 8, Math.min(bot - bh, by), 3, bh, '#ffd23a');
+  }
+  if (!isTouch) text('PC: J=Y  K=B  L=A  SPACE=X  ENTER=START', CX, 176, 8, '#9a8a70', 'center');
+  text(isTouch ? 'UP/DOWN: SCROLL    B: BACK' : 'UP/DOWN: SCROLL    ESC: BACK', CX, 196, 8, '#d8c8a8', 'center');
 }
 function drawStar(x, y, r, on) {
   ctx.beginPath();
