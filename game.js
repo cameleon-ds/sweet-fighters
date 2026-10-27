@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v74';
+const VERSION = 'v75';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2039,24 +2039,42 @@ function updGrog() {
   }
   if (G.waves) G.waves = G.waves.filter(w => !w.dead);
 }
-function drawGrogFx() {
+function elecArc(pts, col, w) {   // trait électrique en zigzag le long d'une suite de points
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+  pts.forEach(([x, y], k) => { const jx = (Math.random() - .5) * 3, jy = (Math.random() - .5) * 3; k ? ctx.lineTo(x + jx, y + jy) : ctx.moveTo(x, y); });
+  ctx.stroke();
+}
+function drawGrogFx() {   // ondes électriques bleues de Grog
   for (const w of G.waves || []) {
-    if (w.ring) {   // onde de choc corporelle du Rempart
-      const r = 10 + w.t * 4, a = 1 - w.t / w.life;
-      ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = '#e0e8f4'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(w.x, GROUND - 45, r * .7, r, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-      continue;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (w.ring) {   // Rempart de Fer : onde de choc électrique qui part du corps
+      const k = w.t / w.life, a = 1 - k, rx = 12 + w.t * 5, ry = 20 + w.t * 5.5, cx = w.x, cy = GROUND - 42;
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, ry);
+      g.addColorStop(0, `rgba(168,244,255,${.35 * a})`); g.addColorStop(.7, `rgba(47,180,255,${.18 * a})`); g.addColorStop(1, 'rgba(20,88,196,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      const pts = []; for (let i = 0; i <= 28; i++) { const t = i / 28 * Math.PI * 2; pts.push([cx + Math.cos(t) * rx, cy + Math.sin(t) * ry]); }
+      ctx.globalAlpha = a; elecArc(pts, 'rgba(20,88,196,.9)', 5); elecArc(pts, 'rgba(47,180,255,1)', 2.5); elecArc(pts, '#ffffff', 1);
+      for (let b = 0; b < 4; b++) {   // éclairs qui jaillissent du centre
+        const t = Math.random() * Math.PI * 2, L = [[cx, cy]]; for (let s2 = 1; s2 <= 4; s2++) L.push([cx + Math.cos(t) * rx * s2 / 4, cy + Math.sin(t) * ry * s2 / 4]);
+        elecArc(L, 'rgba(168,244,255,.9)', 1.2);
+      }
+      ctx.restore(); continue;
     }
-    const a = Math.min(1, (w.life - w.t) / 10), n = w.small ? 3 : 5;
-    ctx.save(); ctx.globalAlpha = a;
-    for (let i = 0; i < n; i++) {   // rochers et dalles soulevés
-      const x = Math.round(w.x - w.dir * i * 7), hh = Math.max(2, (n - i) * (w.small ? 3 : 5) - ((G.frame + i) % 3));
-      R(x - 4, GROUND - hh, 8, hh + 2, '#3a2e24'); R(x - 3, GROUND - hh + 1, 6, hh, i % 2 ? '#5a4a3a' : '#7a6650'); R(x - 3, GROUND - hh + 1, 6, 1, '#b8a080'); R(x - 3, GROUND - hh + 2, 2, hh - 2, '#9a8468');
+    // Impact Sismique : demi-mur d'énergie électrique qui court au sol vers l'adversaire
+    const a = Math.min(1, (w.life - w.t) / 8, w.t / 3 + .3), H = w.small ? 18 : 32, R = w.small ? 9 : 13, x = w.x, y = GROUND;
+    const g = ctx.createRadialGradient(x, y - H * .45, 2, x, y - H * .4, H * 1.1);
+    g.addColorStop(0, `rgba(255,255,255,${.55 * a})`); g.addColorStop(.35, `rgba(120,220,255,${.45 * a})`); g.addColorStop(1, 'rgba(20,88,196,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, R * 1.9, H * 1.15, 0, Math.PI, 0); ctx.fill();
+    ctx.globalAlpha = a;
+    for (const [rr, hh, col, lw] of [[R * 1.25, H, 'rgba(20,88,196,.9)', 5], [R, H * .9, 'rgba(47,180,255,1)', 3], [R * .75, H * .75, '#a8f4ff', 2], [R * .5, H * .55, '#ffffff', 1.2]]) {
+      const pts = []; for (let i = 0; i <= 14; i++) { const t = Math.PI + i / 14 * Math.PI; pts.push([x + Math.cos(t) * rr + w.dir * Math.sin(i / 14 * Math.PI) * 3, y + Math.sin(t) * hh]); }
+      elecArc(pts, col, lw);
     }
-    R(Math.round(w.x) - 2, GROUND - (w.small ? 14 : 30) - (G.frame % 4) * 2, 3, 3, '#c8b090');   // éclats
-    R(Math.round(w.x) + 4, GROUND - (w.small ? 10 : 22) - ((G.frame + 2) % 4) * 2, 2, 2, '#8a7660'); R(Math.round(w.x) - 7, GROUND - (w.small ? 8 : 18) - ((G.frame + 1) % 4) * 2, 2, 2, '#a89070');
-    ctx.globalAlpha = a * .35; ctx.fillStyle = '#d8c8a8';
-    ctx.beginPath(); ctx.ellipse(w.x - w.dir * 10, GROUND - 8, w.small ? 16 : 26, w.small ? 7 : 11, 0, 0, Math.PI * 2); ctx.fill();
+    for (let b = 0; b < 3; b++) {   // traînée d'étincelles derrière l'onde
+      const bx = x - w.dir * (8 + Math.random() * 22), by = y - Math.random() * H * .6;
+      ctx.fillStyle = Math.random() < .5 ? '#a8f4ff' : '#2fb4ff'; ctx.fillRect(Math.round(bx), Math.round(by), 2, 2);
+    }
+    ctx.fillStyle = `rgba(47,180,255,${.35 * a})`; ctx.fillRect(Math.round(w.dir > 0 ? x - 30 : x), y - 1, 30, 2);   // sillon lumineux au sol
     ctx.restore();
   }
 }
