@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v75';
+const VERSION = 'v76';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -937,7 +937,7 @@ function drawFighter(f, x = f.x, y = f.y) {
 
 
   // Silhouette féminine : poitrine et hanches arrondies
-  if (d.female) {
+  if (d.curves) {   // formes désactivées pour Vesper (silhouette simple, base Kaito plus mince)
     if (!backView) {
       const bc = add(at(.3), fwd, 5.2 * tw);             // poitrine (côté adversaire)
       sDisc(bc[0], bc[1] + 1, 3, top[0]); sDisc(bc[0], bc[1], 3, top[2]);
