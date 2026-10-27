@@ -4,14 +4,14 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v57';
+const VERSION = 'v58';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
 const EXT = 50;            // le décor dépasse de 50 px de chaque côté : la caméra défile un peu
 let SW = 384 + 2 * EXT;    // largeur totale du décor
 const cv = document.getElementById('game');
-const ctx = cv.getContext('2d');
+let ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 // Portrait sur mobile (ex. rotation verrouillée) : on pivote tout le jeu de 90°
@@ -333,6 +333,19 @@ const HEAD_SORA = [
   "..eSSSSSe.",
 ];
 
+const HEAD_VESPER = [
+  "..aaaaaa..",
+  ".aHLLLHHa.",
+  "aHHHLLHHHa",
+  "aHhHHHHHHa",
+  "ahHHHHsHHs",
+  "ahhHkssks.",
+  "ahhSSssss.",
+  "ahbBBBBBB.",
+  ".abBnnnnB.",
+  "..bBBBBBb.",
+  "...eBBBBe.",
+];
 // Têtes vues de dos 3/4 (nuque, oreille et bord de la joue à l'avant)
 const HEAD_KAITO_BACK = [
   "..aaaaaa..",
@@ -380,6 +393,16 @@ const DEFS = [
     belt:  ['#2e180a', '#4e2c14', '#704220', '#9a6436'],                 // ceinture cuir
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],                 // gants noirs (comme Kaito)
     fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
+  { name: 'VESPER', style: 'tshirt', head: HEAD_VESPER, headBack: HEAD_SORA_BACK, braid: true, shoes: true, slim: true, sleeves: true, kit: 'vesper',
+    skin:  ['#5a3428', '#a8705a', '#e0b090', '#fcd8bc'],
+    hair:  { a: '#1a0a2a', h: '#4a1a7a', H: '#7a3ac8', L: '#c08aff' },   // violet néon
+    bandP: ['#05050a', '#101018', '#1e1e2a', '#3af0ff'],               // masque noir, liseré cyan
+    top:   ['#0a0614', '#1a1028', '#2e1e46', '#5a3a8a'],               // combinaison noire-violette
+    legs:  ['#0a0614', '#1a1028', '#2e1e46', '#4a3870'],
+    belt:  ['#062a3a', '#0a5a7a', '#1ab8e0', '#8af4ff'],               // ceinture néon cyan
+    glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
+    shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
+    fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
 ];
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
@@ -498,9 +521,13 @@ function fist(q, dir, glove, skin) {
   sR(fx + (dir > 0 ? 1 : 0), y0, 1, 1, skin[3]);
 }
 // Baskets montantes en toile noire, bout et semelle blancs
-function shoeP(q, dir, dark) {
+function shoeP(q, dir, dark, P) {
   const x = Math.round(q[0]), y = Math.round(q[1]);
   const x0 = x - (dir > 0 ? 2 : 4);
+  if (P) {   // bottes (palette du personnage)
+    sR(x0, y - 5, 6, 4, dark ? P[0] : P[1]); sR(x0 + (dir > 0 ? 1 : 2), y - 5, 3, 1, dark ? P[1] : '#4a4a5a');
+    sR(x0, y - 1, 7, 1, dark ? P[3] : P[2]); return;
+  }
   sR(x0, y - 4, 6, 3, dark ? '#0a0a0e' : '#16161c');          // tige noire
   sR(x0 + (dir > 0 ? 1 : 2), y - 4, 3, 1, dark ? '#1c1c24' : '#34343e');   // reflet
   sR(x0 + (dir > 0 ? 4 : 0), y - 3, 3, 2, dark ? '#b8b8b0' : '#f4f4ee');   // bout blanc
@@ -595,7 +622,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     const S = near ? sk : dim(sk), T = near ? top : dim(top), Gl = near ? d.glove : dim(d.glove);
     limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
     limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, T);
-    limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, S);
+    limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, d.sleeves ? T : S);
+    if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
     if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
     fist(hd, fd, Gl, S);
   };
@@ -620,7 +648,7 @@ function drawFighter(f, x = f.x, y = f.y) {
       sR(hx - 3, hy, 6, 1, Lg[1]);
       [[-3, 2], [-2, 1], [-1, 3], [0, 1], [1, 2], [2, 1]].forEach(([dx, l], i) => sR(hx + dx, hy + 1, 1, l, i % 2 ? Lg[2] : Lg[1]));
     }
-    if (d.shoes) shoeP(ft, dir, !near); else footP(ft, dir, S);
+    if (d.shoes) shoeP(ft, dir, !near, d.shoe); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
 
@@ -641,7 +669,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   // ---- Torse ----
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
-  const tw = 1.15;   // torse plus large (on le voit de 3/4)
+  const tw = d.slim ? .95 : 1.15;   // torse plus large (on le voit de 3/4) ; plus fin pour les combattantes
   const torso = [add(sh, fwd, 6 * tw + RK * rs), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
                  add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(sh, fwd, -5.5 * tw - RK * rs)];
   if (shY != null) { torso[0][1] = Math.max(torso[0][1], shY - 1); torso[7][1] = Math.max(torso[7][1], shY - 1); }
@@ -1089,11 +1117,12 @@ const ATK = {
   flame:    { dur: 26, act: [6, 12], box: [14, -80, 54, -48], dmg: 10, stun: 18, bstun: 12, push: 3.0, sfx: 'heavy' },
   gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
+  zenith:   { dur: 60, act: [4, 26], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const ATTACKING = ['zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1146,6 +1175,9 @@ function poseOf(f) {
     case 'fkick': return f.t < 9 || f.t >= 17 ? 'fkick0' : 'fkick1';
     case 'special': return f.t < 12 ? 'special0' : 'special1';
     case 'pthrow': return f.t < 7 ? 'special0' : 'special1';
+    case 'holo': return f.t < 7 ? 'special0' : 'special1';
+    case 'shadow': return 'tuck';
+    case 'zenith': return f.t < 3 ? 'crouch' : 'tuck';
     case 'uppercut': {
       // accroupi, le poing monte, envol de dos ; au sommet il se retourne et redescend de face
       if (f.t < 3) return 'sho0';
@@ -1203,6 +1235,12 @@ function updFighter(f, o) {
       // 4e coup d'un enchaînement Y Y B / B B Y : A = frappe enflammée
       if (comboReady(f, o) && take(c, 's')) { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); break; }
       if (take(c, 's')) {
+        if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
+          if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
+          if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('whoosh'); break; }
+          if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
+          break;
+        }
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
         if (back) { setState(f, 'gtatsu'); f.vx = 0; f.spinN = 0; sfx('upper'); break; }   // arrière + A : tornade au sol x4
         if (!f.fb) { setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
@@ -1329,6 +1367,19 @@ function updFighter(f, o) {
       break;
     case 'throw': f.vx = 0; updThrow(f); if (f.t >= 38) { f.rotAng = null; f.victim = null; setState(f, 'idle'); } break;
     case 'held': return;   // positionné par le lanceur
+    case 'holo':
+      f.vx = 0;
+      if (f.t === 7) { G.holos.push({ owner: f, x: f.x + f.dir * 16, y: f.y, dir: f.dir, t: 0 }); sfx('fb'); }
+      if (f.t >= 24) setState(f, 'idle');
+      break;
+    case 'shadow':   // recule très vite en laissant une mine
+      f.vx = f.t < 12 ? -f.dir * 5.5 : f.vx * .6;
+      if (f.t >= 18) { f.vx = 0; setState(f, 'idle'); }
+      break;
+    case 'zenith':   // salto vers le haut, lame tendue, retombe derrière l'adversaire
+      if (f.t === 3) { f.air = true; f.vy = -8; f.vx = f.dir * Math.min(3.6, Math.max(1.8, (Math.abs(o.x - f.x) + 30) / 22)); sfx('upper'); }
+      if (f.air) f.rotAng = f.dir * Math.min(1, f.t / 40) * Math.PI * 2;
+      break;
     case 'pthrow': f.vx = 0; if (f.t === 7) launchProp(f, o); if (f.t >= 22) setState(f, 'idle'); break;
   }
 
@@ -1340,6 +1391,7 @@ function updFighter(f, o) {
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
       else if (f.state === 'tatsu') { setState(f, 'land'); f.landT = 10; }
+      else if (f.state === 'zenith') { f.rotAng = null; setState(f, 'land'); f.landT = 10; }
       else if (['jump', 'jpunch', 'jkick'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
@@ -1363,7 +1415,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['jpunch', 'jkick', 'uppercut', 'tatsu'].includes(f.state) && !f.air) return null;
+  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith'].includes(f.state) && !f.air) return null;
   const [x0, y0, x1, y1] = a.box;
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
 }
@@ -1663,6 +1715,59 @@ function updBlood() {
 }
 function drawStains() { for (const s of G.stains || []) { R(s.x - s.w / 2, s.y, s.w, 1, '#6a0a0a'); if (s.w > 2) R(s.x - s.w / 2 + 1, s.y - 1, s.w - 2, 1, '#8a1010'); } }
 function drawBlood() { for (const d of G.blood || []) R(d.x, d.y, d.s + 1, d.s, d.s > 1 ? '#a01010' : '#c81818'); }
+/* ---------- Vesper : hologramme et mines ---------- */
+const HOLO_HIT = { dmg: 6, stun: 42, bstun: 12, push: 1.2, chip: 1, sfx: 'hit' };       // décharge paralysante
+const MINE_HIT = { dmg: 8, knock: true, stun: 20, bstun: 14, push: 5, chip: 0, sfx: 'heavy', unblock: true };
+function shock(att, o, data, x, y) {
+  addSpark(x, y, 'parry'); G.flashT = Math.max(G.flashT, 6); G.boltX = x; G.boltY = y;
+  applyHit(att, o, data, x, y, att.x, true);
+  sfx('parry');
+}
+function updVesper() {
+  for (const q of G.holos || []) {
+    const o = G.f.find(f => f !== q.owner);
+    q.t++; q.x += q.dir * 5.5;
+    if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30 || q.t > 90) q.dead = true;
+    if (q.dead || !o) continue;
+    const hb = hurtbox(o), ab = rawAtkBox(o);
+    const touch = hb && Math.abs(o.x - q.x) < 16 && o.y > q.y - 70;
+    const struck = ab && ab[0] < q.x + 12 && ab[2] > q.x - 12;   // l'adversaire frappe l'hologramme
+    if (touch || struck) { q.dead = true; if (hurtbox(o)) shock(q.owner, o, HOLO_HIT, q.x, q.y - 50); else addSpark(q.x, q.y - 50, 'parry'); }
+  }
+  if (G.holos) G.holos = G.holos.filter(q => !q.dead);
+  for (const m of G.mines || []) {
+    const o = G.f.find(f => f !== m.owner);
+    m.t++;
+    if (m.t > 420) m.dead = true;
+    if (m.dead || !o || m.t < 18) continue;
+    if (!o.air && Math.abs(o.x - m.x) < 14 && hurtbox(o)) { m.dead = true; shock(m.owner, o, MINE_HIT, m.x, GROUND - 10); G.shake = 5; }
+  }
+  if (G.mines) G.mines = G.mines.filter(m => !m.dead);
+}
+function drawVesperFx() {
+  for (const q of G.holos || []) {   // double holographique translucide
+    ctx.save(); ctx.globalAlpha = .45 + .15 * Math.sin(G.frame * .9); ctx.globalCompositeOperation = 'lighter';
+    drawFighter({ def: q.owner.def, id: 9, dir: q.dir, state: 'fpunch', t: 8, flash: 0, x: q.x, y: q.y, vx: 0, air: false }, q.x, q.y);
+    ctx.restore();
+    for (let i = 0; i < 4; i++) R(q.x - q.dir * (8 + i * 7), q.y - 70 + ((G.frame * 3 + i * 17) % 60), 5, 1, '#3af0ff');
+  }
+  for (const m of G.mines || []) {   // mine magnétique : petit disque avec lumière clignotante
+    const on = m.t >= 18 && (G.frame >> 3) % 2;
+    R(m.x - 5, GROUND - 3, 11, 3, '#1a1a24'); R(m.x - 4, GROUND - 4, 9, 1, '#3a3a4a');
+    R(m.x - 1, GROUND - 5, 3, 2, on ? '#3af0ff' : '#0a5a7a');
+    if (on) { ctx.save(); ctx.globalAlpha = .35; disc(m.x, GROUND - 4, 5, '#3af0ff'); ctx.restore(); }
+  }
+  for (const f of G.f) {   // traînée et croissant de lame pour Pas de l'Ombre / Lame Zénith
+    if (f.state === 'shadow' && f.t < 12) { ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { x: f.x + f.dir * 10 }), f.x + f.dir * 10, f.y); ctx.restore(); }
+    if (f.state === 'zenith' && f.air && f.t < 30) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(58,240,255,.8)'; ctx.lineWidth = 3;
+      const a0 = (f.rotAng || 0) - Math.PI / 2;
+      ctx.beginPath(); ctx.arc(f.x, f.y - 45, 30, a0 - 1.2 * f.dir, a0, f.dir < 0); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(f.x, f.y - 45, 30, a0 - .6 * f.dir, a0, f.dir < 0); ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
 function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 
 const CLASH_HIT = { dmg: 14, knock: true, stun: 24, bstun: 20, push: 5.5, chip: 0, sfx: 'heavy' };
@@ -1834,6 +1939,7 @@ function aiInput(f, o) {
 const ALT = [
   { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
+  { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
@@ -1856,6 +1962,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
+  G.holos = []; G.mines = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -2149,7 +2256,7 @@ function stepFight() {
     }
   }
 
-  updProps(); updBlood();
+  updProps(); updBlood(); updVesper();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -2224,14 +2331,38 @@ function drawSpark(s) {
 // ---------- Portraits et grille de sélection (8 cases) ----------
 const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
 const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
-const PORTRAIT_FACE = [1, -1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
-const ROSTER = [0, 1, null, null, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
+const PORTRAIT_FACE = [1, -1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
+// Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
+function makePortrait(i, hurt) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), pal = DEFS[i].fb;
+  const bg = g.createRadialGradient(32, 28, 4, 32, 32, 46); bg.addColorStop(0, pal[3]); bg.addColorStop(1, '#06040c');
+  g.fillStyle = bg; g.fillRect(0, 0, 64, 64);
+  const keep = ctx; ctx = g;   // on réutilise le moteur de dessin du jeu sur ce petit canvas
+  try {
+    g.save(); g.translate(40, 135); g.scale(1.6, 1.6);
+    drawFighter({ def: Object.assign({ idx: i }, DEFS[i]), id: 0, dir: 1, state: 'idle', t: 0, flash: 0, x: 0, y: 0, vx: 0 }, 0, 0);
+    g.restore();
+  } finally { ctx = keep; }
+  if (hurt) {
+    g.fillStyle = 'rgba(120,0,0,.25)'; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = '#b01010'; for (const [x, y, h] of [[34, 14, 6], [40, 20, 4], [26, 30, 5], [44, 34, 7]]) g.fillRect(x, y, 1, h);
+    g.fillStyle = 'rgba(90,40,120,.55)'; g.fillRect(36, 12, 5, 3);
+  }
+  return c;
+}
+function portraitOf(i, hurt) {
+  const arr = hurt ? PORTRAITS_HURT : PORTRAITS;
+  if (!arr[i]) { try { arr[i] = makePortrait(i, hurt); } catch (e) { return null; } }
+  return arr[i];
+}
+const ROSTER = [0, 1, 2, null, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
 function drawPortrait(i, x, y, sz, border, look = 1, hurt = false) {   // look : 1 = regarde à droite, -1 = à gauche
   R(x - 2, y - 2, sz + 4, sz + 4, '#000');
   R(x - 1, y - 1, sz + 2, sz + 2, border || '#c8c8d0');
-  const im = i == null ? null : (hurt ? PORTRAITS_HURT : PORTRAITS)[i];
+  const im = i == null ? null : portraitOf(i, hurt);
   const flip = i != null && PORTRAIT_FACE[i] !== look;
-  if (im && im.complete && im.naturalWidth) {
+  if (im && (im instanceof HTMLCanvasElement || (im.complete && im.naturalWidth))) {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     if (flip) { ctx.translate(x + sz, y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0, sz, sz); }
     else ctx.drawImage(im, x, y, sz, sz);
@@ -2362,6 +2493,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
+  drawVesperFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -2427,6 +2559,9 @@ const MOVES = [
     ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
+  { title: 'VESPER SPECIALS', lines: [
+    ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
+    ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
