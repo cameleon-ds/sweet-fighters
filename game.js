@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v64';
+const VERSION = 'v66';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -354,49 +354,37 @@ const HEAD_VESPER = [
   "..bBBBnnb.",
   "...eBBBBe.",
 ];
-const HEAD_GROG = [
-  "..aaaaa...",
-  ".aHLLHHa..",
-  "aHLHhHHHa.",
-  "aHHhHHLHHa",
-  "aHhHHHHHHa",
-  "ahHHHaaHaa",
-  "ahhHHkcakc",
-  "eShHSsslS.",
-  "eSbBSbkkb.",
-  ".ebBBBBBb.",
-  "..bbBBbb..",
+const HEAD_GROG = [   // tête de Kaito : crâne chauve blindé, yeux rouges, barbe
+  "..aaaaaa..",
+  ".aHHLLHHa.",
+  "aHHHLLHHHa",
+  "aHHHHHLHHa",
+  "ahHHHHHHHh",
+  "ahhSkcskc.",
+  "ahhSsssss.",
+  "ahSssssss.",
+  ".aSbBbbBs.",
+  "..SbBmmBs.",
+  "..ebBBBbe.",
 ];
-const GROG_TORSO = [
-  "oooooooooooooooooooooo",
-  "odmrlllllmdmllllllrlmo",
-  "odmrrllllmdmlllllrrlmo",
-  "odmmlrllgGGgglllrlmmmo",
-  "oddmxrrmGmdmgmmrrmmmmo",
-  ".oddmxrrgmdmgmrrmmmmo.",
-  ".odddddrgdddgrrdddddo.",
-  ".oddddddgggggrdddddmo.",
-  "..oldmdllrrrrldmmmmo..",
-  "..oddmdmmmrrmmdmmxmo..",
-  "..oldmdddrrrrddmmxmo..",
-  "...odddlrrdlrldmmmo...",
-  "...odddrrmdmmrrmmmo...",
-  "...odddrddddddrmmmo...",
-  "....orrllldllldrro....",
-  "....ordmmmdmmmdmro....",
-];
-const HEAD_GROG_BACK = [
-  "..aaaaa...",
-  ".aHLLHHa..",
-  "aHHLhHHHa.",
-  "aHhHHHLHHa",
-  "aHHHhHHHHa",
-  "ahHHHHHHha",
-  "ahhHHHHhSs",
-  "eShhhhhSss",
-  "eSsssssSs.",
-  ".eSsssSSs.",
-  "..eSSSSe..",
+
+const GROG_TORSO = [   // d'après le pixel art de Nizar
+  "....oooooo..oooooo....",
+  "..oommmmmdoodmmmmmoo..",
+  ".ommmmmmmmddmmmmmmmmo.",
+  "ommxmmmmmmddmmmmmmxmmo",
+  "omxmmmmmmmmdmmmmmmmxmo",
+  "ommmmmmmmmmdmmmmmmmmmo",
+  "omdmmmmxmmmdmmmxmxmmdo",
+  "omdmmmmmxmmdmmmmxmmmdo",
+  ".odddddddddddddddddddo",
+  ".omdmmmmmmmdmmmmmmdmo.",
+  "..odmmddddmdddddmmdo..",
+  "..odmmmmmmdmmmmxmmdo..",
+  "..odmmddddddddmmmmdo..",
+  "...odmmmmmdmmmxmmdo...",
+  "...odmmmmmdmmmmmmdo...",
+  "....oooooooooooooo....",
 ];
 // Têtes vues de dos 3/4 (nuque, oreille et bord de la joue à l'avant)
 const HEAD_KAITO_BACK = [
@@ -456,19 +444,18 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_GROG_BACK, bare: true, bulk: true, size: 1.08, upper: 1.22, armor: true, harness: true, heavyBelt: true, cargo: true, shoes: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_SORA_BACK, skinTop: true, bracer: true, scars: true, heavyBelt: true, shoes: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
-    skin:  ['#101a14', '#2c4637', '#5c8a6c', '#b4dcbc'],               // peau de mutant vert-de-gris
+    skin:  ['#1a2a22', '#3a5848', '#5a8070', '#86a898'],               // peau de mutant vert-de-gris
     eye:   '#ff2a1a',
-    hair:  { a: '#1e2228', h: '#4e5662', H: '#7c8696', L: '#c4ccd8' },   // crâne blindé de titane
-    top:   ['#101a14', '#2c4637', '#5c8a6c', '#b4dcbc'],               // torse nu musclé
-    legs:  ['#181c12', '#323a28', '#4c5640', '#66725a'],               // pantalon cargo kaki
-    belt:  ['#1a0e06', '#3a2412', '#5a3a1e', '#7a5434'],               // ceinture de cuir rivetée
-    strap: ['#2a1608', '#5a3418', '#7a4a26'],                          // harnais de cuir
-    bandP: ['#0c120e', '#16201a', '#243028', '#3a4a40'],               // barbe drue
-    armorP:['#1e2228', '#4e5662', '#7c8696', '#c4ccd8'],               // blindage titane
-    glove: ['#1e2228', '#4e5662', '#7c8696', '#c4ccd8'],
-    shoe:  ['#101216', '#3a3e46', '#5a606a', '#2a2e34'],               // rangers grises
+    hair:  { a: '#2a2e36', h: '#4e5662', H: '#7c8696', L: '#c4ccd8' },   // crâne blindé de titane
+    bandP: ['#0e1612', '#1a2620', '#2a3a30', '#3a4a40'],               // barbe
+    top:   ['#1a2a22', '#3a5848', '#5a8070', '#86a898'],               // torse nu
+    legs:  ['#1a1e14', '#343c2a', '#4c5640', '#66725a'],               // pantalon cargo kaki
+    belt:  ['#1a0e06', '#3a2412', '#5a3a1e', '#7a5434'],               // ceinture de cuir
+    armorP:['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],               // brassards d'acier
+    glove: ['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],               // gantelets
+    shoe:  ['#14161a', '#3a3e46', '#5a606a', '#2a2e34'],               // rangers grises
     fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
 ];
 
@@ -717,18 +704,11 @@ function drawFighter(f, x = f.x, y = f.y) {
       const bc = mix(s0, e, .55), bn = add(bc, [ (e[1] - s0[1]) * .12 * fd, 0]);
       if (near) { sDisc(bn[0], bn[1] - 1, 3, S[3]); sR(bn[0] - 2, bn[1] + 1, 4, 1, S[1]); const sl = mix(s0, e, .8); sR(sl[0] - 1, sl[1], 3, 1, S[1]); }   // biceps éclairé
       const f0 = mix(e, hd, .12);
-      limbT(f0, hd, near ? 8 : 7.5, near ? 7.5 : 7, .3, AR);
+      limbT(f0, mix(f0, hd, .85), near ? 8 : 7.5, near ? 7.5 : 7, .3, AR);
       const ed = mix(f0, hd, .1); limbT(ed, mix(f0, hd, .75), 1.5, 1.5, 0, [AR[3], AR[3], AR[3], AR[3]]);   // arête lumineuse
       for (const t of [.22, .82]) { const q = mix(f0, hd, t); sR(q[0] - 4, q[1] - 1, 8, 2, SP[1]); sR(q[0] - 4, q[1] - 1, 8, 1, SP[2]); sR(q[0], q[1] - 1, 1, 1, AR[3]); }
-      const x0 = Math.round(hd[0]) - 3, y0 = Math.round(hd[1]) - 2;   // gantelet : phalanges d'acier, doigts verts
-      sR(x0, y0, 7, 6, AR[0]); sR(x0 + 1, y0, 5, 3, AR[2]); for (let k2 = 0; k2 < 3; k2++) sR(x0 + 1 + k2 * 2, y0, 1, 1, AR[3]);
-      sR(x0 + 1, y0 + 3, 5, 2, S[2]); sR(x0 + 1, y0 + 4, 5, 1, S[1]);
-      // épaulière en dôme, à plusieurs plaques
-      const pr = near ? 4.5 : 4, pc = [s0[0] + (s0[0] - sh[0]) * .5, s0[1] - 2.5];   // épaulière décalée vers l'extérieur
-      sDisc(pc[0], pc[1], pr, AR[0]); sDisc(pc[0], pc[1] - .5, pr - 1, AR[1]); sDisc(pc[0] - fd, pc[1] - 1.5, pr - 2.5, AR[2]);
-      sR(pc[0] - pr + 1, pc[1] + 2, pr * 2 - 1, 1, AR[0]); sR(pc[0] - pr + 2, pc[1] + 3, pr * 2 - 3, 1, AR[2]);   // bord inférieur
-      sR(pc[0] - fd * 2, pc[1] - 4, 2, 1, AR[3]); sR(pc[0], pc[1] - pr + 2, 1, pr, AR[1]);                     // reflet, jointure
-      sR(pc[0] + 2, pc[1] - 1, 1, 1, AR[3]); sR(pc[0] - 3, pc[1] - 1, 1, 1, AR[3]);                           // rivets
+      const x0 = Math.round(hd[0]) - 3, y0 = Math.round(hd[1]) - 2;   // grosse main verte
+      sR(x0, y0, 7, 5, S[0]); sR(x0 + 1, y0, 5, 4, S[2]); sR(x0 + 1, y0 + 3, 5, 1, S[1]);
       return;
     }
     limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
@@ -736,10 +716,16 @@ function drawFighter(f, x = f.x, y = f.y) {
     limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, d.sleeves ? T : S);
     if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
     if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
+    if (d.bracer) {   // Grog : brassard d'acier sanglé de cuir sur l'avant-bras
+      const AR = near ? d.armorP : dim(d.armorP), b0 = mix(e, hd, .15), b1 = mix(e, hd, .85);
+      limbT(b0, b1, near ? 5.5 : 5, near ? 5 : 4.5, .2, AR);
+      const hl = mix(b0, b1, .2); sR(hl[0], hl[1] - 1, 1, 2, AR[3]);
+      const st = mix(b0, b1, .55); sR(st[0] - 2, st[1], 5, 1, near ? '#6e3c28' : '#3c1e0a');
+    }
     fist(hd, fd, Gl, S);
   };
   const leg = (k, ft, near) => {
-    const soft = pal => [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour)
+    const soft = pal => d.outlineLegs ? pal : [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour), sauf Grog
     const Lg = near ? soft(legs) : dim(legs), S = near ? soft(sk) : dim(sk);
     limbT(p, k, d.female ? 6.5 : d.bulk ? 11.5 : 7, d.female ? 4.2 : d.bulk ? 6 : 5, d.bulk ? 1.8 : .8, Lg);
     // la jambe s'arrête à la cheville : rien ne dépasse sous le pied / la semelle
@@ -842,6 +828,9 @@ function drawFighter(f, x = f.x, y = f.y) {
       for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
     }
   }
+  if (d.scars && !backView) {   // cicatrices en X sur le torse
+    for (const [t, o] of [[.25, 3.5], [.55, -2]]) { const q = add(at(t), fwd, o); sR(q[0] - 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0], q[1], 1, 1, '#7a3a2a'); sR(q[0] - 1, q[1] + 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] + 1, 1, 1, '#7a3a2a'); }
+  }
   // Cou court et large
   limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, sk);
   if (d.bulk && !backView) {   // trapèzes massifs
@@ -863,7 +852,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     for (const [a0, a1] of [[add(sh, fwd, 7), add(wa, fwd, -6)], [add(sh, fwd, -6), add(wa, fwd, 6.5)]]) for (let t = 0; t <= 1; t += .06) { const q = mix(a0, a1, t); sR(q[0], q[1], 2, 1, SP[1]); }
   }
 
-  if (tshirt && !backView && !d.vneck && !d.bare) {
+  if (tshirt && !backView && !d.vneck && !d.bare && !d.skinTop) {
     // col rond
     const c1 = add(sh, fwd, -1.5), c2 = add(sh, fwd, 3.5), cb = add(at(.1), fwd, 1);
     sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);
@@ -916,7 +905,7 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
-  limbT(add(by, fwd, d.bulk ? -6 : -4.5), add(by, fwd, d.bulk ? 6.5 : 5), d.techBelt ? 2 : d.heavyBelt ? 4 : 3, d.techBelt ? 2 : d.heavyBelt ? 4 : 3, 0, bl);
+  limbT(add(by, fwd, d.bulk ? -6 : -4.5), add(by, fwd, d.bulk ? 6.5 : 5), d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, 0, bl);
   if (d.heavyBelt) {   // grosse ceinture, boucle d'acier
     const bk2 = add(by, fwd, 3.5); const A = d.armorP;
     for (let t = -5; t <= 6; t += 2.2) { const q = add(by, fwd, t); sR(q[0], q[1] - 1, 1, 1, '#a88a5a'); }   // rivets
@@ -2229,7 +2218,7 @@ const ALT = [
   { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
-  { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], glove: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, blindage bronze
+  { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], glove: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
@@ -2619,8 +2608,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg'].map(src => { const im = new Image(); im.src = src + '?v=66'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=66'; return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
