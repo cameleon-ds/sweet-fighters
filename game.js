@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v86';
+const VERSION = 'v87';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -479,6 +479,17 @@ const DEFS = [
     glove: ['#0a1420', '#16263a', '#24405a', '#3a6080'],
     shoe:  ['#0a1018', '#1a2836', '#6a4022', '#4a2c16'],               // bottes bleu nuit, semelles marron
     fb: ['#ffffff', '#d8fbff', '#7ae8f0', '#2a9aaa'] },
+  { name: 'NYX', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, witchHat: true, hairDown: true, female: true, slim: true, sleeveless: true, softNeck: true, flaps: true, shoes: true, kit: 'nyx',
+    skin:  ['#4a2a18', '#8a5a3c', '#b8805c', '#dcaa84'],
+    eye:   '#3a2418',
+    hair:  { a: '#1a0a2a', h: '#3a1a5a', H: '#5a2e88', L: '#8a5abc' },   // longs cheveux violets
+    top:   ['#14040a', '#360a1c', '#5a1630', '#86304a'],               // corset bordeaux
+    flapP: ['#0c0c10', '#24242c', '#363642', '#4c4c5a'],               // jupe noire déchirée
+    legs:  ['#08080a', '#16161a', '#24242a', '#36363e'],               // pantalon noir
+    belt:  ['#08080a', '#1a1a20', '#2a2a32', '#3e3e48'],
+    glove: ['#06060a', '#141418', '#24242c', '#3a3a44'],               // mitaines noires
+    shoe:  ['#06060a', '#18181e', '#2a2018', '#1a140e'],               // bottes noires
+    fb: ['#ffffff', '#ffb0e0', '#c83aff', '#6a0a8a'] },
 ];
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
@@ -707,6 +718,14 @@ function drawFighter(f, x = f.x, y = f.y) {
     });
   };
   const drawBraid = () => {
+    if (d.hairDown) {   // longs cheveux lâchés qui tombent dans le dos
+      const hp = d.hair, sw = (f.air ? -f.vx * .6 : 0) + Math.sin(G.frame * .1) * .4, base = [h[0] - dir * 4, h[1] - 3];
+      for (let i = 0; i < 12; i++) {
+        const t = i / 11, w = Math.round(6 - 2.5 * t), q = [base[0] - dir * (1 + i * .75) + sw * i * .3, base[1] + i * 2.2];
+        sR(q[0] - (w >> 1) - 1, q[1], w + 2, 3, hp.a); sR(q[0] - (w >> 1), q[1], w, 2, i % 3 === 0 ? hp.H : hp.h);
+        if (i % 2) sR(q[0] - dir, q[1], 1, 2, hp.L);
+      }
+    }
     if (!d.braid) return;
     const hp = d.hair, swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
     if (d.ponytail) {
@@ -753,7 +772,8 @@ function drawFighter(f, x = f.x, y = f.y) {
       return;
     }
     limbT(s0, e, d.bigArms ? (near ? 7.5 : 7) : near ? 5 : 4.5, d.bigArms ? 4.8 : 4, near ? (d.bigArms ? 1.6 : 1.2) : 1, d.skinTop ? [S[1], S[1], S[2], S[3]] : S);   // Grog : contour adouci
-    limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, d.skinTop ? [T[1], T[1], T[2], T[3]] : T);
+    if (!d.sleeveless) limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, d.skinTop ? [T[1], T[1], T[2], T[3]] : T);
+    else { const sc2 = mix(s0, e, .12); sR(sc2[0] - 2, sc2[1] - 1, 4, 2, T[1]); }   // emmanchure du corset
     limbT(e, hd, d.bigArms ? (near ? 6 : 5.5) : near ? 4.5 : 4, d.bigArms ? (near ? 5 : 4.5) : near ? 3.5 : 3, 1, d.sleeves ? T : d.bigArms ? [S[1], S[1], S[2], S[3]] : S);
     if (d.tornTop && tshirt) { const ed = mix(s0, e, .42); sR(ed[0] - 1, ed[1], 1, 2, T[0]); sR(ed[0] + 1, ed[1] + 1, 1, 2, T[1]); }   // manche effilochée
     if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
@@ -824,8 +844,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     return [add(p, fwd, a0), add(p, fwd, a1), add([p[0], p[1] + hang], fwd, a1 + s2 + (side > 0 ? .5 : 0)), add([p[0], p[1] + hang - 1], fwd, a0 + s2)];
   };
   const drawFlap = (side, shade) => {
-    const P2 = flapPts(side); sPoly(P2, top[shade]); sPoly([P2[0], P2[1], mix(P2[1], P2[2], .5), mix(P2[0], P2[3], .5)], top[shade === 1 ? 2 : 3]);
-    for (let k = 0; k < 3; k++) { const q = mix(P2[3], P2[2], (k + .5) / 3); sR(q[0], q[1] + (k % 2), 1, 1, top[0]); }   // bas déchiré
+    const FP = d.flapP || top, P2 = flapPts(side); sPoly(P2, FP[shade]); sPoly([P2[0], P2[1], mix(P2[1], P2[2], .5), mix(P2[0], P2[3], .5)], FP[shade === 1 ? 2 : 3]);
+    for (let k = 0; k < 3; k++) { const q = mix(P2[3], P2[2], (k + .5) / 3); sR(q[0], q[1] + (k % 2), 1, 1, FP[0]); }   // bas déchiré
   };
   if (d.flaps && !fullBack) drawFlap(backView ? 1 : -1, 1);   // pan arrière, derrière les jambes
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
@@ -1022,6 +1042,18 @@ function drawFighter(f, x = f.x, y = f.y) {
   for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
     const ch = map[r][c]; if (ch === '.') continue;
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
+  }
+  if (d.witchHat) {   // grand chapeau de sorcière noir, pointe tordue vers l'arrière
+    const WH = ['#050508', '#121218', '#22222c', '#3a3a4a'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 3;
+    for (let x = cx - 12; x <= cx + 12; x++) { const yy = by + Math.round(dir * (x - cx) * .08); sR(x, yy, 1, 1, WH[0]); sR(x, yy - 1, 1, 1, Math.abs(x - cx) < 10 ? WH[2] : WH[1]); }   // large bord
+    const halves = [6, 6, 5, 5, 5, 4, 4, 3, 3, 3, 2, 2, 1, 1];
+    halves.forEach((hw, r2) => {
+      const off = -dir * Math.round(Math.max(0, r2 - 6) * .9), y = by - 2 - r2, x0 = cx + off;
+      sR(x0 - hw, y, hw * 2 + 1, 1, WH[1]); sR(x0 - hw, y, 1, 1, WH[0]); sR(x0 + hw, y, 1, 1, WH[0]);
+      if (hw > 1) sR(x0 + dir * (hw - 2), y, 1, 1, WH[3]);
+    });
+    const tx = cx - dir * Math.round(7 * .9), ty = by - 15; sR(tx - dir, ty - 1, 1, 1, WH[1]); sR(tx - dir * 2, ty - 1, 1, 1, WH[1]); sR(tx - dir * 3, ty, 1, 1, WH[1]); sR(tx - dir * 4, ty + 1, 1, 1, WH[0]);   // pointe pliée vers l'arrière
+    sR(cx - 6, by - 3, 13, 2, '#2a1030'); sR(cx + dir * 2 - 1, by - 3, 2, 2, '#8a8a96');   // bandeau et boucle
   }
   if (d.kasa) {   // chapeau de paille conique de samouraï, incliné vers l'avant
     const K2 = ['#3a2a12', '#8a6a30', '#b8944a', '#e4c67e'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 5;   // enfoncé : le bord avant cache les yeux
@@ -1421,7 +1453,7 @@ const ATK = {
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1489,6 +1521,9 @@ function poseOf(f) {
     case 'sink': return f.t < 22 ? 'block' : 'upper0';
     case 'tornado': return f.t < 3 ? 'sho0' : 'upper2';
     case 'hover': return 'tuck';
+    case 'flask': return f.t < 8 ? 'special0' : 'punch1';
+    case 'smokeback': return f.t < 4 ? 'special0' : 'hit';
+    case 'geyser': return f.t < 8 ? 'upper1' : 'gq1';
     case 'wallslash': return f.t < 8 ? 'upper1' : f.t < 11 ? 'fpunch1' : f.t < 28 ? 'cpunch' : 'crouch';
     case 'plunge': return 'sho0';
     case 'zenith': return f.t < 3 ? 'crouch' : 'tuck';
@@ -1553,6 +1588,13 @@ function updFighter(f, o) {
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
           if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('whoosh'); break; }
           if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
+          break;
+        }
+        if (f.def.kit === 'nyx') {   // Nyx : Geyser Alchimique / Écran de Fumée Toxique / Fiole Magma
+          f.vx = 0;
+          if (h.u) { setState(f, 'geyser'); break; }
+          if (back) { setState(f, 'smokeback'); break; }
+          if (!G.flasks.some(q => q.owner === f)) { setState(f, 'flask'); break; }
           break;
         }
         if (f.def.kit === 'zephyr') {   // Zephyr : Tornade Ascendante / Cyclone Rétrograde / Lame de Fond
@@ -1754,6 +1796,21 @@ function updFighter(f, o) {
     case 'cyclone':   // bond en arrière + bourrasque qui aspire l'adversaire
       if (f.t === 4) { f.air = true; f.vy = -4.6; f.vx = -f.dir * 3.4; f.pullT = 40; sfx('whoosh'); }
       if (!f.air && f.t > 6) { f.vx *= .7; if (f.t >= 30) setState(f, 'idle'); }
+      break;
+    case 'flask':   // lance une fiole en cloche
+      f.vx = 0;
+      if (f.t === 8) { G.flasks.push({ owner: f, x: f.x + f.dir * 18, y: f.y - 62, vx: f.dir * 3.4, vy: -3.6, t: 0 }); sfx('whoosh'); }
+      if (f.t >= 24) setState(f, 'idle');
+      break;
+    case 'smokeback':   // lâche un nuage toxique et recule
+      if (f.t === 3) { G.smokes = G.smokes.filter(c => c.owner !== f); G.smokes.push({ owner: f, x: f.x + f.dir * 30, dir: f.dir, t: 0 }); sfx('fb'); }
+      f.vx = f.t >= 3 && f.t < 18 ? -f.dir * 3.2 : 0;
+      if (f.t >= 26) setState(f, 'idle');
+      break;
+    case 'geyser':   // frappe le sol : gerbe de flammes violettes en diagonale vers le haut
+      f.vx = 0;
+      if (f.t === 9) { G.geysers.push({ owner: f, x: f.x + f.dir * 14, dir: f.dir, t: 0 }); G.shake = Math.max(G.shake, 3); sfx('heavy'); sfx('fb'); }
+      if (f.t >= 34) setState(f, 'idle');
       break;
     case 'wallslash':   // lève le sabre au-dessus de la tête puis frappe jusqu'au sol en s'accroupissant
       f.vx = f.t >= 8 && f.t < 13 ? f.dir * 1.2 : 0;
@@ -2150,6 +2207,95 @@ function updVesper() {
 const QUAKE_HIT = { dmg: 9, knock: true, stun: 20, bstun: 14, push: 3, chip: 0, sfx: 'heavy', unblock: true };
 const CRUSH_SHOCK = { dmg: 7, knock: true, stun: 20, bstun: 14, push: 4, chip: 0, sfx: 'heavy', unblock: true };
 const RAMPART_HIT = { dmg: 6, knock: true, stun: 20, bstun: 14, push: 6, chip: 0, sfx: 'heavy', unblock: true };
+/* ---------- Nyx : fioles, flaques de feu, fumée, geysers ---------- */
+const FLASK_HIT = { dmg: 7, stun: 16, bstun: 10, push: 1.8, chip: 1, sfx: 'hit' };
+const PUDDLE_HIT = { dmg: 3, stun: 10, bstun: 6, push: .6, chip: 0, sfx: 'hit', unblock: true };
+const GEYSER_HIT = { dmg: 12, knock: true, lift: 7, bstun: 14, push: 2, chip: 2, sfx: 'heavy' };
+const NYX_FIRE = ['#ffffff', '#ffb0e0', '#e0306a', '#6a0a8a'];
+function addPuddle(owner, x) {
+  const mine = G.puddles.filter(p => p.owner === owner); if (mine.length >= 2) mine[0].t = 9999;
+  G.puddles.push({ owner, x, t: 0, last: -99 }); sfx('fb');
+}
+function updNyx() {
+  for (const q of G.flasks || []) {
+    const o = G.f.find(f => f !== q.owner);
+    q.t++; q.x += q.vx; q.y += q.vy; q.vy += .22;
+    if (o && hurtbox(o) && Math.abs(o.x - q.x) < 14 && q.y > o.y - 80 && q.y < o.y) { q.dead = true; applyHit(q.owner, o, FLASK_HIT, q.x, q.y, q.x - q.vx * 4, true); addPuddle(q.owner, o.x); continue; }
+    if (q.y >= GROUND - 3) { q.dead = true; addPuddle(q.owner, q.x); addSpark(q.x, GROUND - 6, 'fb', NYX_FIRE); }
+    if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30) q.dead = true;
+  }
+  if (G.flasks) G.flasks = G.flasks.filter(q => !q.dead);
+  for (const p of G.puddles || []) {   // flaque de feu : brûle l'adversaire qui marche dedans
+    p.t++; const o = G.f.find(f => f !== p.owner);
+    if (o && !o.air && Math.abs(o.x - p.x) < 20 && hurtbox(o) && G.frame - p.last > 28) {
+      p.last = G.frame; applyHit(p.owner, o, PUDDLE_HIT, o.x, GROUND - 14, p.x, true); o.burn = Math.max(o.burn || 0, 40); o.burnPal = NYX_FIRE;
+    }
+  }
+  if (G.puddles) G.puddles = G.puddles.filter(p => p.t < 300);
+  for (const c of G.smokes || []) {   // nuage toxique : aveugle l'adversaire et arrête ses projectiles
+    c.t++; if (c.t < 90) c.x += c.dir * .5; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);
+    if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.blindT > 0)) addPopup(o.x, o.y - 100, 'BLINDED!', '#c8a0ff'); o.blindT = 100; }
+    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== c.owner && Math.abs(fb.x - c.x) < R) { fb.alive = false; addSpark(fb.x, fb.y, 'parry'); }
+    for (const q of G.blades || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
+    for (const q of G.holos || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
+    for (const q of G.flasks || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
+  }
+  if (G.smokes) G.smokes = G.smokes.filter(c => c.t < 260);
+  for (const f of G.f) if (f.blindT > 0) f.blindT--;
+  for (const g of G.geysers || []) {   // gerbe de flammes en diagonale : piège ceux qui sautent
+    g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 8) * 130;
+    if (!g.done && o && hurtbox(o) && g.t < 26) {
+      const ex = g.x + g.dir * L * .5, ey = GROUND - L * .87, px = o.x, py = o.y - 40;
+      const vx = ex - g.x, vy = ey - GROUND, k = Math.max(0, Math.min(1, ((px - g.x) * vx + (py - GROUND) * vy) / (vx * vx + vy * vy || 1)));
+      if (Math.hypot(px - (g.x + vx * k), py - (GROUND + vy * k)) < 20) { g.done = true; applyHit(g.owner, o, GEYSER_HIT, px, py, g.x, true); o.burn = 60; o.burnPal = NYX_FIRE; }
+    }
+  }
+  if (G.geysers) G.geysers = G.geysers.filter(g => g.t < 34);
+}
+function drawNyxFx() {
+  for (const p of G.puddles || []) {   // flaque de feu chimique au sol
+    const a = Math.min(1, (300 - p.t) / 40);
+    ctx.save(); ctx.globalAlpha = a; ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(p.x, GROUND, 2, p.x, GROUND, 26); g.addColorStop(0, 'rgba(255,90,160,.5)'); g.addColorStop(1, 'rgba(110,10,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(p.x, GROUND, 26, 7, 0, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 9; i++) {
+      const life = ((G.frame * 1.8 + i * 11) % 30) / 30, x = p.x - 18 + i * 4.5 + Math.sin(G.frame * .3 + i) * 1.5, y = GROUND - 1 - life * 16, rr = Math.max(1, Math.round(3.5 * (1 - life)));
+      ctx.fillStyle = life < .3 ? '#ffe0f0' : life < .6 ? '#ff4a9a' : '#9a2ad0'; ctx.fillRect(Math.round(x) - rr, Math.round(y) - rr, rr * 2, rr * 2);
+    }
+    ctx.restore();
+  }
+  for (const q of G.flasks || []) {   // fiole qui tourne en vol
+    const x = Math.round(q.x), y = Math.round(q.y), sp = (q.t >> 2) & 1;
+    R(x - 3, y - 2, 6, 6, '#1a2a2a'); R(x - 2, y - 1, 4, 4, '#d0204a'); R(x - 2, y - 1, 4, 2, '#50d080'); R(x - 1, y - 1, 1, 1, '#ffffff');
+    R(x - 1 + (sp ? 1 : 0), y - 5, 2, 3, '#a8c8c0');
+    ctx.save(); ctx.globalAlpha = .5; R(x - Math.sign(q.vx) * 6, y + 1, 2, 2, '#c83aff'); R(x - Math.sign(q.vx) * 10, y + 3, 2, 2, '#6a2a8a'); ctx.restore();
+  }
+  for (const c of G.smokes || []) {   // nuage de gaz opaque
+    const a = Math.min(1, c.t / 6, (260 - c.t) / 50), R2 = 38 + Math.min(18, c.t * .7);
+    ctx.save(); ctx.globalAlpha = .85 * a;
+    for (let i = 0; i < 16; i++) {   // volutes de fumée qui tournent lentement
+      const ang = i * 1.7 + c.t * .03 * (i % 2 ? 1 : -1), rr = R2 * (.22 + (i % 4) * .07), px = c.x + Math.cos(ang) * R2 * .62, py = GROUND - 34 + Math.sin(ang * 1.3) * 26 - (i % 3) * 6;
+      ctx.fillStyle = ['#2e3a2e', '#3e3050', '#4e5e3e', '#5a4a6a'][i % 4]; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(160,220,120,.25)'; ctx.beginPath(); ctx.arc(px - 2, py - rr * .4, rr * .45, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = .35 * a; ctx.fillStyle = '#9adf6a'; ctx.beginPath(); ctx.arc(c.x, GROUND - 34, R2 * .5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  for (const g of G.geysers || []) {   // gerbe de flammes violettes
+    const L = Math.min(1, g.t / 8) * 130, a = Math.min(1, (34 - g.t) / 10);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a;
+    for (let i = 0; i < 22; i++) {
+      const k = i / 21, d2 = k * L, x = g.x + g.dir * d2 * .5 + Math.sin(G.frame * .5 + i) * 3, y = GROUND - d2 * .87, rr = 3 + (1 - k) * 7 + Math.sin(G.frame * .7 + i * 2) * 1.5;
+      const gr = ctx.createRadialGradient(x, y, 0, x, y, rr * 1.6); gr.addColorStop(0, 'rgba(255,220,255,.9)'); gr.addColorStop(.4, 'rgba(200,58,255,.7)'); gr.addColorStop(1, 'rgba(90,10,140,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, rr * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+function drawBlind() {   // joueur humain aveuglé : l'écran s'assombrit
+  const b = G.f.find(f => f.blindT > 0 && !f.cpu); if (!b) return;
+  ctx.save(); ctx.globalAlpha = Math.min(.6, b.blindT / 60); ctx.fillStyle = '#10180e'; ctx.fillRect(-1000, -1000, SW + 2000, 3000); ctx.restore();
+}
 /* ---------- Zephyr : lames d'air et bourrasques ---------- */
 const BLADE_HIT = { dmg: 9, stun: 18, bstun: 12, push: 2.4, chip: 1, sfx: 'hit' };
 function updZephyr() {
@@ -2466,7 +2612,7 @@ function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
 function press(a, b, up) { a.press = b; a.pressU = !!up; a.pressFrames = 2; }
 function lowAttack(a, b) { a.hold = { d: true }; a.holdT = 10; press(a, b); }
 function aiInput(f, o) {
-  if (OPT.diff === 3) return {};   // entraînement : l'adversaire ne bouge pas
+  if (OPT.diff === 3 || f.blindT > 0) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
   const dk = [.45, 1, 1.7][OPT.diff], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l', back = dx > 0 ? 'l' : 'r';
@@ -2540,6 +2686,7 @@ const ALT = [
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
   { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a0404', '#4a0808', '#6e1010', '#962222'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
   { top: ['#0a1a26', '#16324a', '#24506e', '#3a7aa0'], hair: { a: '#1a1a22', h: '#2e2e3a', H: '#4a4a5a', L: '#8a8a9c' } },   // Zephyr : kimono bleu nuit, cheveux noirs
+  { top: ['#04140e', '#0a3624', '#165a3c', '#2e8a5e'], hair: { a: '#2a0606', h: '#5a0e0e', H: '#8e1a1a', L: '#d04040' } },   // Nyx : corset vert, cheveux rouges
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
@@ -2557,12 +2704,12 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0 });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, blindT: 0, sinkK: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.holos = []; G.mines = []; G.waves = []; G.blades = [];
+  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -2856,7 +3003,7 @@ function stepFight() {
     }
   }
 
-  updProps(); updBlood(); updVesper(); updGrog(); updZephyr();
+  updProps(); updBlood(); updVesper(); updGrog(); updZephyr(); updNyx();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -2929,9 +3076,9 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg'].map(src => { const im = new Image(); im.src = src + '?v=82'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=82'; return im; });
-const PORTRAIT_FACE = [1, -1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg'].map(src => { const im = new Image(); im.src = src + '?v=87'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=87'; return im; });
+const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -2956,7 +3103,7 @@ function portraitOf(i, hurt) {
   if (!arr[i]) { try { arr[i] = makePortrait(i, hurt); } catch (e) { return null; } }
   return arr[i];
 }
-const ROSTER = [0, 1, 2, 3, 4, null, null, null];   // indices dans DEFS ; null = personnage à venir
+const ROSTER = [0, 1, 2, 3, 4, 5, null, null, null];   // indices dans DEFS ; null = personnage à venir
 function drawPortrait(i, x, y, sz, border, look = 1, hurt = false) {   // look : 1 = regarde à droite, -1 = à gauche
   R(x - 2, y - 2, sz + 4, sz + 4, '#000');
   R(x - 1, y - 1, sz + 2, sz + 2, border || '#c8c8d0');
@@ -3101,7 +3248,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawDiveTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx();
+  drawDiveTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -3170,6 +3317,9 @@ const MOVES = [
   { title: 'VESPER SPECIALS', lines: [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
+  { title: 'NYX SPECIALS', lines: [
+    ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC SMOKE'], ['', 'BACKS OFF, BLINDS, STOPS SHOTS'],
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
