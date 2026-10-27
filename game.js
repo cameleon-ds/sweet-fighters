@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v66';
+const VERSION = 'v67';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -444,18 +444,18 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_SORA_BACK, skinTop: true, bracer: true, scars: true, heavyBelt: true, shoes: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_SORA_BACK, skinTop: true, bracer: true, muscles: true, heavyBelt: true, shoes: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
-    skin:  ['#1a2a22', '#3a5848', '#5a8070', '#86a898'],               // peau de mutant vert-de-gris
+    skin:  ['#1a2a22', '#3a5848', '#5a8070', '#9cc8b0'],               // peau de mutant vert-de-gris
     eye:   '#ff2a1a',
     hair:  { a: '#2a2e36', h: '#4e5662', H: '#7c8696', L: '#c4ccd8' },   // crâne blindé de titane
     bandP: ['#0e1612', '#1a2620', '#2a3a30', '#3a4a40'],               // barbe
-    top:   ['#1a2a22', '#3a5848', '#5a8070', '#86a898'],               // torse nu
+    top:   ['#1a2a22', '#3a5848', '#5a8070', '#9cc8b0'],               // torse nu
     legs:  ['#1a1e14', '#343c2a', '#4c5640', '#66725a'],               // pantalon cargo kaki
     belt:  ['#1a0e06', '#3a2412', '#5a3a1e', '#7a5434'],               // ceinture de cuir
     armorP:['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],               // brassards d'acier
     glove: ['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],               // gantelets
-    shoe:  ['#14161a', '#3a3e46', '#5a606a', '#2a2e34'],               // rangers grises
+    shoe:  { hunt: true },                                              // chaussures de chasse gris foncé et noir
     fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
 ];
 
@@ -584,6 +584,14 @@ function fist(q, dir, glove, skin) {
 function shoeP(q, dir, dark, P) {
   const x = Math.round(q[0]), y = Math.round(q[1]);
   const x0 = x - (dir > 0 ? 2 : 4);
+  if (P && P.hunt) {   // chaussures de chasse (forme des baskets de John) : tige gris foncé, bout et semelle crantée noirs
+    sR(x0, y - 5, 6, 4, dark ? '#1a1b1e' : '#3a3c42');                          // tige montante gris foncé
+    sR(x0 + (dir > 0 ? 1 : 2), y - 5, 3, 1, dark ? '#26282c' : '#5a5d64');       // reflet
+    sR(x0 + (dir > 0 ? 4 : 0), y - 3, 3, 2, dark ? '#060608' : '#121214');      // bout noir
+    sR(x0, y - 1, 7, 1, '#050506'); if (!dark) for (let i = 0; i < 7; i += 2) sR(x0 + i, y - 1, 1, 1, '#1e1e22');   // semelle crantée
+    sR(x0 + 1, y - 4, 1, 1, '#8a8c90'); sR(x0 + 1, y - 2, 1, 1, '#8a8c90');    // œillets
+    return;
+  }
   if (P) {   // bottes (palette du personnage)
     sR(x0, y - 5, 6, 4, dark ? P[0] : P[1]); sR(x0 + (dir > 0 ? 1 : 2), y - 5, 3, 1, dark ? P[1] : '#4a4a5a');
     sR(x0, y - 1, 7, 1, dark ? P[3] : P[2]); return;
@@ -827,6 +835,27 @@ function drawFighter(f, x = f.x, y = f.y) {
       const ab = add(at(.45), fwd, 1.5); sR(ab[0], ab[1], 1, 1, sk[1]);
       for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
     }
+  }
+  if (d.muscles && !backView && !fullBack) {   // Grog : trapèzes, deltoïdes ronds, pectoraux détaillés
+    const S0 = sk[0], S1 = sk[1], S2 = sk[2], S3 = sk[3];
+    // trapèzes : pente musclée du cou vers les épaules
+    sPoly([add(n, fwd, -3), add(n, fwd, 3.5), add(sh, fwd, 7), add(at(.06), fwd, 5), add(at(.06), fwd, -5), add(sh, fwd, -6.5)], S1);
+    sPoly([add(n, fwd, -2), add(n, fwd, 2.5), add(sh, fwd, 5.5), add(at(.03), fwd, 3), add(at(.03), fwd, -3), add(sh, fwd, -5)], S2);
+    const tr = add(n, fwd, 2); sR(tr[0], tr[1] + 1, 2, 1, S3); sR(tr[0] + dir * 2, tr[1] + 2, 2, 1, S3);
+    // deltoïdes ronds et plus gros
+    for (const [p0, rr, lit] of [[sdA, 3.5, false], [sdB, 4, true]]) {
+      const c = add(p0, [0, .5]);
+      sDisc(c[0], c[1], rr + .6, S0); sDisc(c[0], c[1], rr, lit ? S2 : S1);
+      sR(c[0] - 1, c[1] - rr + 1, 3, 1, lit ? S3 : S2); if (lit) sR(c[0] - 2, c[1] - rr + 2, 2, 1, S3);
+    }
+    // pectoraux : deux masses bombées, reflet en haut, ombre franche dessous
+    sPoly([add(at(.07), fwd, 1), add(at(.07), fwd, 6.5), add(at(.24), fwd, 7), add(at(.34), fwd, 4.5), add(at(.34), fwd, 1)], S2);
+    sPoly([add(at(.09), fwd, 2), add(at(.09), fwd, 5.5), add(at(.18), fwd, 5.5), add(at(.2), fwd, 2)], S3);
+    sPoly([add(at(.08), fwd, 0), add(at(.08), fwd, -5), add(at(.26), fwd, -5.5), add(at(.34), fwd, -3), add(at(.34), fwd, 0)], S2);
+    sPoly([add(at(.1), fwd, -1), add(at(.1), fwd, -3.5), add(at(.18), fwd, -3.5), add(at(.2), fwd, -1)], S3);
+    for (let k2 = -5; k2 <= 6.5; k2 += .5) { const q = add(at(k2 > 4 ? .33 : .36), fwd, k2); sR(q[0], q[1], 1, 1, S1); }   // pli sous les pectoraux
+    for (let t = .07; t <= .36; t += .04) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, S1); }                   // sillon central
+    const nA = add(at(.26), fwd, 4.5), nB = add(at(.27), fwd, -3); sR(nA[0], nA[1], 1, 1, S1); sR(nB[0], nB[1], 1, 1, S1);
   }
   if (d.scars && !backView) {   // cicatrices en X sur le torse
     for (const [t, o] of [[.25, 3.5], [.55, -2]]) { const q = add(at(t), fwd, o); sR(q[0] - 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0], q[1], 1, 1, '#7a3a2a'); sR(q[0] - 1, q[1] + 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] + 1, 1, 1, '#7a3a2a'); }
