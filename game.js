@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v70';
+const VERSION = 'v71';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -798,6 +798,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     torso[0] = add(torso[0], fwd, 2); torso[7] = add(torso[7], fwd, -2); torso[1] = add(torso[1], fwd, 1.5); torso[6] = add(torso[6], fwd, -1.5);
     torso[3] = add(torso[3], fwd, -1.5); torso[4] = add(torso[4], fwd, 1.5);
   }
+  if (d.skinTop) limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] + 1], 5, 5, 0, [sk[1], sk[1], sk[2], sk[3]]);   // Grog : cou derrière le torse
   sPoly(grow(torso, .6), d.skinTop ? top[1] : top[0]);
   if (d.female && !fullBack) {   // taille plus fine
     for (const i of [2, 3, 4, 5]) { const c = mix(at(.75), at(.75), 0); torso[i] = mix(torso[i], add(i < 4 ? wa : at(.6), [0, 0]), .18); }
@@ -824,9 +825,11 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
     if (tshirt) {
       // t-shirt moulant : ombre sous les pectoraux, ligne centrale des abdos
-      for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
-      for (let t = .48; t <= .85; t += .1) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, top[1]); }
-      const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0] - (dir < 0 ? 1 : 0), a1[1], 2, 1, top[1]); sR(a2[0] - (dir < 0 ? 1 : 0), a2[1], 2, 1, top[1]);
+      if (!d.skinTop) for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
+      if (!d.skinTop) {   // Grog : pas d'abdos, seulement les pectoraux
+        for (let t = .48; t <= .85; t += .1) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, top[1]); }
+        const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0] - (dir < 0 ? 1 : 0), a1[1], 2, 1, top[1]); sR(a2[0] - (dir < 0 ? 1 : 0), a2[1], 2, 1, top[1]);
+      }
     } else {
       // veste ouverte en V : torse nu visible
       sPoly([add(sh, fwd, -1), add(sh, fwd, 4.5), add(at(.55), fwd, 1.5)], sk[2]);
@@ -845,20 +848,22 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(nk, fwd, -1.5), add(nk, fwd, 2.5), add(sh, fwd, 5.5), add(at(.02), fwd, 3), add(at(.02), fwd, -3), add(sh, fwd, -5)], S2);
     const tr = add(nk, fwd, 2.5); sR(tr[0], tr[1] + 2, 2, 1, S3); sR(tr[0] + dir * 2, tr[1] + 3, 2, 1, S3); sR(tr[0] + dir * 3, tr[1] + 4, 2, 1, S3);
     const tl = add(nk, fwd, -2); sR(tl[0], tl[1] + 2, 1, 2, S3);
-    // pectoraux : deux masses bombées, reflet en haut, ombre franche dessous
-    sPoly([add(at(.07), fwd, 1), add(at(.07), fwd, 6.5), add(at(.24), fwd, 7), add(at(.34), fwd, 4.5), add(at(.34), fwd, 1)], S2);
-    sPoly([add(at(.09), fwd, 2), add(at(.09), fwd, 5.5), add(at(.18), fwd, 5.5), add(at(.2), fwd, 2)], S3);
-    sPoly([add(at(.08), fwd, 0), add(at(.08), fwd, -5), add(at(.26), fwd, -5.5), add(at(.34), fwd, -3), add(at(.34), fwd, 0)], S2);
-    sPoly([add(at(.1), fwd, -1), add(at(.1), fwd, -3.5), add(at(.18), fwd, -3.5), add(at(.2), fwd, -1)], S3);
-    for (let k2 = -5; k2 <= 6.5; k2 += .5) { const q = add(at(k2 > 4 ? .33 : .36), fwd, k2); sR(q[0], q[1], 1, 1, S1); }   // pli sous les pectoraux
-    for (let t = .07; t <= .36; t += .04) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, S1); }                   // sillon central
-    const nA = add(at(.26), fwd, 4.5), nB = add(at(.27), fwd, -3); sR(nA[0], nA[1], 1, 1, S1); sR(nB[0], nB[1], 1, 1, S1);
+    // pectoraux : deux grandes masses bombées qui occupent le haut du torse
+    sPoly([add(at(.03), fwd, 1), add(at(.03), fwd, 7), add(at(.2), fwd, 8), add(at(.38), fwd, 6.5), add(at(.46), fwd, 3.5), add(at(.46), fwd, 1)], S2);   // pectoral avant
+    sPoly([add(at(.03), fwd, 0), add(at(.03), fwd, -5.5), add(at(.2), fwd, -6.5), add(at(.38), fwd, -5.5), add(at(.46), fwd, -2.5), add(at(.46), fwd, 0)], S2);   // pectoral arrière
+    sPoly([add(at(.06), fwd, 2), add(at(.06), fwd, 6.5), add(at(.16), fwd, 7), add(at(.26), fwd, 5), add(at(.26), fwd, 2)], S3);        // reflet avant (grand)
+    sPoly([add(at(.07), fwd, -1), add(at(.07), fwd, -4.5), add(at(.15), fwd, -5), add(at(.22), fwd, -3.5), add(at(.22), fwd, -1)], S3); // reflet arrière
+    for (let k2 = -5.5; k2 <= 7.5; k2 += .5) {   // ombre franche sous les pectoraux, qui remonte sur les côtés
+      const side = Math.max(0, Math.abs(k2 - 1) - 3.5), q = add(at(.48 - side * .03), fwd, k2);
+      sR(q[0], q[1], 1, 2, S1);
+    }
+    for (let t = .04; t <= .46; t += .03) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, S1); }   // sillon entre les pectoraux
   }
   if (d.scars && !backView) {   // cicatrices en X sur le torse
     for (const [t, o] of [[.25, 3.5], [.55, -2]]) { const q = add(at(t), fwd, o); sR(q[0] - 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0], q[1], 1, 1, '#7a3a2a'); sR(q[0] - 1, q[1] + 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] + 1, 1, 1, '#7a3a2a'); }
   }
   // Cou court et large
-  limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, d.skinTop ? [sk[1], sk[1], sk[2], sk[3]] : sk);   // Grog : cou sans contour sombre
+  if (!d.skinTop) limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, sk);
   if (d.bulk && !backView) {   // trapèzes massifs
     sPoly([add(sh, fwd, -7), add(sh, fwd, 8), add(n, fwd, 3), add(n, fwd, -3)], sk[1]);
     sPoly([add(sh, fwd, -5), add(sh, fwd, 6.5), add(n, fwd, 2), add(n, fwd, -2)], sk[2]);
