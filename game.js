@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v60';
+const VERSION = 'v61';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -436,6 +436,7 @@ const POSES = {
   cblock:  [1,-35, 0,-28, -2,-14, 7,-25, 6,-36, 5,-26, 9,-36, 11,-10, 13,0, -8,-6, -16,0],
   cpunch:  [5,-37, 3,-30, 0,-15, 15,-30, 27,-31, -4,-23, -1,-28, 12,-10, 13,0, -8,-4, -16,0],
   ckick:   [-2,-33, -3,-27, -2,-12, 4,-20, 8,-12, -10,-20, -14,-8, 16,-5, 34,-2, -8,-4, -14,0],
+  dive:    [-7,-60, -6,-52, 0,-36, -12,-46, -20,-54, 3,-48, 9,-55, 15,-24, 30,-6, 6,-38, -4,-30],
   tatsu:   [1,-58, 0,-50, 0,-34, -7,-46, -13,-44, 6,-46, 12,-44, 14,-36, 30,-37, 3,-24, -3,-17],
   parry:   [2,-55, 0,-47, -1,-29, 10,-44, 16,-53, 8,-42, 15,-47, 8,-15, 12,0, -9,-14, -13,0],
   stunned: [-3,-52, -3,-44, -1,-28, 2,-36, 4,-29, -7,-36, -5,-29, 6,-14, 10,0, -8,-13, -12,0],
@@ -1159,13 +1160,14 @@ const ATK = {
   rupper:   { dur: 30, act: [4, 13], box: [8, -110, 50, -40], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
   flame:    { dur: 26, act: [6, 12], box: [14, -80, 54, -48], dmg: 10, stun: 18, bstun: 12, push: 3.0, sfx: 'heavy' },
   gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
+  dive:     { act: [3, 60], box: [8, -30, 38, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   zenith:   { dur: 60, act: [4, 26], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'uppercut', 'special'];
+const ATTACKING = ['zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1206,6 +1208,7 @@ function poseOf(f) {
     case 'cpunch': return f.t < 3 || f.t >= 8 ? 'crouch' : 'cpunch';
     case 'ckick': return f.t < 2 || f.t >= 10 ? 'crouch' : 'ckick';   // jambe tendue pendant les images actives (visible à l'impact)
     case 'tatsu': return f.t < 4 ? 'jump' : 'tatsu';
+    case 'dive': return f.t < 3 ? 'jkick' : 'dive';
     case 'gtatsu': return f.t >= 6 && f.t < 54 ? 'tatsu' : 'kick0';
     case 'flame': return f.t < 5 ? 'special0' : 'special1';
     case 'jump': return f.roll && f.t > 3 ? 'tuck' : 'jump';
@@ -1368,6 +1371,10 @@ function updFighter(f, o) {
       if (!f.airAtk && live) {
         if (take(c, 'p')) { setState(f, 'jpunch'); f.airAtk = true; sfx('whoosh'); }
         else if (take(c, 'k')) { setState(f, 'jkick'); f.airAtk = true; sfx('whoosh'); }
+        else if (f.def.kit === 'vesper' && take(c, 's')) {
+          // Vesper : coup de pied plongeant en diagonale avec traînée néon
+          setState(f, 'dive'); f.airAtk = true; f.trail = []; f.bounced = false; sfx('upper');
+        }
         else if (take(c, 's')) {
           // Coup de pied tournoyant aérien
           setState(f, 'tatsu'); f.airAtk = true;
@@ -1378,6 +1385,12 @@ function updFighter(f, o) {
     case 'tatsu':
       f.vy -= GRAV * 0.45; // plane un peu pendant la rotation
       if (f.t % 8 === 4) sfx('whoosh');
+      break;
+    case 'dive':
+      if (f.t < 3) { f.vx *= .5; f.vy = Math.min(f.vy, 0) * .5; }
+      else if (!f.hasHit) { f.vx = 5.2 * f.dir; f.vy = 5.6 - GRAV; }
+      else if (!f.bounced) { f.bounced = true; f.vx = -1.6 * f.dir; f.vy = -3.2; }
+      (f.trail = f.trail || []).push([f.x + f.dir * 27, f.y - 1]); if (f.trail.length > 14) f.trail.shift();
       break;
     case 'land': if (f.t >= f.landT) setState(f, 'idle'); break;
     case 'hit':
@@ -1434,6 +1447,7 @@ function updFighter(f, o) {
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
       else if (f.state === 'tatsu') { setState(f, 'land'); f.landT = 10; }
+      else if (f.state === 'dive') { f.trail = null; f.bounced = false; setState(f, 'land'); f.landT = 8; G.shake = Math.max(G.shake, 1); }
       else if (f.state === 'zenith') { f.rotAng = null; setState(f, 'land'); f.landT = 10; }
       else if (['jump', 'jpunch', 'jkick'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
@@ -1458,7 +1472,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith'].includes(f.state) && !f.air) return null;
+  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive'].includes(f.state) && !f.air) return null;
   const [x0, y0, x1, y1] = a.box;
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
 }
@@ -1787,6 +1801,18 @@ function updVesper() {
   }
   if (G.mines) G.mines = G.mines.filter(m => !m.dead);
 }
+function drawDiveTrail() {
+  for (const f of G.f) {   // traînée néon du coup de pied plongeant
+    if (f.state !== 'dive' || !f.trail || f.trail.length < 2) continue;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    const T = f.trail, cols = [['rgba(200,58,255,.45)', 7], ['rgba(58,240,255,.75)', 4], ['rgba(255,255,255,.9)', 1.5]];
+    for (const [c, w] of cols) for (let i = 1; i < T.length; i++) {
+      ctx.strokeStyle = c; ctx.lineWidth = w * i / T.length; ctx.globalAlpha = i / T.length;
+      ctx.beginPath(); ctx.moveTo(T[i - 1][0], T[i - 1][1]); ctx.lineTo(T[i][0], T[i][1]); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
 function drawVesperFx() {
   for (const q of G.holos || []) {   // double holographique translucide
     ctx.save(); ctx.globalAlpha = .45 + .15 * Math.sin(G.frame * .9); ctx.globalCompositeOperation = 'lighter';
@@ -1799,6 +1825,10 @@ function drawVesperFx() {
     R(m.x - 5, GROUND - 3, 11, 3, '#1a1a24'); R(m.x - 4, GROUND - 4, 9, 1, '#3a3a4a');
     R(m.x - 1, GROUND - 5, 3, 2, on ? '#3af0ff' : '#0a5a7a');
     if (on) { ctx.save(); ctx.globalAlpha = .35; disc(m.x, GROUND - 4, 5, '#3af0ff'); ctx.restore(); }
+  }
+  for (const f of G.f) if (f.state === 'dive' && f.t >= 3 && f.trail) {   // éclat néon au bout du pied
+    const [x, y] = f.trail[f.trail.length - 1];
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55; disc(x, y, 4, '#3af0ff'); ctx.globalAlpha = .9; disc(x, y, 1.5, '#ffffff'); ctx.restore();
   }
   for (const f of G.f) {   // traînée et croissant de lame pour Pas de l'Ombre / Lame Zénith
     if (f.state === 'shadow' && f.t < 12) { ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { x: f.x + f.dir * 10 }), f.x + f.dir * 10, f.y); ctx.restore(); }
@@ -2536,7 +2566,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawVesperFx();
+  drawDiveTrail(); drawVesperFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -2604,7 +2634,7 @@ const MOVES = [
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'VESPER SPECIALS', lines: [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
-    ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'] ] },
+    ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
