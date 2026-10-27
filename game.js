@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v56';
+const VERSION = 'v57';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1934,7 +1934,15 @@ function stepPause() {
 /* ---------------- Musiques ---------------- */
 const BGM = new Audio(); BGM.loop = true; BGM.preload = 'auto';
 const MUSIC = { title: 'music/music_title.mp3', select: 'music/music_select.mp3', dojo: 'music/music_dojo.mp3', city: 'music/music_city.mp3' };
-let bgmKey = null, bgmUnlocked = false;
+let bgmKey = null, bgmUnlocked = false, bgmGain = null;
+const MUSIC_MAX = .55;   // niveau maximal de la musique (les MP3 sont mixés fort)
+// Le volume d'un élément <audio> est ignoré sur iPhone/iPad : on fait passer la musique par Web Audio (GainNode)
+function bgmRoute() {
+  if (bgmGain || location.protocol === 'file:') return;   // en local (file://) Web Audio rendrait la musique muette
+  initAudio(); if (!AC) return;
+  try { const src = AC.createMediaElementSource(BGM); bgmGain = AC.createGain(); src.connect(bgmGain).connect(AC.destination); BGM.volume = 1; }
+  catch (e) { bgmGain = null; }
+}
 function musicWanted() {
   if (G.scene === 'title') return 'title';
   if (G.scene === 'select' || G.scene === 'stage' || G.scene === 'over') return 'select';
@@ -1946,8 +1954,9 @@ function updateMusic() {
     bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0;
     if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {});
   }
-  const vol = OPT.music / 4 * (G.paused ? .35 : 1);
-  BGM.volume = Math.max(0, Math.min(1, vol));
+  const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1)));
+  if (bgmGain) bgmGain.gain.value = vol; else BGM.volume = vol;   // réglage appliqué en temps réel
+  if (bgmGain && AC && AC.state !== 'running' && bgmUnlocked && !document.hidden) AC.resume().catch(() => {});
   if (OPT.music === 0 && !BGM.paused) BGM.pause();
   else if (OPT.music > 0 && bgmUnlocked && BGM.paused && BGM.src) BGM.play().catch(() => {});
 }
@@ -1955,6 +1964,7 @@ function updateMusic() {
 const unlockAudio = () => {
   if (bgmUnlocked) return;
   bgmUnlocked = true;
+  bgmRoute();
   if (!BGM.src) { bgmKey = musicWanted(); BGM.src = MUSIC[bgmKey] + '?v=55'; }
   if (OPT.music > 0) BGM.play().catch(() => { bgmUnlocked = false; });
 };
@@ -2642,5 +2652,5 @@ if (document.fonts && document.fonts.load) {
 } else go();
 
 // Accès debug pour les tests
-window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__mkqr = () => makeQRs();
+window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__bgmGain = () => bgmGain; window.__mkqr = () => makeQRs();
 })();
