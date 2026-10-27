@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v59';
+const VERSION = 'v60';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -393,14 +393,14 @@ const DEFS = [
     belt:  ['#2e180a', '#4e2c14', '#704220', '#9a6436'],                 // ceinture cuir
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],                 // gants noirs (comme Kaito)
     fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
-  { name: 'VESPER', style: 'tshirt', head: HEAD_VESPER, headBack: HEAD_SORA_BACK, braid: true, ponytail: true, neonV: true, shoes: true, slim: true, sleeves: true, kit: 'vesper',
+  { name: 'VESPER', style: 'tshirt', head: HEAD_VESPER, headBack: HEAD_SORA_BACK, braid: true, ponytail: true, neonV: true, female: true, techBelt: true, shoes: true, slim: true, sleeves: true, kit: 'vesper',
     skin:  ['#6a3e2c', '#b8826a', '#e8bea0', '#fce0c8'],
     eye:   '#5ae0e0',
     hair:  { a: '#1e0a3a', h: '#4a1e8a', H: '#7a3ad0', L: '#b07aff' },   // longue queue de cheval violette
     bandP: ['#06040c', '#140e22', '#24183a', '#3af0ff'],               // masque noir, liseré cyan
     top:   ['#140828', '#2e1656', '#4e2a8a', '#8a5ad0'],               // combinaison violette
     legs:  ['#0e0618', '#20123a', '#34205a', '#5a3a8a'],
-    belt:  ['#062a3a', '#0a5a7a', '#1ab8e0', '#8af4ff'],               // ceinture néon cyan
+    belt:  ['#0a0a12', '#1ab8e0', '#3af0ff', '#c8ffff'],               // ceinture futuriste néon cyan
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
@@ -607,18 +607,30 @@ function drawFighter(f, x = f.x, y = f.y) {
   };
   const drawBraid = () => {
     if (!d.braid) return;
-    const hp = d.hair, tail = d.ponytail;
-    const base = tail ? [h[0] - dir * 3, h[1] - 6] : backView ? [h[0] - dir * 1, h[1] + 2] : [h[0] - dir * 4, h[1]];
-    const swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
-    const slant = tail ? 2 : backView ? .6 : 1.4;
-    if (tail) sR(base[0] - 1, base[1] - 1, 3, 2, '#101018');   // attache
-    for (let i = 0; i < (tail ? 10 : 7); i++) {
+    const hp = d.hair, swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
+    if (d.ponytail) {
+      // vraie queue de cheval : attachée haut à l'arrière du crâne, épaisse au départ, fine au bout
+      const base = [h[0] - dir * 4, h[1] - 6];
+      sR(base[0] - 1, base[1] - 1, 3, 3, hp.a); sR(base[0] - 1, base[1], 3, 1, '#101018');   // élastique
+      const N = 11;
+      for (let i = 0; i < N; i++) {
+        const t = i / (N - 1);
+        const q = [base[0] - dir * (1.9 * i - .09 * i * i) + swing * i * .3, base[1] + .5 + 2.2 * i];
+        const w = Math.max(1, Math.round(3.6 - 2.8 * t));
+        sR(q[0] - (w >> 1) - 1, q[1] - 1, w + 2, 3, hp.a);
+        sR(q[0] - (w >> 1), q[1] - 1, w, 2, i % 3 === 1 ? hp.H : hp.h);
+        if (w > 1 && i % 2 === 0) sR(q[0] - (w >> 1) + (dir > 0 ? w - 1 : 0), q[1] - 1, 1, 1, hp.L);
+      }
+      return;
+    }
+    const base = backView ? [h[0] - dir * 1, h[1] + 2] : [h[0] - dir * 4, h[1]];
+    const slant = backView ? .6 : 1.4;
+    for (let i = 0; i < 7; i++) {
       const q = [base[0] - dir * (slant * i - .07 * i * i) + swing * i * .25, base[1] + 2.2 * i];
       sR(q[0] - 1, q[1] - 1, 3, 3, hp.a);
       sR(q[0] - 1, q[1] - 1, 2, 2, i % 2 ? hp.h : hp.H);
       if (i % 2 === 0) sR(q[0] - 1, q[1] - 1, 1, 1, hp.L);
-      if (tail && i > 0 && i < 8) sR(q[0] - (dir > 0 ? 2 : 0), q[1], 1, 2, hp.h);   // queue plus épaisse
-      if (i === 6 && !tail) { sR(q[0] - 1, q[1] + 2, 3, 1, top[2]); sR(q[0], q[1] + 3, 1, 3, hp.H); }
+      if (i === 6) { sR(q[0] - 1, q[1] + 2, 3, 1, top[2]); sR(q[0], q[1] + 3, 1, 3, hp.H); }
     }
   };
   // Bras : lead = bras avant (celui qui frappe), rear = bras arrière
@@ -634,7 +646,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const leg = (k, ft, near) => {
     const soft = pal => [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour)
     const Lg = near ? soft(legs) : dim(legs), S = near ? soft(sk) : dim(sk);
-    limbT(p, k, 7, 5, .8, Lg);
+    limbT(p, k, d.female ? 6.5 : 7, d.female ? 4.2 : 5, .8, Lg);
     // la jambe s'arrête à la cheville : rien ne dépasse sous le pied / la semelle
     const ank = add(ft, [0, d.shoes ? -4 : -4]);
     if (d.torn) {
@@ -645,7 +657,7 @@ function drawFighter(f, x = f.x, y = f.y) {
         sR(cut[0] - 2, cut[1] + 2, 1, 1, Lg[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, Lg[1]);
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
-    } else limbT(k, ank, 5.5, 3.5, .8, Lg);
+    } else limbT(k, ank, d.female ? 4.2 : 5.5, d.female ? 2.6 : 3.5, .8, Lg);
     if (d.hem) {
       // bas du kimono effiloché aux chevilles
       const hx = Math.round(ank[0]), hy = Math.round(ank[1]);
@@ -683,6 +695,9 @@ function drawFighter(f, x = f.x, y = f.y) {
     for (let i = 0; i < 8; i++) torso[i] = T2[i];
   }
   sPoly(grow(torso, .6), top[0]);
+  if (d.female && !fullBack) {   // taille plus fine
+    for (const i of [2, 3, 4, 5]) { const c = mix(at(.75), at(.75), 0); torso[i] = mix(torso[i], add(i < 4 ? wa : at(.6), [0, 0]), .18); }
+  }
   sPoly(torso, top[2]);
   if (fullBack) {
     // dos vu de face : deux omoplates, colonne au centre, flancs dans l'ombre
@@ -741,6 +756,21 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
 
 
+  // Silhouette féminine : poitrine et hanches arrondies
+  if (d.female) {
+    if (!backView) {
+      const bc = add(at(.3), fwd, 5.2 * tw);             // poitrine (côté adversaire)
+      disc(bc[0], bc[1] + 1, 3, top[0]); disc(bc[0], bc[1], 3, top[2]);
+      sR(bc[0] - 1 + (dir > 0 ? 0 : -1), bc[1] - 2, 2, 1, top[3]);
+      const b2 = add(at(.32), fwd, 1.2);                  // second sein, de 3/4
+      disc(b2[0], b2[1], 2, top[2]); sR(b2[0] - 1, b2[1] + 2, 3, 1, top[1]);
+      const und = add(at(.42), fwd, 2.5); sR(und[0] - 3, und[1], 6, 1, top[1]);   // ombre sous la poitrine
+    }
+    const hb = add(add(p, [-ux, -uy], -1), fwd, -4.2);   // fessier arrondi
+    disc(hb[0], hb[1], 4, legs[1]); disc(hb[0] + dir * .5, hb[1] - .5, 3, legs[2]);
+    sR(hb[0] - dir * 2, hb[1] - 2, 1, 2, legs[3]);
+  }
+
   // ---- Jambe proche ----
   leg(bk, bf, true);    // jambe arrière au premier plan, côté caméra
 
@@ -755,8 +785,12 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
-  limbT(add(by, fwd, -4.5), add(by, fwd, 5), 3, 3, 0, bl);
-  if (d.jeans) {
+  limbT(add(by, fwd, -4.5), add(by, fwd, 5), d.techBelt ? 2 : 3, d.techBelt ? 2 : 3, 0, bl);
+  if (d.techBelt) {   // ceinture futuriste : bande fine, segments et boucle lumineuse
+    const bk2 = add(by, fwd, 3);
+    for (let t = -4; t <= 4.5; t += 2.5) { const q = add(by, fwd, t); sR(q[0], q[1] - 1, 1, 1, bl[0]); }
+    sR(bk2[0] - 2, bk2[1] - 1, 4, 3, bl[0]); sR(bk2[0] - 1, bk2[1] - 1, 2, 2, '#c8ffff');
+  } else if (d.jeans) {
     const bk2 = add(by, fwd, 3); sR(bk2[0] - 1, bk2[1] - 1, 3, 2, '#d8b048'); sR(bk2[0], bk2[1] - 1, 1, 1, '#fff0a0');   // boucle
   } else if (!backView) {
     const kn = add(by, fwd, 3.5);
