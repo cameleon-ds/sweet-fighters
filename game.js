@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v68';
+const VERSION = 'v69';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -444,7 +444,7 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_SORA_BACK, skinTop: true, bracer: true, muscles: true, heavyBelt: true, shoes: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_SORA_BACK, skinTop: true, bigArms: true, bracer: true, muscles: true, heavyBelt: true, shoes: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
     skin:  ['#1a2a22', '#3a5848', '#5a8070', '#9cc8b0'],               // peau de mutant vert-de-gris
     eye:   '#ff2a1a',
@@ -719,7 +719,7 @@ function drawFighter(f, x = f.x, y = f.y) {
       sR(x0, y0, 7, 5, S[0]); sR(x0 + 1, y0, 5, 4, S[2]); sR(x0 + 1, y0 + 3, 5, 1, S[1]);
       return;
     }
-    limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
+    limbT(s0, e, d.bigArms ? (near ? 6.5 : 6) : near ? 5 : 4.5, d.bigArms ? 4.8 : 4, near ? (d.bigArms ? 1.6 : 1.2) : 1, S);
     limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, T);
     limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, d.sleeves ? T : S);
     if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
@@ -839,9 +839,12 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (d.muscles && !backView && !fullBack) {   // Grog : trapèzes, deltoïdes ronds, pectoraux détaillés
     const S0 = sk[0], S1 = sk[1], S2 = sk[2], S3 = sk[3];
     // trapèzes : pente musclée du cou vers les épaules
-    sPoly([add(n, fwd, -3), add(n, fwd, 3.5), add(sh, fwd, 7), add(at(.06), fwd, 5), add(at(.06), fwd, -5), add(sh, fwd, -6.5)], S1);
-    sPoly([add(n, fwd, -2), add(n, fwd, 2.5), add(sh, fwd, 5.5), add(at(.03), fwd, 3), add(at(.03), fwd, -3), add(sh, fwd, -5)], S2);
-    const tr = add(n, fwd, 2); sR(tr[0], tr[1] + 1, 2, 1, S3); sR(tr[0] + dir * 2, tr[1] + 2, 2, 1, S3);
+    const nk = add(n, [0, -3]);   // trapèzes énormes qui montent jusqu'au bas du crâne
+    sPoly([add(nk, fwd, -3.5), add(nk, fwd, 4), add(sh, fwd, 8), add(at(.08), fwd, 6), add(at(.08), fwd, -6), add(sh, fwd, -7.5)], S0);
+    sPoly([add(nk, fwd, -2.5), add(nk, fwd, 3), add(sh, fwd, 7), add(at(.05), fwd, 4.5), add(at(.05), fwd, -4.5), add(sh, fwd, -6.5)], S1);
+    sPoly([add(nk, fwd, -1.5), add(nk, fwd, 2.5), add(sh, fwd, 5.5), add(at(.02), fwd, 3), add(at(.02), fwd, -3), add(sh, fwd, -5)], S2);
+    const tr = add(nk, fwd, 2.5); sR(tr[0], tr[1] + 2, 2, 1, S3); sR(tr[0] + dir * 2, tr[1] + 3, 2, 1, S3); sR(tr[0] + dir * 3, tr[1] + 4, 2, 1, S3);
+    const tl = add(nk, fwd, -2); sR(tl[0], tl[1] + 2, 1, 2, S3);
     // pectoraux : deux masses bombées, reflet en haut, ombre franche dessous
     sPoly([add(at(.07), fwd, 1), add(at(.07), fwd, 6.5), add(at(.24), fwd, 7), add(at(.34), fwd, 4.5), add(at(.34), fwd, 1)], S2);
     sPoly([add(at(.09), fwd, 2), add(at(.09), fwd, 5.5), add(at(.18), fwd, 5.5), add(at(.2), fwd, 2)], S3);
@@ -2631,8 +2634,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg'].map(src => { const im = new Image(); im.src = src + '?v=66'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=66'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg'].map(src => { const im = new Image(); im.src = src + '?v=69'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=69'; return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
