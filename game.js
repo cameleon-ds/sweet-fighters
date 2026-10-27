@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v82';
+const VERSION = 'v83';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1435,7 +1435,7 @@ function makeFighter(def, id, x, dir, cpu) {
 }
 
 const chargeMax = f => f.hp <= 80 ? 60 : 120;
-function setState(f, s) { if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
+function setState(f, s) { if (s !== 'sink') f.sinkK = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
 function poseOf(f) {
@@ -1478,6 +1478,7 @@ function poseOf(f) {
     case 'crushLand': return 'gq1';
     case 'gust': return f.t < 6 ? 'special0' : f.t < 16 ? 'punch1' : 'punch0';
     case 'cyclone': return f.t < 4 ? 'crouch' : f.air ? 'tuck' : 'special1';
+    case 'sink': return f.t < 22 ? 'block' : 'upper0';
     case 'tornado': return f.t < 3 ? 'sho0' : 'upper2';
     case 'hover': return 'tuck';
     case 'plunge': return 'sho0';
@@ -1547,7 +1548,7 @@ function updFighter(f, o) {
         }
         if (f.def.kit === 'zephyr') {   // Zephyr : Tornade Ascendante / Cyclone Rétrograde / Lame de Fond
           if (h.u) { setState(f, 'tornado'); f.vx = 0; f.invuln = 10; break; }
-          if (back) { setState(f, 'cyclone'); f.vx = 0; break; }
+          if (back) { setState(f, 'sink'); f.vx = 0; f.invuln = 50; sfx('parry'); break; }   // passe sous terre et ressort derrière l'adversaire
           if (!G.blades.some(q => q.owner === f)) { setState(f, 'gust'); f.vx = 0; break; }
           break;
         }
@@ -1732,6 +1733,14 @@ function updFighter(f, o) {
       if (f.t === 7) { G.blades.push({ owner: f, x: f.x + f.dir * 30, y: f.y - 50, dir: f.dir, t: 0 }); sfx('whoosh'); sfx('fb'); }
       if (f.t >= 26) setState(f, 'idle');
       break;
+    case 'sink': {   // s'enfonce dans le sol dans un éclair, puis ressort juste derrière l'adversaire
+      f.vx = 0; f.invuln = Math.max(f.invuln, 2);
+      if (f.t <= 20) f.sinkK = f.t / 20;
+      if (f.t === 21) { f.x = Math.max(18, Math.min(SW - 18, o.x + Math.sign(o.x - f.x || 1) * 34)); f.dir = o.x > f.x ? 1 : -1; sfx('parry'); G.flashT = Math.max(G.flashT, 3); }
+      if (f.t > 21) f.sinkK = Math.max(0, 1 - (f.t - 21) / 16);
+      if (f.t >= 44) { f.sinkK = 0; setState(f, 'idle'); }
+      break;
+    }
     case 'cyclone':   // bond en arrière + bourrasque qui aspire l'adversaire
       if (f.t === 4) { f.air = true; f.vy = -4.6; f.vx = -f.dir * 3.4; f.pullT = 40; sfx('whoosh'); }
       if (!f.air && f.t > 6) { f.vx *= .7; if (f.t >= 30) setState(f, 'idle'); }
@@ -2147,7 +2156,7 @@ function updZephyr() {
     }
   }
 }
-const SWORD_SPECIAL = ['gust', 'tornado', 'plunge', 'hover', 'cyclone'];
+const SWORD_SPECIAL = ['gust', 'tornado', 'plunge', 'hover', 'cyclone', 'sink'];
 function drawZephyrFx() {
   for (const f of G.f) {   // traînée du sabre : transparente sur les coups normaux, bleue sur les coups spéciaux
     if (!f.def.sword) continue;
@@ -2165,6 +2174,23 @@ function drawZephyrFx() {
       ctx.beginPath(); ctx.moveTo(T[i - 1][0][0], T[i - 1][0][1]); ctx.lineTo(T[i - 1][1][0], T[i - 1][1][1]); ctx.lineTo(T[i][1][0], T[i][1][1]); ctx.lineTo(T[i][0][0], T[i][0][1]); ctx.closePath(); ctx.fill();
       if (special) { ctx.strokeStyle = `rgba(200,240,255,${.7 * a})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(T[i - 1][1][0], T[i - 1][1][1]); ctx.lineTo(T[i][1][0], T[i][1][1]); ctx.stroke(); }
     }
+    ctx.restore();
+  }
+  for (const f of G.f) {   // éclairs au sol pendant la descente / la remontée
+    if (f.state !== 'sink') continue;
+    const k = f.t <= 21 ? Math.min(1, f.t / 6) : Math.max(0, 1 - (f.t - 21) / 22);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    const g = ctx.createRadialGradient(f.x, GROUND, 2, f.x, GROUND, 34);
+    g.addColorStop(0, `rgba(200,240,255,${.6 * k})`); g.addColorStop(.5, `rgba(47,180,255,${.35 * k})`); g.addColorStop(1, 'rgba(20,88,196,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(f.x, GROUND, 34, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = k;
+    for (let b = 0; b < 5; b++) {   // arcs électriques qui montent du sol autour du corps
+      const bx = f.x + (Math.random() - .5) * 34, top = GROUND - 20 - Math.random() * 60 * (1 - (f.sinkK || 0) * .6), L = [];
+      for (let s2 = 0; s2 <= 5; s2++) L.push([bx + (Math.random() - .5) * 8, GROUND - (GROUND - top) * s2 / 5]);
+      elecArc(L, 'rgba(47,180,255,.9)', 2.5); elecArc(L, '#ffffff', 1);
+    }
+    const ring = []; for (let i = 0; i <= 20; i++) { const t = i / 20 * Math.PI * 2; ring.push([f.x + Math.cos(t) * 24, GROUND + Math.sin(t) * 6]); }
+    elecArc(ring, 'rgba(120,220,255,.9)', 1.5);
     ctx.restore();
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
@@ -3022,7 +3048,13 @@ function drawFight() {
   drawProps();
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
-  order.forEach(f => drawFighter(f, f.dizzy ? f.x + Math.round(Math.sin(G.frame * .15) * 2) : f.x));
+  order.forEach(f => {
+    if (f.sinkK > 0) {   // Zephyr à moitié sous terre : on coupe tout ce qui passe sous le sol
+      ctx.save(); ctx.beginPath(); ctx.rect(-1000, -1000, SW + 2000, GROUND + 1000 + 1); ctx.clip();
+      drawFighter(f, f.x, f.y + Math.round(f.sinkK * 90)); ctx.restore(); return;
+    }
+    drawFighter(f, f.dizzy ? f.x + Math.round(Math.sin(G.frame * .15) * 2) : f.x);
+  });
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
@@ -3096,7 +3128,7 @@ const MOVES = [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
-    ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'RETRO CYCLONE'], ['', 'HOPS BACK, PULLS THE FOE IN'],
+    ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
   { title: 'GROG SPECIALS', lines: [
     ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ABSORBS A HIT, PUSHES BACK'],
