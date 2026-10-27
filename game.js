@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v58';
+const VERSION = 'v59';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -336,14 +336,14 @@ const HEAD_SORA = [
 const HEAD_VESPER = [
   "..aaaaaa..",
   ".aHLLLHHa.",
-  "aHHHLLHHHa",
-  "aHhHHHHHHa",
-  "ahHHHHsHHs",
-  "ahhHkssks.",
-  "ahhSSssss.",
-  "ahbBBBBBB.",
-  ".abBnnnnB.",
-  "..bBBBBBb.",
+  "aHHLLLHHHa",
+  "aHHHHHHHha",
+  "ahHHsHHsHh",
+  "ahhScssch.",
+  "ahhSssssh.",
+  "ahbBnBBBh.",
+  ".abBBnBBB.",
+  "..bBBBnnb.",
   "...eBBBBe.",
 ];
 // Têtes vues de dos 3/4 (nuque, oreille et bord de la joue à l'avant)
@@ -393,12 +393,13 @@ const DEFS = [
     belt:  ['#2e180a', '#4e2c14', '#704220', '#9a6436'],                 // ceinture cuir
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],                 // gants noirs (comme Kaito)
     fb: ['#ffffff', '#fff2a0', '#ff9c2c', '#c64812'] },
-  { name: 'VESPER', style: 'tshirt', head: HEAD_VESPER, headBack: HEAD_SORA_BACK, braid: true, shoes: true, slim: true, sleeves: true, kit: 'vesper',
-    skin:  ['#5a3428', '#a8705a', '#e0b090', '#fcd8bc'],
-    hair:  { a: '#1a0a2a', h: '#4a1a7a', H: '#7a3ac8', L: '#c08aff' },   // violet néon
-    bandP: ['#05050a', '#101018', '#1e1e2a', '#3af0ff'],               // masque noir, liseré cyan
-    top:   ['#0a0614', '#1a1028', '#2e1e46', '#5a3a8a'],               // combinaison noire-violette
-    legs:  ['#0a0614', '#1a1028', '#2e1e46', '#4a3870'],
+  { name: 'VESPER', style: 'tshirt', head: HEAD_VESPER, headBack: HEAD_SORA_BACK, braid: true, ponytail: true, neonV: true, shoes: true, slim: true, sleeves: true, kit: 'vesper',
+    skin:  ['#6a3e2c', '#b8826a', '#e8bea0', '#fce0c8'],
+    eye:   '#5ae0e0',
+    hair:  { a: '#1e0a3a', h: '#4a1e8a', H: '#7a3ad0', L: '#b07aff' },   // longue queue de cheval violette
+    bandP: ['#06040c', '#140e22', '#24183a', '#3af0ff'],               // masque noir, liseré cyan
+    top:   ['#140828', '#2e1656', '#4e2a8a', '#8a5ad0'],               // combinaison violette
+    legs:  ['#0e0618', '#20123a', '#34205a', '#5a3a8a'],
     belt:  ['#062a3a', '#0a5a7a', '#1ab8e0', '#8af4ff'],               // ceinture néon cyan
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
@@ -606,15 +607,18 @@ function drawFighter(f, x = f.x, y = f.y) {
   };
   const drawBraid = () => {
     if (!d.braid) return;
-    const hp = d.hair, base = backView ? [h[0] - dir * 1, h[1] + 2] : [h[0] - dir * 4, h[1]];
+    const hp = d.hair, tail = d.ponytail;
+    const base = tail ? [h[0] - dir * 3, h[1] - 6] : backView ? [h[0] - dir * 1, h[1] + 2] : [h[0] - dir * 4, h[1]];
     const swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
-    const slant = backView ? .6 : 1.4;
-    for (let i = 0; i < 7; i++) {
+    const slant = tail ? 2 : backView ? .6 : 1.4;
+    if (tail) sR(base[0] - 1, base[1] - 1, 3, 2, '#101018');   // attache
+    for (let i = 0; i < (tail ? 10 : 7); i++) {
       const q = [base[0] - dir * (slant * i - .07 * i * i) + swing * i * .25, base[1] + 2.2 * i];
       sR(q[0] - 1, q[1] - 1, 3, 3, hp.a);
       sR(q[0] - 1, q[1] - 1, 2, 2, i % 2 ? hp.h : hp.H);
       if (i % 2 === 0) sR(q[0] - 1, q[1] - 1, 1, 1, hp.L);
-      if (i === 6) { sR(q[0] - 1, q[1] + 2, 3, 1, top[2]); sR(q[0], q[1] + 3, 1, 3, hp.H); }
+      if (tail && i > 0 && i < 8) sR(q[0] - (dir > 0 ? 2 : 0), q[1], 1, 2, hp.h);   // queue plus épaisse
+      if (i === 6 && !tail) { sR(q[0] - 1, q[1] + 2, 3, 1, top[2]); sR(q[0], q[1] + 3, 1, 3, hp.H); }
     }
   };
   // Bras : lead = bras avant (celui qui frappe), rear = bras arrière
@@ -719,6 +723,11 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);
     sPoly([c1, c2, cb], sk[2]);
   }
+  if (d.neonV && !backView && !fullBack) {   // col en V néon cyan sur la combinaison
+    const c1 = add(sh, fwd, -3.5), c2 = add(sh, fwd, 5.5), cb = add(at(.3), fwd, 1);
+    for (let t = 0; t <= 1; t += .12) { const q = mix(c1, cb, t), r = mix(c2, cb, t); sR(q[0], q[1], 1, 1, '#3af0ff'); sR(r[0], r[1], 1, 1, '#3af0ff'); }
+    sR(cb[0], cb[1], 1, 1, '#c8ffff');
+  }
   if (tshirt && !backView && d.vneck) {
     // Col en V ouvert : haut des pectoraux visible
     const c1 = add(sh, fwd, -3), c2 = add(sh, fwd, 5), cb = add(at(.34), fwd, 1);
@@ -762,7 +771,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   // ---- Tête ----
   const map = backView ? d.headBack : d.head, hp = d.hair, bp = d.bandP || [];
   const pal = { a: hp.a, h: hp.h, H: hp.H, L: hp.L, b: bp[1], B: bp[2], n: bp[3],
-                e: sk[0], S: sk[1], s: sk[2], l: sk[3], k: '#120a06', m: sk[2] };
+                e: sk[0], S: sk[1], s: sk[2], l: sk[3], k: '#120a06', m: sk[2], c: d.eye || '#120a06' };
   const hx = Math.round(h[0]), hy = Math.round(h[1]) - 7;
   for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
     const ch = map[r][c]; if (ch === '.') continue;
@@ -2329,8 +2338,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
 const PORTRAIT_FACE = [1, -1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
