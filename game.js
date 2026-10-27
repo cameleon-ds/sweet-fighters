@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v79';
+const VERSION = 'v80';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -470,14 +470,14 @@ const DEFS = [
     glove: ['#2a2e36', '#5a6270', '#9aa4b4', '#e4ecf6'],               // gants métallisés
     shoe:  { hunt: true },                                              // baskets de John en noir et gris
     fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
-  { name: 'ZEPHYR', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, kasa: true, tornTop: true, softNeck: true, sword: true, shoes: true, kit: 'zephyr',
+  { name: 'ZEPHYR', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, kasa: true, tornTop: true, softNeck: true, flaps: true, sword: true, shoes: true, kit: 'zephyr',
     skin:  ['#6a3c24', '#b07650', '#e0aa80', '#fcd4b0'],
     hair:  { a: '#4a5262', h: '#8a92a4', H: '#c4ccda', L: '#ffffff' },   // cheveux argentés
-    top:   ['#2a1608', '#4e2c14', '#76461f', '#a06a34'],               // kimono marron, un peu déchiré
+    top:   ['#120804', '#24140a', '#3a2212', '#58361e'],               // kimono brun très foncé, un peu déchiré (mystique)
     legs:  ['#3a4048', '#8a929c', '#c4ccd4', '#eef2f6'],               // pantalon blanc cassé
     belt:  ['#0a1420', '#16263a', '#24405a', '#3a6080'],
     glove: ['#0a1420', '#16263a', '#24405a', '#3a6080'],
-    shoe:  ['#0a1018', '#1a2836', '#7ad8e0', '#3aa8b8'],               // bottes bleu nuit
+    shoe:  ['#0a1018', '#1a2836', '#3a2010', '#24140a'],               // bottes bleu nuit, semelles marron foncé
     fb: ['#ffffff', '#d8fbff', '#7ae8f0', '#2a9aaa'] },
 ];
 
@@ -818,6 +818,16 @@ function drawFighter(f, x = f.x, y = f.y) {
     arm(sdA, e1, h1, true);
   } else if (fullBack) arm(sdB, be, bh, false);   // de dos : le bras plié passe derrière le dos
   else arm(sdA, fe, fh, !backView);
+  const flapPts = side => {   // pans longs du kimono (devant / derrière), bas effiloché
+    const hang = f.air ? 9 : 12, sway = Math.min(3, Math.abs(f.vx) * 1.2) + Math.sin(G.frame * .15 + side) * .6;
+    const a0 = side > 0 ? .5 : -5, a1 = side > 0 ? 5.5 : -.5, s2 = side > 0 ? -sway * .4 : -sway;
+    return [add(p, fwd, a0), add(p, fwd, a1), add([p[0], p[1] + hang], fwd, a1 + s2 + (side > 0 ? .5 : 0)), add([p[0], p[1] + hang - 1], fwd, a0 + s2)];
+  };
+  const drawFlap = (side, shade) => {
+    const P2 = flapPts(side); sPoly(P2, top[shade]); sPoly([P2[0], P2[1], mix(P2[1], P2[2], .5), mix(P2[0], P2[3], .5)], top[shade === 1 ? 2 : 3]);
+    for (let k = 0; k < 3; k++) { const q = mix(P2[3], P2[2], (k + .5) / 3); sR(q[0], q[1] + (k % 2), 1, 1, top[0]); }   // bas déchiré
+  };
+  if (d.flaps && !fullBack) drawFlap(backView ? 1 : -1, 1);   // pan arrière, derrière les jambes
   leg(fk, ff, false);   // jambe avant (côté adversaire) derrière, dans l'ombre
 
   // ---- Torse ----
@@ -970,6 +980,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   leg(bk, bf, true);    // jambe arrière au premier plan, côté caméra
 
   // Pans de veste
+  if (d.flaps && !fullBack) drawFlap(backView ? -1 : 1, 2);   // pan avant, devant les jambes
   if (d.style === 'jacket') {
     const hang = f.air ? 5 : 7, flare = Math.min(2, Math.abs(f.vx));
     const back = [add(p, fwd, -4.5), add(p, fwd, -.5), add([p[0], p[1] + hang], fwd, -1 - flare), add([p[0], p[1] + hang], fwd, -5.5 - flare)];
@@ -1017,7 +1028,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     const tilt = x => Math.round(dir * (x - cx) * .25);   // l'avant du bord descend, l'arrière remonte
     const px = (x, y, col) => sR(x, y + tilt(x), 1, 1, col);
     for (let r2 = 0; r2 < 6; r2++) {
-      const half = 2 + r2 * 2, y = by - 6 + r2;
+      const half = [3, 6, 8, 10, 11, 12][r2], y = by - 6 + r2;   // profil arrondi
       for (let x = cx - half; x <= cx + half; x++) {
         let col = r2 === 5 ? K2[1] : K2[2];
         if (x === cx - half || x === cx + half) col = K2[0];
@@ -1027,7 +1038,7 @@ function drawFighter(f, x = f.x, y = f.y) {
       }
     }
     for (let x = cx - 13; x <= cx + 13; x++) px(x, by, K2[0]);   // bord inférieur
-    px(cx, by - 7, K2[1]);   // pointe
+    for (let x = cx - 1; x <= cx + 1; x++) px(x, by - 7, x === cx ? K2[2] : K2[0]);   // sommet arrondi
   }
 
   // ---- Plan avant ----
@@ -1048,10 +1059,13 @@ function drawFighter(f, x = f.x, y = f.y) {
     let ux2 = swH[0] - swE[0], uy2 = swH[1] - swE[1]; const L2 = Math.hypot(ux2, uy2) || 1; ux2 /= L2; uy2 /= L2;
     if (f.state === 'idle' || f.state === 'walk' || f.state === 'crouch' || f.state === 'block') { ux2 = dir * .75; uy2 = -.66; }   // en garde : lame pointée vers l'avant
     if (f.state === 'plunge' || f.state === 'hover') { ux2 = dir * .1; uy2 = 1; }   // plongeon : lame pointée vers le sol
-    sR(swH[0] - uy2 * 2 - 1, swH[1] + ux2 * 2, 2, 2, '#e0b040'); sR(swH[0] + uy2 * 2 - 1, swH[1] - ux2 * 2, 2, 2, '#e0b040');   // garde dorée
-    for (let k = 2; k <= 17; k++) {
-      const x = Math.round(swH[0] + ux2 * k), y = Math.round(swH[1] + uy2 * k);
-      sR(x, y, 1, 1, k > 15 ? '#ffffff' : '#dfe8ee'); sR(x, y + 1, 1, 1, '#7a8894');
+    // katana : poignée tressée, tsuba ronde, lame légèrement courbée
+    for (let k = -4; k <= 0; k++) { const x = Math.round(swH[0] + ux2 * k), y = Math.round(swH[1] + uy2 * k); sR(x, y, 1, 1, (k & 1) ? '#e8e0d0' : '#1a1418'); }   // tsuka
+    const tb = [swH[0] + ux2 * 1.5, swH[1] + uy2 * 1.5]; sR(tb[0] - 1, tb[1] - 1, 3, 3, '#2a2228'); sR(tb[0], tb[1] - 1, 1, 1, '#c8a040');      // tsuba
+    const nx = -uy2 * (dir > 0 ? 1 : -1), ny = ux2 * (dir > 0 ? 1 : -1);   // normale : courbure côté dos de la lame
+    for (let k = 3; k <= 20; k++) {
+      const c2 = ((k - 3) / 17) ** 1.6 * 3.4, x = Math.round(swH[0] + ux2 * k + nx * c2), y = Math.round(swH[1] + uy2 * k + ny * c2);
+      sR(x, y, 1, 1, k > 18 ? '#ffffff' : '#e6eef2'); sR(Math.round(x - nx), Math.round(y - ny), 1, 1, '#8a98a4');
     }
   }
   if (f.flash > 0) {
