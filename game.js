@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v72';
+const VERSION = 'v74';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -354,18 +354,18 @@ const HEAD_VESPER = [
   "..bBBBnnb.",
   "...eBBBBe.",
 ];
-const HEAD_GROG = [   // casque gris foncé avec plaque claire, bande noire et yeux rouges, visage vert
+const HEAD_GROG = [   // même tête que Kaito : cheveux gris acier, yeux rouges
   "..aaaaaa..",
-  ".ahhhhhhha",
-  "ahhhhHLLHa",
-  "ahhhhHLLHa",
-  "ahhhhhhhhh",
-  "aaaaaaaaaa",
-  "..Skckkck.",
-  "..Sssssss.",
-  "..Sssssss.",
-  "..Sssssss.",
-  "...SSSSS..",
+  ".aHHLLHHa.",
+  "aHHHHLLHHa",
+  "aBBBBBBBBB",
+  "abbbbbbbbb",
+  "ahhScssck.",
+  "ahhScssck.",
+  "ahSssssss.",
+  ".aSssssss.",
+  "..Ssssmms.",
+  "..eSSSSSe.",
 ];
 const HEAD_GROG_BACK = [
   "..aaaaaa..",
@@ -457,16 +457,17 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_GROG_BACK, vneck: true, heavyBelt: true, shoes: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_KAITO_BACK, vneck: true, minBelt: true, shoes: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
     skin:  ['#1e3424', '#3c6448', '#5a9068', '#82b890'],               // peau verte de mutant
     eye:   '#ff2a1a',
-    hair:  { a: '#1c1e24', h: '#34373e', H: '#4c5058', L: '#9a9ea8' },   // casque gris foncé, plaque claire
-    top:   ['#1e3424', '#3c6448', '#5a9068', '#82b890'],               // torse de Kaito, en vert
+    hair:  { a: '#1c1e24', h: '#34373e', H: '#4c5058', L: '#9a9ea8' },   // cheveux gris comme le casque
+    bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],               // bandeau noir (comme Kaito)
+    top:   ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'],               // t-shirt noir (comme Kaito v2)
     legs:  ['#1e2210', '#3a4220', '#525c2e', '#6a7640'],               // pantalon cargo kaki ample
     belt:  ['#1e0e06', '#4a2414', '#6e3a1e', '#8a5230'],               // ceinture de cuir
     armorP:['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],
-    glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],               // gants noirs (comme Kaito)
+    glove: ['#2a2e36', '#5a6270', '#9aa4b4', '#e4ecf6'],               // gants métallisés
     shoe:  { hunt: true },                                              // baskets de John en noir et gris
     fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
 ];
@@ -964,8 +965,10 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
-  limbT(add(by, fwd, d.bulk ? -6 : -4.5), add(by, fwd, d.bulk ? 6.5 : 5), d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, 0, bl);
-  if (d.heavyBelt) {   // grosse ceinture, boucle d'acier
+  if (d.minBelt) limbT(add(by, fwd, -4), add(by, fwd, 4.5), 1.5, 1.5, 0, [bl[1], bl[1], bl[2], bl[2]]);   // Grog : ceinture fine qui ne dépasse pas
+  else limbT(add(by, fwd, d.bulk ? -6 : -4.5), add(by, fwd, d.bulk ? 6.5 : 5), d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, d.techBelt ? 2 : d.heavyBelt ? 3.5 : 3, 0, bl);
+  if (d.minBelt) {
+  } else if (d.heavyBelt) {   // grosse ceinture, boucle d'acier
     const bk2 = add(by, fwd, 3.5); const A = d.armorP;
     for (let t = -5; t <= 6; t += 2.2) { const q = add(by, fwd, t); sR(q[0], q[1] - 1, 1, 1, '#a88a5a'); }   // rivets
     if (!backView) { sR(bk2[0] - 3, bk2[1] - 2, 6, 4, A[0]); sR(bk2[0] - 2, bk2[1] - 1, 4, 2, A[2]); sR(bk2[0] - 1, bk2[1] - 1, 2, 1, A[0]); sR(bk2[0] - 2, bk2[1] - 2, 1, 1, A[3]); }
@@ -2277,7 +2280,7 @@ const ALT = [
   { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
-  { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
+  { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a0404', '#4a0808', '#6e1010', '#962222'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
