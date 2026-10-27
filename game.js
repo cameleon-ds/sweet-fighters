@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v80';
+const VERSION = 'v81';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -477,7 +477,7 @@ const DEFS = [
     legs:  ['#3a4048', '#8a929c', '#c4ccd4', '#eef2f6'],               // pantalon blanc cassé
     belt:  ['#0a1420', '#16263a', '#24405a', '#3a6080'],
     glove: ['#0a1420', '#16263a', '#24405a', '#3a6080'],
-    shoe:  ['#0a1018', '#1a2836', '#3a2010', '#24140a'],               // bottes bleu nuit, semelles marron foncé
+    shoe:  ['#0a1018', '#1a2836', '#6a4022', '#4a2c16'],               // bottes bleu nuit, semelles marron
     fb: ['#ffffff', '#d8fbff', '#7ae8f0', '#2a9aaa'] },
 ];
 
@@ -1063,6 +1063,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     for (let k = -4; k <= 0; k++) { const x = Math.round(swH[0] + ux2 * k), y = Math.round(swH[1] + uy2 * k); sR(x, y, 1, 1, (k & 1) ? '#e8e0d0' : '#1a1418'); }   // tsuka
     const tb = [swH[0] + ux2 * 1.5, swH[1] + uy2 * 1.5]; sR(tb[0] - 1, tb[1] - 1, 3, 3, '#2a2228'); sR(tb[0], tb[1] - 1, 1, 1, '#c8a040');      // tsuba
     const nx = -uy2 * (dir > 0 ? 1 : -1), ny = ux2 * (dir > 0 ? 1 : -1);   // normale : courbure côté dos de la lame
+    const wp = (k, c2) => [x + (swH[0] + ux2 * k + nx * c2 - OX) * UP, y + (swH[1] + uy2 * k + ny * c2 - OY) * UP];   // position à l'écran
+    if (f.id === 0 || f.id === 1) f.swSeg = [wp(6, ((3) / 17) ** 1.6 * 3.4), wp(20, 3.4)];
     for (let k = 3; k <= 20; k++) {
       const c2 = ((k - 3) / 17) ** 1.6 * 3.4, x = Math.round(swH[0] + ux2 * k + nx * c2), y = Math.round(swH[1] + uy2 * k + ny * c2);
       sR(x, y, 1, 1, k > 18 ? '#ffffff' : '#e6eef2'); sR(Math.round(x - nx), Math.round(y - ny), 1, 1, '#8a98a4');
@@ -2145,7 +2147,26 @@ function updZephyr() {
     }
   }
 }
+const SWORD_SPECIAL = ['gust', 'tornado', 'plunge', 'hover', 'cyclone'];
 function drawZephyrFx() {
+  for (const f of G.f) {   // traînée du sabre : transparente sur les coups normaux, bleue sur les coups spéciaux
+    if (!f.def.sword) continue;
+    const swinging = f.swSeg && f.rotAng == null && (ATTACKING.includes(f.state) || ['jpunch', 'jkick', 'hover'].includes(f.state)) && !['idle', 'walk', 'tornado'].includes(f.state);
+    f.swTrail = f.swTrail || [];
+    if (swinging && G.frame !== f.swLastF) { f.swTrail.push(f.swSeg); f.swLastF = G.frame; }
+    else if (!swinging) f.swTrail.shift();
+    while (f.swTrail.length > 10) f.swTrail.shift();
+    const T = f.swTrail; if (T.length < 2) continue;
+    const special = SWORD_SPECIAL.includes(f.state);
+    ctx.save(); if (special) ctx.globalCompositeOperation = 'lighter';
+    for (let i = 1; i < T.length; i++) {
+      const a = i / T.length;
+      ctx.fillStyle = special ? `rgba(70,170,255,${.75 * a})` : `rgba(255,255,255,${.5 * a})`;
+      ctx.beginPath(); ctx.moveTo(T[i - 1][0][0], T[i - 1][0][1]); ctx.lineTo(T[i - 1][1][0], T[i - 1][1][1]); ctx.lineTo(T[i][1][0], T[i][1][1]); ctx.lineTo(T[i][0][0], T[i][0][1]); ctx.closePath(); ctx.fill();
+      if (special) { ctx.strokeStyle = `rgba(200,240,255,${.7 * a})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(T[i - 1][1][0], T[i - 1][1][1]); ctx.lineTo(T[i][1][0], T[i][1][1]); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   for (const q of G.blades || []) {   // croissant d'air affûté
     const cx = q.x - q.dir * 8;
