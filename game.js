@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v61';
+const VERSION = 'v62';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1805,9 +1805,9 @@ function drawDiveTrail() {
   for (const f of G.f) {   // traînée néon du coup de pied plongeant
     if (f.state !== 'dive' || !f.trail || f.trail.length < 2) continue;
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-    const T = f.trail, cols = [['rgba(200,58,255,.45)', 7], ['rgba(58,240,255,.75)', 4], ['rgba(255,255,255,.9)', 1.5]];
+    const T = f.trail, cols = [['rgba(58,240,255,.8)', 3], ['rgba(255,255,255,.9)', 1]];   // même style que l'arc de la Lame Zénith
     for (const [c, w] of cols) for (let i = 1; i < T.length; i++) {
-      ctx.strokeStyle = c; ctx.lineWidth = w * i / T.length; ctx.globalAlpha = i / T.length;
+      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.globalAlpha = Math.min(1, 1.6 * i / T.length);
       ctx.beginPath(); ctx.moveTo(T[i - 1][0], T[i - 1][1]); ctx.lineTo(T[i][0], T[i][1]); ctx.stroke();
     }
     ctx.restore();
@@ -1828,7 +1828,7 @@ function drawVesperFx() {
   }
   for (const f of G.f) if (f.state === 'dive' && f.t >= 3 && f.trail) {   // éclat néon au bout du pied
     const [x, y] = f.trail[f.trail.length - 1];
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55; disc(x, y, 4, '#3af0ff'); ctx.globalAlpha = .9; disc(x, y, 1.5, '#ffffff'); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .4; disc(x, y, 3, '#3af0ff'); ctx.globalAlpha = .9; disc(x, y, 1, '#ffffff'); ctx.restore();
   }
   for (const f of G.f) {   // traînée et croissant de lame pour Pas de l'Ombre / Lame Zénith
     if (f.state === 'shadow' && f.t < 12) { ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { x: f.x + f.dir * 10 }), f.x + f.dir * 10, f.y); ctx.restore(); }
