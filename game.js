@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v62';
+const VERSION = 'v63';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -346,6 +346,32 @@ const HEAD_VESPER = [
   "..bBBBnnb.",
   "...eBBBBe.",
 ];
+const HEAD_GROG = [
+  "..aaaaa...",
+  ".aHLLHHa..",
+  "aHHLHHHHal",
+  "aHhHHHssss",
+  "eSsSkkkkkk",
+  "eSssScsSc.",
+  "eSsssssss.",
+  ".SssssSss.",
+  ".SbBBBBBb.",
+  "..bBmmBBb.",
+  "...ebbbe..",
+];
+const HEAD_GROG_BACK = [
+  "..aaaaa...",
+  ".aHLLHHa..",
+  "aHHLLHHHa.",
+  "aHHHHHHHss",
+  "eSsssssSks",
+  "eSssssSSss",
+  "eSsssssSss",
+  ".SsssssSs.",
+  ".SSsssSbb.",
+  "..SSSSbBb.",
+  "...eSSSe..",
+];
 // Têtes vues de dos 3/4 (nuque, oreille et bord de la joue à l'avant)
 const HEAD_KAITO_BACK = [
   "..aaaaaa..",
@@ -404,6 +430,19 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_GROG_BACK, bare: true, bulk: true, size: 1.14, armor: true, harness: true, heavyBelt: true, shoes: true, kit: 'grog',
+    speed: .72, tough: .82, power: 1.12,
+    skin:  ['#26301e', '#4a5e3a', '#6e8a56', '#9cba7c'],               // peau de mutant vert-de-gris
+    eye:   '#ff3a1a',
+    hair:  { a: '#22262e', h: '#5a606c', H: '#8a92a2', L: '#d4dcea' },   // plaque de titane sur le crâne
+    bandP: ['#10140c', '#1e2616', '#2c3820', '#3a4a2a'],               // barbe courte
+    top:   ['#26301e', '#4a5e3a', '#6e8a56', '#9cba7c'],               // torse nu
+    legs:  ['#140e0a', '#2a2018', '#40322a', '#5e4c3c'],               // pantalon treillis brun
+    belt:  ['#0e0a06', '#241a10', '#3a2a1a', '#5a4430'],
+    armorP:['#1e2028', '#4a505e', '#868ea0', '#e0e8f4'],               // blindage titane
+    glove: ['#1e2028', '#4a505e', '#868ea0', '#e0e8f4'],
+    shoe:  ['#0a0806', '#241c16', '#5a606c', '#3a3e48'],               // rangers, semelle acier
+    fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
 ];
 
 // Squelettes : [tête, cou, bassin, coudeAv, mainAv, coudeAr, mainAr, genouAv, piedAv, genouAr, piedAr]
@@ -437,6 +476,11 @@ const POSES = {
   cpunch:  [5,-37, 3,-30, 0,-15, 15,-30, 27,-31, -4,-23, -1,-28, 12,-10, 13,0, -8,-4, -16,0],
   ckick:   [-2,-33, -3,-27, -2,-12, 4,-20, 8,-12, -10,-20, -14,-8, 16,-5, 34,-2, -8,-4, -14,0],
   dive:    [-7,-60, -6,-52, 0,-36, -12,-46, -20,-54, 3,-48, 9,-55, 15,-24, 30,-6, 6,-38, -4,-30],
+  gq0:     [2,-54, 1,-46, -1,-28, 6,-60, 10,-72, 2,-58, 6,-70, 8,-14, 12,0, -8,-13, -12,0],     // Grog : poings levés
+  gq1:     [9,-36, 7,-29, 0,-14, 15,-19, 22,-2, 11,-17, 17,-2, 12,-10, 14,0, -8,-6, -16,0],          // poings au sol
+  rampart: [0,-53, -1,-45, -2,-27, 11,-41, 7,-57, 10,-39, 13,-56, 8,-14, 12,0, -8,-13, -14,0],     // bras croisés devant
+  rburst:  [4,-55, 2,-47, -1,-29, 15,-47, 24,-55, -6,-44, -13,-52, 9,-15, 13,0, -9,-14, -14,0],    // bras écartés
+  crush0:  [2,-58, 1,-50, 0,-32, 6,-63, 9,-76, 1,-61, 4,-74, 8,-26, 6,-12, -3,-16, -6,-2],      // envol, bras au-dessus de la tête
   tatsu:   [1,-58, 0,-50, 0,-34, -7,-46, -13,-44, 6,-46, 12,-44, 14,-36, 30,-37, 3,-24, -3,-17],
   parry:   [2,-55, 0,-47, -1,-29, 10,-44, 16,-53, 8,-42, 15,-47, 8,-15, 12,0, -9,-14, -13,0],
   stunned: [-3,-52, -3,-44, -1,-28, 2,-36, 4,-29, -7,-36, -5,-29, 6,-14, 10,0, -8,-13, -12,0],
@@ -559,6 +603,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   for (const i of [7, 8, 9, 10]) { Q[i * 2] = px0 + (Q[i * 2] - px0) * LF; Q[i * 2 + 1] = py0 + (Q[i * 2 + 1] - py0) * LF; }
   const lift = footBefore - Math.max(Q[17], Q[21]);
   for (let i = 1; i < Q.length; i += 2) Q[i] += lift;
+  if (d.size) for (let i = 0; i < Q.length; i++) Q[i] *= d.size;   // colosse : plus grand
   const pt = i => [OX + dir * Q[i * 2] * K, OY + Q[i * 2 + 1] * K];
   let [h, n, p, fe, fh, be, bh, fk, ff, bk, bf] = [0,1,2,3,4,5,6,7,8,9,10].map(pt);
   const sk = d.skin, top = d.top, legs = d.legs;
@@ -637,6 +682,19 @@ function drawFighter(f, x = f.x, y = f.y) {
   // Bras : lead = bras avant (celui qui frappe), rear = bras arrière
   const arm = (s0, e, hd, near, fd = dir) => {
     const S = near ? sk : dim(sk), T = near ? top : dim(top), Gl = near ? d.glove : dim(d.glove);
+    if (d.armor) {   // Grog : biceps énormes, avant-bras et épaule blindés de titane, gros gantelet
+      const AR = near ? d.armorP : dim(d.armorP);
+      limbT(s0, e, near ? 7.5 : 7, 6, near ? 1.6 : 1.2, S);
+      limbT(e, hd, near ? 7 : 6.5, near ? 6 : 5.5, .6, AR);
+      for (const t of [.3, .65]) { const q = mix(e, hd, t); sR(q[0] - 2, q[1], 4, 1, AR[0]); sR(q[0], q[1] - 1, 1, 1, AR[3]); }
+      const hl = mix(e, hd, .15); sR(hl[0] - 1, hl[1] - 1, 2, 1, AR[3]);
+      disc(s0[0], s0[1], near ? 4.5 : 4, AR[0]); disc(s0[0], s0[1] - .5, near ? 3.5 : 3, AR[2]);
+      sR(s0[0] - 1, s0[1] - 3, 2, 1, AR[3]); sR(s0[0] + (fd > 0 ? 1 : -2), s0[1], 1, 1, AR[0]);
+      const x0 = Math.round(hd[0]) - 3, y0 = Math.round(hd[1]) - 3;
+      sR(x0, y0, 7, 6, AR[0]); sR(x0 + 1, y0, 5, 5, AR[1]); sR(x0 + 1, y0, 5, 2, AR[2]);
+      for (let i = 0; i < 3; i++) sR(x0 + 1 + i * 2, y0, 1, 1, AR[3]);
+      return;
+    }
     limbT(s0, e, near ? 5 : 4.5, 4, near ? 1.2 : 1, S);
     limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, T);
     limbT(e, hd, near ? 4.5 : 4, near ? 3.5 : 3, 1, d.sleeves ? T : S);
@@ -647,7 +705,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   const leg = (k, ft, near) => {
     const soft = pal => [pal[1], pal[1], pal[2], pal[3]];   // pas de bord sombre (pas de contour)
     const Lg = near ? soft(legs) : dim(legs), S = near ? soft(sk) : dim(sk);
-    limbT(p, k, d.female ? 6.5 : 7, d.female ? 4.2 : 5, .8, Lg);
+    limbT(p, k, d.female ? 6.5 : d.bulk ? 9 : 7, d.female ? 4.2 : d.bulk ? 7 : 5, .8, Lg);
     // la jambe s'arrête à la cheville : rien ne dépasse sous le pied / la semelle
     const ank = add(ft, [0, d.shoes ? -4 : -4]);
     if (d.torn) {
@@ -658,7 +716,7 @@ function drawFighter(f, x = f.x, y = f.y) {
         sR(cut[0] - 2, cut[1] + 2, 1, 1, Lg[1]); sR(cut[0] + 1, cut[1] + 2, 1, 1, Lg[1]);
         const tr = mix(p, k, .6); sR(tr[0] + dir, tr[1], 2, 1, sk[2]);
       }
-    } else limbT(k, ank, d.female ? 4.2 : 5.5, d.female ? 2.6 : 3.5, .8, Lg);
+    } else limbT(k, ank, d.female ? 4.2 : d.bulk ? 7 : 5.5, d.female ? 2.6 : d.bulk ? 5 : 3.5, .8, Lg);
     if (d.hem) {
       // bas du kimono effiloché aux chevilles
       const hx = Math.round(ank[0]), hy = Math.round(ank[1]);
@@ -686,7 +744,7 @@ function drawFighter(f, x = f.x, y = f.y) {
   // ---- Torse ----
   const wa = add(p, [-ux, -uy], 1);
   const at = t => mix(sh, wa, t);
-  const tw = d.slim ? .95 : 1.15;   // torse plus large (on le voit de 3/4) ; plus fin pour les combattantes
+  const tw = d.slim ? .95 : d.bulk ? 1.55 : 1.15;   // torse plus large (on le voit de 3/4) ; plus fin pour les combattantes
   const torso = [add(sh, fwd, 6 * tw + RK * rs), add(at(.3), fwd, 6.5 * tw + RK * .6 * rs), add(at(.75), fwd, 5 * tw + RK * .2 * rs), add(wa, fwd, 4.5 * tw),
                  add(wa, fwd, -4 * tw), add(at(.6), fwd, -5 * tw - RK * .3 * rs), add(at(.25), fwd, -6 * tw - RK * .7 * rs), add(sh, fwd, -5.5 * tw - RK * rs)];
   if (shY != null) { torso[0][1] = Math.max(torso[0][1], shY - 1); torso[7][1] = Math.max(torso[7][1], shY - 1); }
@@ -732,8 +790,17 @@ function drawFighter(f, x = f.x, y = f.y) {
     }
   }
   // Cou court et large
-  limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], 5, 5, 0, sk);
-  if (tshirt && !backView && !d.vneck) {
+  limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, sk);
+  if (d.bulk && !backView) {   // trapèzes massifs
+    sPoly([add(sh, fwd, -6), add(sh, fwd, 7), add(n, fwd, 3), add(n, fwd, -3)], sk[1]);
+    sPoly([add(sh, fwd, -4), add(sh, fwd, 6), add(n, fwd, 2), add(n, fwd, -2)], sk[2]);
+  }
+  if (d.harness && !fullBack) {   // harnais de cuir en travers du torse, anneau d'acier
+    const a0 = add(sh, fwd, backView ? -6 : 6), a1 = add(wa, fwd, backView ? 5 : -5);
+    for (let t = 0; t <= 1; t += .07) { const q = mix(a0, a1, t); sR(q[0] - 1, q[1], 3, 2, '#2a1a0e'); sR(q[0], q[1], 1, 1, '#4a3020'); }
+    const rg = mix(a0, a1, .35); sR(rg[0] - 1, rg[1] - 1, 3, 3, d.armorP[1]); sR(rg[0], rg[1] - 1, 1, 1, d.armorP[3]);
+  }
+  if (tshirt && !backView && !d.vneck && !d.bare) {
     // col rond
     const c1 = add(sh, fwd, -1.5), c2 = add(sh, fwd, 3.5), cb = add(at(.1), fwd, 1);
     sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);
@@ -786,8 +853,11 @@ function drawFighter(f, x = f.x, y = f.y) {
 
   // Ceinture (le nœud est devant, donc caché en vue de dos)
   const bl = d.belt, by = add(p, [-ux, -uy], 1.5);
-  limbT(add(by, fwd, -4.5), add(by, fwd, 5), d.techBelt ? 2 : 3, d.techBelt ? 2 : 3, 0, bl);
-  if (d.techBelt) {   // ceinture futuriste : bande fine, segments et boucle lumineuse
+  limbT(add(by, fwd, d.bulk ? -6 : -4.5), add(by, fwd, d.bulk ? 6.5 : 5), d.techBelt ? 2 : d.heavyBelt ? 4 : 3, d.techBelt ? 2 : d.heavyBelt ? 4 : 3, 0, bl);
+  if (d.heavyBelt) {   // grosse ceinture, boucle d'acier
+    const bk2 = add(by, fwd, 3.5); const A = d.armorP;
+    if (!backView) { sR(bk2[0] - 2, bk2[1] - 2, 5, 4, A[0]); sR(bk2[0] - 1, bk2[1] - 1, 3, 2, A[2]); sR(bk2[0] - 1, bk2[1] - 1, 1, 1, A[3]); }
+  } else if (d.techBelt) {   // ceinture futuriste : bande fine, segments et boucle lumineuse
     const bk2 = add(by, fwd, 3);
     for (let t = -4; t <= 4.5; t += 2.5) { const q = add(by, fwd, t); sR(q[0], q[1] - 1, 1, 1, bl[0]); }
     sR(bk2[0] - 2, bk2[1] - 1, 4, 3, bl[0]); sR(bk2[0] - 1, bk2[1] - 1, 2, 2, '#c8ffff');
@@ -1162,12 +1232,13 @@ const ATK = {
   gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
   dive:     { act: [3, 60], box: [8, -30, 38, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
+  crushD:   { act: [0, 99], box: [-10, -46, 28, 4], high: true, dmg: 16, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   zenith:   { dur: 60, act: [4, 26], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1223,6 +1294,12 @@ function poseOf(f) {
     case 'pthrow': return f.t < 7 ? 'special0' : 'special1';
     case 'holo': return f.t < 7 ? 'special0' : 'special1';
     case 'shadow': return 'tuck';
+    case 'quake': return f.t < 12 ? 'gq0' : 'gq1';
+    case 'rampart': return 'rampart';
+    case 'rburst': return 'rburst';
+    case 'crush': return f.t < 6 ? 'crouch' : 'crush0';
+    case 'crushD': return 'crush0';
+    case 'crushLand': return 'gq1';
     case 'zenith': return f.t < 3 ? 'crouch' : 'tuck';
     case 'uppercut': {
       // accroupi, le poing monte, envol de dos ; au sommet il se retourne et redescend de face
@@ -1287,6 +1364,13 @@ function updFighter(f, o) {
           if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
           break;
         }
+        if (f.def.kit === 'grog') {   // Grog : Écrasement Céleste / Rempart de Fer / Impact Sismique
+          f.vx = 0;
+          if (h.u) { setState(f, 'crush'); break; }
+          if (back) { setState(f, 'rampart'); sfx('block'); break; }
+          if (!G.waves.some(w => w.owner === f && !w.small)) { setState(f, 'quake'); break; }
+          break;
+        }
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
         if (back) { setState(f, 'gtatsu'); f.vx = 0; f.spinN = 0; sfx('upper'); break; }   // arrière + A : tornade au sol x4
         if (!f.fb) { setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
@@ -1321,8 +1405,8 @@ function updFighter(f, o) {
       if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'p'); break; }
       if (take(c, 'k')) { setState(f, fwd ? 'fkick' : 'kick'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'k'); break; }
       if (back && threatened(f, o)) { f.vx = 0; if (f.state !== 'block') { setState(f, 'block'); f.bstun = 0; } break; }
-      if (fwd) { f.vx = 1.9 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
-      else if (back) { f.vx = -1.45 * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      if (fwd) { f.vx = 1.9 * (f.def.speed || 1) * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
+      else if (back) { f.vx = -1.45 * (f.def.speed || 1) * f.dir; if (f.state !== 'walk') setState(f, 'walk'); }
       else { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); }
       break;
     }
@@ -1436,6 +1520,23 @@ function updFighter(f, o) {
       if (f.t === 3) { f.air = true; f.vy = -8; f.vx = f.dir * Math.min(3.6, Math.max(1.8, (Math.abs(o.x - f.x) + 30) / 22)); sfx('upper'); }
       if (f.air) f.rotAng = f.dir * Math.min(1, f.t / 40) * Math.PI * 2;
       break;
+    case 'quake':   // frappe le sol : onde de choc au ras du sol
+      f.vx = 0;
+      if (f.t === 12) { G.waves.push({ owner: f, x: f.x + f.dir * 22, dir: f.dir, t: 0, life: 75 }); G.shake = Math.max(G.shake, 5); sfx('thud'); sfx('heavy'); }
+      if (f.t >= 34) setState(f, 'idle');
+      break;
+    case 'rampart': f.vx = 0; if (f.t >= 46) setState(f, 'idle'); break;
+    case 'rburst': f.vx = 0; if (f.t >= 22) setState(f, 'idle'); break;
+    case 'crush':   // grand bond vertical, suit l'adversaire en montant
+      if (f.t < 6) { f.vx = 0; break; }
+      if (f.t === 6) { f.air = true; f.vy = -9.6; sfx('upper'); }
+      f.vx = Math.max(-2.4, Math.min(2.4, (o.x - f.x) / 26));
+      if (f.t > 8 && f.vy >= -.5) { setState(f, 'crushD'); f.vx = Math.max(-3.2, Math.min(3.2, (o.x - f.x) / 12)); sfx('whoosh'); }
+      break;
+    case 'crushD':   // plongeon poings en avant
+      f.rotAng = f.dir * 2.7; f.vy = 8.5 - GRAV;
+      break;
+    case 'crushLand': f.vx = 0; if (f.t >= 20) setState(f, 'idle'); break;
     case 'pthrow': f.vx = 0; if (f.t === 7) launchProp(f, o); if (f.t >= 22) setState(f, 'idle'); break;
   }
 
@@ -1449,6 +1550,10 @@ function updFighter(f, o) {
       else if (f.state === 'tatsu') { setState(f, 'land'); f.landT = 10; }
       else if (f.state === 'dive') { f.trail = null; f.bounced = false; setState(f, 'land'); f.landT = 8; G.shake = Math.max(G.shake, 1); }
       else if (f.state === 'zenith') { f.rotAng = null; setState(f, 'land'); f.landT = 10; }
+      else if (f.state === 'crushD' || f.state === 'crush') {
+        const hit = f.hasHit; f.rotAng = null; setState(f, 'crushLand'); G.shake = Math.max(G.shake, 8); sfx('thud'); sfx('heavy');
+        for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 12, small: true, done: hit });
+      }
       else if (['jump', 'jpunch', 'jkick'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
@@ -1472,7 +1577,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive'].includes(f.state) && !f.air) return null;
+  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD'].includes(f.state) && !f.air) return null;
   const [x0, y0, x1, y1] = a.box;
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
 }
@@ -1801,6 +1906,45 @@ function updVesper() {
   }
   if (G.mines) G.mines = G.mines.filter(m => !m.dead);
 }
+/* ---------- Grog : ondes de choc au sol ---------- */
+const QUAKE_HIT = { dmg: 9, knock: true, stun: 20, bstun: 14, push: 3, chip: 0, sfx: 'heavy', unblock: true };
+const CRUSH_SHOCK = { dmg: 7, knock: true, stun: 20, bstun: 14, push: 4, chip: 0, sfx: 'heavy', unblock: true };
+const RAMPART_HIT = { dmg: 6, knock: true, stun: 20, bstun: 14, push: 6, chip: 0, sfx: 'heavy', unblock: true };
+function updGrog() {
+  for (const w of G.waves || []) {
+    const o = G.f.find(f => f !== w.owner);
+    w.t++; if (!w.ring) w.x += w.dir * (w.small ? 3 : 4.2);
+    if (w.t > w.life || w.x < (G.camL || 0) - 20 || w.x > (G.camL || 0) + W + 20) w.dead = true;
+    if (w.dead || w.done || !o) continue;
+    // fait trébucher l'adversaire s'il n'est pas en train de sauter
+    if (!o.air && Math.abs(o.x - w.x) < (w.small ? 20 : 14) && hurtbox(o)) {
+      w.done = true; if (!w.small) w.dead = true;
+      applyHit(w.owner, o, w.small ? CRUSH_SHOCK : QUAKE_HIT, w.x, GROUND - 12, w.x - w.dir, true);
+    }
+  }
+  if (G.waves) G.waves = G.waves.filter(w => !w.dead);
+}
+function drawGrogFx() {
+  for (const w of G.waves || []) {
+    if (w.ring) {   // onde de choc corporelle du Rempart
+      const r = 10 + w.t * 4, a = 1 - w.t / w.life;
+      ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = '#e0e8f4'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(w.x, GROUND - 45, r * .7, r, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      continue;
+    }
+    const a = Math.min(1, (w.life - w.t) / 10), n = w.small ? 3 : 5;
+    ctx.save(); ctx.globalAlpha = a;
+    for (let i = 0; i < n; i++) {   // rochers et dalles soulevés
+      const x = Math.round(w.x - w.dir * i * 7), hh = Math.max(2, (n - i) * (w.small ? 3 : 5) - ((G.frame + i) % 3));
+      R(x - 4, GROUND - hh, 8, hh + 2, '#3a2e24'); R(x - 3, GROUND - hh + 1, 6, hh, i % 2 ? '#5a4a3a' : '#7a6650'); R(x - 3, GROUND - hh + 1, 6, 1, '#b8a080'); R(x - 3, GROUND - hh + 2, 2, hh - 2, '#9a8468');
+    }
+    R(Math.round(w.x) - 2, GROUND - (w.small ? 14 : 30) - (G.frame % 4) * 2, 3, 3, '#c8b090');   // éclats
+    R(Math.round(w.x) + 4, GROUND - (w.small ? 10 : 22) - ((G.frame + 2) % 4) * 2, 2, 2, '#8a7660'); R(Math.round(w.x) - 7, GROUND - (w.small ? 8 : 18) - ((G.frame + 1) % 4) * 2, 2, 2, '#a89070');
+    ctx.globalAlpha = a * .35; ctx.fillStyle = '#d8c8a8';
+    ctx.beginPath(); ctx.ellipse(w.x - w.dir * 10, GROUND - 8, w.small ? 16 : 26, w.small ? 7 : 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
 function drawDiveTrail() {
   for (const f of G.f) {   // traînée néon du coup de pied plongeant
     if (f.state !== 'dive' || !f.trail || f.trail.length < 2) continue;
@@ -1887,6 +2031,14 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     addPopup(def.x, def.y - 100, 'COUNTER!', '#7af0ff');
     return;
   }
+  // Rempart de Fer : absorbe totalement le coup puis repousse l'attaquant
+  if (def.state === 'rampart' && def.t >= 3 && def.t < 42) {
+    G.freeze = 8; addSpark(sx, sy, 'parry'); sfx('parry');
+    setState(def, 'rburst'); G.flashT = Math.max(G.flashT, 6); G.boltX = def.x; G.boltY = def.y - 50;
+    G.waves.push({ owner: def, x: def.x, dir: def.dir, t: 0, life: 14, small: true, ring: true, done: true });
+    if (!projectile && Math.abs(att.x - def.x) < 90) { att.hasHit = true; applyHit(def, att, RAMPART_HIT, (att.x + def.x) / 2, att.y - 50, def.x, true); }
+    return;
+  }
   const away = fromX < def.x ? 1 : -1;
   if (isBlocking(def, fromX, data)) {
     setState(def, def.ctl.held.d ? 'cblock' : 'block'); def.bstun = data.bstun; def.vx = away * data.push;
@@ -1915,7 +2067,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
   }
-  def.hp = Math.max(0, def.hp - dmgK(data.dmg)); def.lagT = 32;
+  def.hp = Math.max(0, def.hp - dmgK(Math.round(data.dmg * (def.def.tough || 1) * (projectile ? 1 : att.def.power || 1)))); def.lagT = 32;
   spawnBlood(sx, sy, away, data.dmg);
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
@@ -2013,6 +2165,7 @@ const ALT = [
   { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
+  { skin: ['#3a2a2a', '#6a4a46', '#9a7068', '#c89a8a'], top: ['#3a2a2a', '#6a4a46', '#9a7068', '#c89a8a'], legs: ['#0a0e14', '#18202c', '#28344a', '#3e506c'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], glove: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], eye: '#3af0ff' },   // Grog : peau rougeâtre, blindage bronze
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
@@ -2035,7 +2188,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.holos = []; G.mines = [];
+  G.holos = []; G.mines = []; G.waves = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -2329,7 +2482,7 @@ function stepFight() {
     }
   }
 
-  updProps(); updBlood(); updVesper();
+  updProps(); updBlood(); updVesper(); updGrog();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -2404,7 +2557,7 @@ function drawSpark(s) {
 // ---------- Portraits et grille de sélection (8 cases) ----------
 const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
 const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=52'; return im; });
-const PORTRAIT_FACE = [1, -1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
+const PORTRAIT_FACE = [1, -1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -2429,7 +2582,7 @@ function portraitOf(i, hurt) {
   if (!arr[i]) { try { arr[i] = makePortrait(i, hurt); } catch (e) { return null; } }
   return arr[i];
 }
-const ROSTER = [0, 1, 2, null, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
+const ROSTER = [0, 1, 2, 3, null, null, null, null];   // indices dans DEFS ; null = personnage à venir
 function drawPortrait(i, x, y, sz, border, look = 1, hurt = false) {   // look : 1 = regarde à droite, -1 = à gauche
   R(x - 2, y - 2, sz + 4, sz + 4, '#000');
   R(x - 1, y - 1, sz + 2, sz + 2, border || '#c8c8d0');
@@ -2566,7 +2719,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawDiveTrail(); drawVesperFx();
+  drawDiveTrail(); drawVesperFx(); drawGrogFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -2635,6 +2788,9 @@ const MOVES = [
   { title: 'VESPER SPECIALS', lines: [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
+  { title: 'GROG SPECIALS', lines: [
+    ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ABSORBS A HIT, PUSHES BACK'],
+    ['UP + A', 'CELESTIAL CRUSH'], ['', 'HUGE LEAP, FISTS-FIRST DIVE'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
     ['Y Y B B', 'FIRE FINISH'], ['B B Y Y', 'FIRE FINISH'], ['Y Y B A', 'FLAME STRIKE FINISH'], ['B B Y A', 'FLAME STRIKE FINISH'] ] },
@@ -2860,5 +3016,5 @@ if (document.fonts && document.fonts.load) {
 } else go();
 
 // Accès debug pour les tests
-window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__bgmGain = () => bgmGain; window.__mkqr = () => makeQRs();
+window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__bgmGain = () => bgmGain; window.__mkqr = () => makeQRs(); window.__start = (a, b, s) => startMatch(a, b, s);
 })();
