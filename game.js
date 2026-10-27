@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v77';
+const VERSION = 'v79';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -470,11 +470,10 @@ const DEFS = [
     glove: ['#2a2e36', '#5a6270', '#9aa4b4', '#e4ecf6'],               // gants métallisés
     shoe:  { hunt: true },                                              // baskets de John en noir et gris
     fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
-  { name: 'ZEPHYR', style: 'jacket', head: HEAD_SORA, headBack: HEAD_SORA_BACK, band: true, sword: true, shoes: true, kit: 'zephyr',
+  { name: 'ZEPHYR', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, kasa: true, tornTop: true, softNeck: true, sword: true, shoes: true, kit: 'zephyr',
     skin:  ['#6a3c24', '#b07650', '#e0aa80', '#fcd4b0'],
     hair:  { a: '#4a5262', h: '#8a92a4', H: '#c4ccda', L: '#ffffff' },   // cheveux argentés
-    bandP: ['#0a2a30', '#1a6a74', '#3ab8c4', '#9af0f4'],               // bandeau turquoise qui flotte au vent
-    top:   ['#0a2630', '#17505e', '#2a8494', '#78d4dc'],               // veste longue turquoise
+    top:   ['#2a1608', '#4e2c14', '#76461f', '#a06a34'],               // kimono marron, un peu déchiré
     legs:  ['#3a4048', '#8a929c', '#c4ccd4', '#eef2f6'],               // pantalon blanc cassé
     belt:  ['#0a1420', '#16263a', '#24405a', '#3a6080'],
     glove: ['#0a1420', '#16263a', '#24405a', '#3a6080'],
@@ -756,6 +755,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     limbT(s0, e, d.bigArms ? (near ? 7.5 : 7) : near ? 5 : 4.5, d.bigArms ? 4.8 : 4, near ? (d.bigArms ? 1.6 : 1.2) : 1, d.skinTop ? [S[1], S[1], S[2], S[3]] : S);   // Grog : contour adouci
     limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, d.skinTop ? [T[1], T[1], T[2], T[3]] : T);
     limbT(e, hd, d.bigArms ? (near ? 6 : 5.5) : near ? 4.5 : 4, d.bigArms ? (near ? 5 : 4.5) : near ? 3.5 : 3, 1, d.sleeves ? T : d.bigArms ? [S[1], S[1], S[2], S[3]] : S);
+    if (d.tornTop && tshirt) { const ed = mix(s0, e, .42); sR(ed[0] - 1, ed[1], 1, 2, T[0]); sR(ed[0] + 1, ed[1] + 1, 1, 2, T[1]); }   // manche effilochée
     if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
     if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
     if (d.bracer) {   // Grog : brassard d'acier sanglé de cuir sur l'avant-bras
@@ -904,7 +904,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     for (const [t, o] of [[.25, 3.5], [.55, -2]]) { const q = add(at(t), fwd, o); sR(q[0] - 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0], q[1], 1, 1, '#7a3a2a'); sR(q[0] - 1, q[1] + 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] + 1, 1, 1, '#7a3a2a'); }
   }
   // Cou court et large
-  if (!d.skinTop) limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, sk);
+  if (!d.skinTop) limbT([h[0] - dir * .5, h[1] + 3], [n[0] + dir * .5, n[1] - .5], d.bulk ? 8 : 5, d.bulk ? 9 : 5, 0, d.softNeck ? [sk[1], sk[1], sk[2], sk[3]] : sk);   // softNeck : cou sans contour
   if (d.bulk && !backView) {   // trapèzes massifs
     sPoly([add(sh, fwd, -7), add(sh, fwd, 8), add(n, fwd, 3), add(n, fwd, -3)], sk[1]);
     sPoly([add(sh, fwd, -5), add(sh, fwd, 6.5), add(n, fwd, 2), add(n, fwd, -2)], sk[2]);
@@ -934,6 +934,9 @@ function drawFighter(f, x = f.x, y = f.y) {
     const c1 = add(sh, fwd, -3.5), c2 = add(sh, fwd, 5.5), cb = add(at(.3), fwd, 1);
     for (let t = 0; t <= 1; t += .12) { const q = mix(c1, cb, t), r = mix(c2, cb, t); sR(q[0], q[1], 1, 1, '#3af0ff'); sR(r[0], r[1], 1, 1, '#3af0ff'); }
     sR(cb[0], cb[1], 1, 1, '#c8ffff');
+  }
+  if (d.tornTop && !fullBack) {   // kimono déchiré : accrocs sur la poitrine et le bas
+    const hm = add(wa, fwd, -3.5); sR(hm[0], hm[1] - 1, 1, 2, sk[1]); const hm2 = add(wa, fwd, 2); sR(hm2[0], hm2[1] - 1, 1, 2, top[0]);
   }
   if (tshirt && !backView && d.vneck) {
     // Col en V ouvert : haut des pectoraux visible
@@ -1008,6 +1011,23 @@ function drawFighter(f, x = f.x, y = f.y) {
   for (let r = 0; r < map.length; r++) for (let c = 0; c < map[r].length; c++) {
     const ch = map[r][c]; if (ch === '.') continue;
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
+  }
+  if (d.kasa) {   // chapeau de paille conique de samouraï, incliné vers l'avant
+    const K2 = ['#3a2a12', '#8a6a30', '#b8944a', '#e4c67e'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 5;   // enfoncé : le bord avant cache les yeux
+    const tilt = x => Math.round(dir * (x - cx) * .25);   // l'avant du bord descend, l'arrière remonte
+    const px = (x, y, col) => sR(x, y + tilt(x), 1, 1, col);
+    for (let r2 = 0; r2 < 6; r2++) {
+      const half = 2 + r2 * 2, y = by - 6 + r2;
+      for (let x = cx - half; x <= cx + half; x++) {
+        let col = r2 === 5 ? K2[1] : K2[2];
+        if (x === cx - half || x === cx + half) col = K2[0];
+        else if (r2 < 4 && (x - cx) * -dir >= half - 2 && (x - cx) * -dir <= half - 1) col = K2[3];   // reflet
+        else if (r2 >= 2 && (x - cx + half) % 3 === 2) col = K2[1];   // tressage
+        px(x, y, col);
+      }
+    }
+    for (let x = cx - 13; x <= cx + 13; x++) px(x, by, K2[0]);   // bord inférieur
+    px(cx, by - 7, K2[1]);   // pointe
   }
 
   // ---- Plan avant ----
@@ -2417,7 +2437,7 @@ const ALT = [
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
   { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a0404', '#4a0808', '#6e1010', '#962222'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
-  { top: ['#2a0610', '#5a0e22', '#8e1a36', '#e05a78'], bandP: ['#2a0610', '#6a1028', '#c02a4a', '#ff8aa0'], hair: { a: '#1a1a22', h: '#2e2e3a', H: '#4a4a5a', L: '#8a8a9c' } },   // Zephyr : veste pourpre, cheveux noirs
+  { top: ['#0a1a26', '#16324a', '#24506e', '#3a7aa0'], hair: { a: '#1a1a22', h: '#2e2e3a', H: '#4a4a5a', L: '#8a8a9c' } },   // Zephyr : kimono bleu nuit, cheveux noirs
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
