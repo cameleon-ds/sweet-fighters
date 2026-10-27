@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v87';
+const VERSION = 'v88';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -479,10 +479,10 @@ const DEFS = [
     glove: ['#0a1420', '#16263a', '#24405a', '#3a6080'],
     shoe:  ['#0a1018', '#1a2836', '#6a4022', '#4a2c16'],               // bottes bleu nuit, semelles marron
     fb: ['#ffffff', '#d8fbff', '#7ae8f0', '#2a9aaa'] },
-  { name: 'NYX', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, witchHat: true, hairDown: true, female: true, slim: true, sleeveless: true, softNeck: true, flaps: true, shoes: true, kit: 'nyx',
+  { name: 'NYX', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, witchHat: true, hairDown: true, female: true, slim: true, sleeveless: true, thinArms: true, noAbs: true, softNeck: true, flaps: true, shoes: true, kit: 'nyx',
     skin:  ['#4a2a18', '#8a5a3c', '#b8805c', '#dcaa84'],
     eye:   '#3a2418',
-    hair:  { a: '#1a0a2a', h: '#3a1a5a', H: '#5a2e88', L: '#8a5abc' },   // longs cheveux violets
+    hair:  { a: '#2a1238', h: '#6a3a8e', H: '#9a68c4', L: '#c8a2ec' },   // longs cheveux mauves
     top:   ['#14040a', '#360a1c', '#5a1630', '#86304a'],               // corset bordeaux
     flapP: ['#0c0c10', '#24242c', '#363642', '#4c4c5a'],               // jupe noire déchirée
     legs:  ['#08080a', '#16161a', '#24242a', '#36363e'],               // pantalon noir
@@ -718,13 +718,16 @@ function drawFighter(f, x = f.x, y = f.y) {
     });
   };
   const drawBraid = () => {
-    if (d.hairDown) {   // longs cheveux lâchés qui tombent dans le dos
-      const hp = d.hair, sw = (f.air ? -f.vx * .6 : 0) + Math.sin(G.frame * .1) * .4, base = [h[0] - dir * 4, h[1] - 3];
-      for (let i = 0; i < 12; i++) {
-        const t = i / 11, w = Math.round(6 - 2.5 * t), q = [base[0] - dir * (1 + i * .75) + sw * i * .3, base[1] + i * 2.2];
-        sR(q[0] - (w >> 1) - 1, q[1], w + 2, 3, hp.a); sR(q[0] - (w >> 1), q[1], w, 2, i % 3 === 0 ? hp.H : hp.h);
-        if (i % 2) sR(q[0] - dir, q[1], 1, 2, hp.L);
+    if (d.hairDown) {   // longs cheveux mauves : masse qui tombe derrière la tête jusqu'aux épaules
+      const hp = d.hair, sw = (f.air ? -f.vx * .5 : 0) + Math.sin(G.frame * .08) * .4;
+      const t0 = [h[0] - dir * 1, h[1] - 6], L = 15;
+      for (let i = 0; i <= L; i++) {
+        const k = i / L, w = Math.round(8 + 3 * Math.sin(k * Math.PI * .7)), cx2 = t0[0] - dir * (2.5 + k * 2.5) + sw * k * 3, y = t0[1] + i * 1.5;
+        sR(cx2 - w / 2 - 1, y, w + 2, 2, hp.a); sR(cx2 - w / 2, y, w, 2, hp.h);
+        for (let st = -w / 2 + 1; st < w / 2; st += 3) sR(cx2 + st, y, 1, 2, (i + st) % 2 ? hp.H : hp.L);   // mèches
       }
+      const tip = t0[1] + L * 1.5 + 2;
+      for (let st = -4; st <= 4; st += 2) sR(t0[0] - dir * 5 + st + sw * 3, tip, 1, 2 + (st & 2 ? 1 : 0), hp.h);   // pointes effilées
     }
     if (!d.braid) return;
     const hp = d.hair, swing = (f.air ? -f.vx : 0) + Math.sin(G.frame * .12) * .5;
@@ -771,10 +774,10 @@ function drawFighter(f, x = f.x, y = f.y) {
       sR(x0, y0, 7, 5, S[0]); sR(x0 + 1, y0, 5, 4, S[2]); sR(x0 + 1, y0 + 3, 5, 1, S[1]);
       return;
     }
-    limbT(s0, e, d.bigArms ? (near ? 7.5 : 7) : near ? 5 : 4.5, d.bigArms ? 4.8 : 4, near ? (d.bigArms ? 1.6 : 1.2) : 1, d.skinTop ? [S[1], S[1], S[2], S[3]] : S);   // Grog : contour adouci
+    limbT(s0, e, d.bigArms ? (near ? 7.5 : 7) : d.thinArms ? (near ? 3.8 : 3.4) : near ? 5 : 4.5, d.bigArms ? 4.8 : d.thinArms ? 3.2 : 4, near ? (d.bigArms ? 1.6 : 1.2) : 1, d.skinTop ? [S[1], S[1], S[2], S[3]] : S);   // Grog : contour adouci
     if (!d.sleeveless) limbT(s0, mix(s0, e, tshirt ? .4 : 1), near ? 6 : 5.5, near ? 5.5 : 5, tshirt ? 0 : .5, d.skinTop ? [T[1], T[1], T[2], T[3]] : T);
     else { const sc2 = mix(s0, e, .12); sR(sc2[0] - 2, sc2[1] - 1, 4, 2, T[1]); }   // emmanchure du corset
-    limbT(e, hd, d.bigArms ? (near ? 6 : 5.5) : near ? 4.5 : 4, d.bigArms ? (near ? 5 : 4.5) : near ? 3.5 : 3, 1, d.sleeves ? T : d.bigArms ? [S[1], S[1], S[2], S[3]] : S);
+    limbT(e, hd, d.bigArms ? (near ? 6 : 5.5) : d.thinArms ? (near ? 3.4 : 3) : near ? 4.5 : 4, d.bigArms ? (near ? 5 : 4.5) : d.thinArms ? 2.6 : near ? 3.5 : 3, 1, d.sleeves ? T : d.bigArms ? [S[1], S[1], S[2], S[3]] : S);
     if (d.tornTop && tshirt) { const ed = mix(s0, e, .42); sR(ed[0] - 1, ed[1], 1, 2, T[0]); sR(ed[0] + 1, ed[1] + 1, 1, 2, T[1]); }   // manche effilochée
     if (d.sleeves) limbT(s0, mix(s0, e, 1), near ? 5.5 : 5, near ? 5 : 4.5, .3, T);
     if (!tshirt) limbT(e, mix(e, hd, .25), 5.5, 5.5, 0, T);
@@ -896,8 +899,8 @@ function drawFighter(f, x = f.x, y = f.y) {
     sPoly([add(sh, fwd, 2), add(sh, fwd, 5.5), add(at(.28), fwd, 5.5), add(at(.22), fwd, 2.5)], top[3]);
     if (tshirt) {
       // t-shirt moulant : ombre sous les pectoraux, ligne centrale des abdos
-      if (!d.skinTop) for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
-      if (!d.skinTop) {   // Grog : pas d'abdos, seulement les pectoraux
+      if (!d.skinTop && !d.noAbs) for (let k = -3; k <= 5; k++) { const q = add(at(.42), fwd, k); sR(q[0], q[1], 1, 1, top[1]); }
+      if (!d.skinTop && !d.noAbs) {   // Grog / Nyx : pas d'abdos
         for (let t = .48; t <= .85; t += .1) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, top[1]); }
         const a1 = add(at(.62), fwd, -1.5), a2 = add(at(.62), fwd, 3.5); sR(a1[0] - (dir < 0 ? 1 : 0), a1[1], 2, 1, top[1]); sR(a2[0] - (dir < 0 ? 1 : 0), a2[1], 2, 1, top[1]);
       }
@@ -1043,17 +1046,20 @@ function drawFighter(f, x = f.x, y = f.y) {
     const ch = map[r][c]; if (ch === '.') continue;
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
   }
-  if (d.witchHat) {   // grand chapeau de sorcière noir, pointe tordue vers l'arrière
+  if (d.witchHat) {   // grand chapeau de sorcière noir, incliné vers l'arrière, pointe tordue
     const WH = ['#050508', '#121218', '#22222c', '#3a3a4a'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 3;
-    for (let x = cx - 12; x <= cx + 12; x++) { const yy = by + Math.round(dir * (x - cx) * .08); sR(x, yy, 1, 1, WH[0]); sR(x, yy - 1, 1, 1, Math.abs(x - cx) < 10 ? WH[2] : WH[1]); }   // large bord
+    const tl = x => Math.round(-dir * (x - cx) * .2);   // bord avant relevé, bord arrière abaissé
+    for (let x = cx - 12; x <= cx + 12; x++) { const yy = by + tl(x); sR(x, yy, 1, 1, WH[0]); sR(x, yy - 1, 1, 1, Math.abs(x - cx) < 10 ? WH[2] : WH[1]); }
     const halves = [6, 6, 5, 5, 5, 4, 4, 3, 3, 3, 2, 2, 1, 1];
+    let tx = cx, ty = by;
     halves.forEach((hw, r2) => {
-      const off = -dir * Math.round(Math.max(0, r2 - 6) * .9), y = by - 2 - r2, x0 = cx + off;
+      const off = -dir * Math.round(r2 * .45 + Math.max(0, r2 - 7) * .7), y = by - 2 - r2, x0 = cx + off;
       sR(x0 - hw, y, hw * 2 + 1, 1, WH[1]); sR(x0 - hw, y, 1, 1, WH[0]); sR(x0 + hw, y, 1, 1, WH[0]);
       if (hw > 1) sR(x0 + dir * (hw - 2), y, 1, 1, WH[3]);
+      tx = x0; ty = y;
     });
-    const tx = cx - dir * Math.round(7 * .9), ty = by - 15; sR(tx - dir, ty - 1, 1, 1, WH[1]); sR(tx - dir * 2, ty - 1, 1, 1, WH[1]); sR(tx - dir * 3, ty, 1, 1, WH[1]); sR(tx - dir * 4, ty + 1, 1, 1, WH[0]);   // pointe pliée vers l'arrière
-    sR(cx - 6, by - 3, 13, 2, '#2a1030'); sR(cx + dir * 2 - 1, by - 3, 2, 2, '#8a8a96');   // bandeau et boucle
+    sR(tx - dir, ty - 1, 1, 1, WH[1]); sR(tx - dir * 2, ty - 1, 1, 1, WH[1]); sR(tx - dir * 3, ty, 1, 1, WH[1]); sR(tx - dir * 4, ty + 1, 1, 1, WH[0]);   // pointe pliée
+    const bx0 = cx - dir; sR(bx0 - 6, by - 3, 13, 2, '#2a1030'); sR(bx0 + dir * 2 - 1, by - 3, 2, 2, '#8a8a96');   // bandeau et boucle
   }
   if (d.kasa) {   // chapeau de paille conique de samouraï, incliné vers l'avant
     const K2 = ['#3a2a12', '#8a6a30', '#b8944a', '#e4c67e'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 5;   // enfoncé : le bord avant cache les yeux
