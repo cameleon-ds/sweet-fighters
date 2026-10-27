@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v84';
+const VERSION = 'v85';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1058,11 +1058,14 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (d.sword && swH) {   // sabre fin : lame d'acier dans le prolongement de l'avant-bras
     let ux2 = swH[0] - swE[0], uy2 = swH[1] - swE[1]; const L2 = Math.hypot(ux2, uy2) || 1; ux2 /= L2; uy2 /= L2;
     if (f.state === 'idle' || f.state === 'walk' || f.state === 'crouch' || f.state === 'block') { ux2 = dir * .75; uy2 = -.66; }   // en garde : lame pointée vers l'avant
-    if (f.state === 'plunge' || f.state === 'hover') { ux2 = dir * .1; uy2 = 1; }   // plongeon : lame pointée vers le sol
+    if (f.state === 'plunge' || f.state === 'hover') { ux2 = dir * .1; uy2 = 1; }
+    if (f.state === 'fpunch' && f.t < 16) {   // avant + Y : coup de sabre en arc de cercle, du haut vers le bas en passant par l'avant
+      const th = -2.1 + Math.min(1, f.t / 13) * 2.8; ux2 = dir * Math.cos(th); uy2 = Math.sin(th);
+    }   // plongeon : lame pointée vers le sol
     // katana : poignée tressée, tsuba ronde, lame légèrement courbée
     for (let k = -4; k <= 0; k++) { const x = Math.round(swH[0] + ux2 * k), y = Math.round(swH[1] + uy2 * k); sR(x, y, 1, 1, (k & 1) ? '#e8e0d0' : '#1a1418'); }   // tsuka
     const tb = [swH[0] + ux2 * 1.5, swH[1] + uy2 * 1.5]; sR(tb[0] - 1, tb[1] - 1, 3, 3, '#2a2228'); sR(tb[0], tb[1] - 1, 1, 1, '#c8a040');      // tsuba
-    const nx = -uy2 * (dir > 0 ? 1 : -1), ny = ux2 * (dir > 0 ? 1 : -1);   // normale : courbure côté dos de la lame
+    const nx = uy2 * (dir > 0 ? 1 : -1), ny = -ux2 * (dir > 0 ? 1 : -1);   // normale : la lame se courbe vers le haut
     const wp = (k, c2) => [x + (swH[0] + ux2 * k + nx * c2 - OX) * UP, y + (swH[1] + uy2 * k + ny * c2 - OY) * UP];   // position à l'écran
     if (f.id === 0 || f.id === 1) f.swSeg = [wp(6, ((3) / 17) ** 1.6 * 3.4), wp(20, 3.4)];
     for (let k = 3; k <= 20; k++) {
@@ -1464,7 +1467,8 @@ function poseOf(f) {
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
     case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
-    case 'fpunch': return f.t < 5 ? 'fpunch0' : f.t < 13 ? 'fpunch1' : 'fpunch0';
+    case 'fpunch': if (f.def.sword) return f.t < 4 ? 'upper1' : f.t < 9 ? 'fpunch1' : f.t < 16 ? 'punch1' : 'fpunch0';
+      return f.t < 5 ? 'fpunch0' : f.t < 13 ? 'fpunch1' : 'fpunch0';
     case 'fkick': return f.t < 9 || f.t >= 17 ? 'fkick0' : 'fkick1';
     case 'special': return f.t < 12 ? 'special0' : 'special1';
     case 'pthrow': return f.t < 7 ? 'special0' : 'special1';
@@ -2143,7 +2147,16 @@ function updZephyr() {
     if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30) q.dead = true;
     if (q.dead || !o) continue;
     const hb = hurtbox(o);
-    if (hb && Math.abs(o.x - q.x) < 14 && o.y - 80 < q.y + 12 && o.y > q.y - 14) { q.dead = true; applyHit(q.owner, o, BLADE_HIT, q.x, q.y, q.x - q.dir * 10, true); }
+    if (hb && Math.abs(o.x - q.x) < 18 && o.y - 80 < q.y + 20 && o.y > q.y - 20) { q.dead = true; applyHit(q.owner, o, BLADE_HIT, q.x, q.y, q.x - q.dir * 10, true); }
+  }
+  for (const q of G.blades || []) {   // deux croissants (ou un croissant et une boule de feu) qui se croisent s'annulent
+    if (q.dead) continue;
+    for (const q2 of G.blades) if (q2 !== q && !q2.dead && q2.owner !== q.owner && Math.abs(q2.x - q.x) < 26 && Math.abs(q2.y - q.y) < 30) {
+      q.dead = q2.dead = true; addSpark((q.x + q2.x) / 2, q.y, 'parry'); G.flashT = Math.max(G.flashT, 4); sfx('parry');
+    }
+    for (const fb of G.fbs || []) if (!q.dead && fb.alive && fb.owner !== q.owner && Math.abs(fb.x - q.x) < 26 && Math.abs(fb.y - q.y) < 30) {
+      q.dead = true; fb.alive = false; if (fb.owner) fb.owner.fb = null; addSpark((q.x + fb.x) / 2, q.y, 'parry'); sfx('parry');
+    }
   }
   if (G.blades) G.blades = G.blades.filter(q => !q.dead);
   for (const f of G.f) {   // Cyclone Rétrograde : aspire l'adversaire et brise son élan
@@ -2194,15 +2207,17 @@ function drawZephyrFx() {
     ctx.restore();
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-  for (const q of G.blades || []) {   // croissant d'air affûté
-    const cx = q.x - q.dir * 8;
-    for (const [r2, col, lw] of [[16, 'rgba(42,154,170,.55)', 5], [15, 'rgba(122,232,240,.9)', 3], [14, '#ffffff', 1.2]]) {
-      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
-      if (q.dir > 0) ctx.arc(cx, q.y, r2, -1.05, 1.05); else ctx.arc(cx, q.y, r2, Math.PI - 1.05, Math.PI + 1.05);
-      ctx.stroke();
+  for (const q of G.blades || []) {   // grand croissant électrique avec halo
+    const cx = q.x - q.dir * 12, R = 24, a0 = q.dir > 0 ? -1.15 : Math.PI - 1.15, a1 = a0 + 2.3;
+    const g = ctx.createRadialGradient(q.x, q.y, 2, q.x, q.y, 34);
+    g.addColorStop(0, 'rgba(200,245,255,.45)'); g.addColorStop(.5, 'rgba(47,180,255,.25)'); g.addColorStop(1, 'rgba(20,88,196,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, 34, 0, Math.PI * 2); ctx.fill();
+    for (const [r2, col, lw] of [[R + 1, 'rgba(20,88,196,.8)', 8], [R, 'rgba(47,180,255,.95)', 5], [R - 1, 'rgba(168,244,255,1)', 2.5], [R - 1, '#ffffff', 1.2]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(cx, q.y, r2, a0, a1); ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(122,232,240,.35)'; ctx.lineWidth = 1;
-    for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(cx - q.dir * k * 9, q.y - 8 + k * 3); ctx.lineTo(cx - q.dir * (k * 9 + 10), q.y - 8 + k * 3); ctx.stroke(); }
+    const pts = []; for (let i2 = 0; i2 <= 12; i2++) { const t = a0 + i2 / 12 * 2.3; pts.push([cx + Math.cos(t) * (R + 3), q.y + Math.sin(t) * (R + 3)]); }
+    elecArc(pts, 'rgba(200,245,255,.9)', 1.2);   // éclairs le long du croissant
+    for (let b = 0; b < 3; b++) { const t = a0 + Math.random() * 2.3, x0 = cx + Math.cos(t) * R, y0 = q.y + Math.sin(t) * R; elecArc([[x0, y0], [x0 - q.dir * 6, y0 + (Math.random() - .5) * 8], [x0 - q.dir * 13, y0 + (Math.random() - .5) * 12]], 'rgba(120,220,255,.8)', 1); }
   }
   for (const f of G.f) {
     if (f.pullT > 0) {   // bourrasque frontale : traits de vent qui convergent vers Zephyr
