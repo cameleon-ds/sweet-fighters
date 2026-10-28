@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v119';
+const VERSION = 'v120';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1322,11 +1322,11 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=119').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=120').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
@@ -1335,6 +1335,17 @@ function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); if (exact) { g.connect(VECHO); g.connect(VERB); }   // voix : delay + réverbe
   src.start(AC.currentTime + at);
   return true;
+}
+// Sphère de Lord Vane : son de charge qui monte tant que A est maintenu, coupé net au lancer
+function vaneChargeStart(f) {
+  vaneChargeStop(f); if (!AC) return;
+  const L = (SFX_BUF.vcharge || []).filter(Boolean); if (!L.length) return;
+  const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = L[0]; src.playbackRate.value = 1.6;
+  g.gain.value = .9 * sfxVol(); src.connect(g).connect(sfxBus()); src.start(); f.chSnd = { src, g };
+}
+function vaneChargeStop(f) {
+  const c = f.chSnd; if (!c || !AC) return; f.chSnd = null;
+  try { const t = AC.currentTime; c.g.gain.setValueAtTime(c.g.gain.value, t); c.g.gain.linearRampToValueAtTime(.0001, t + .08); c.src.stop(t + .1); } catch (e) {}
 }
 function sfx(n) {
   if (AC && !sfxLoading) loadSfx();
@@ -2027,16 +2038,16 @@ function updFighter(f, o) {
       break;
     case 'voidcast':
       f.vx = 0;
-      if (f.t === 8) { G.voids.push({ owner: f, x: f.x + f.dir * 36, y: f.y - 54, vx: 0, vy: 0, dir: f.dir, t: 0, r: 10, slow: true, charging: true, ch: 0 }); sfx('fb'); }
+      if (f.t === 8) { G.voids.push({ owner: f, x: f.x + f.dir * 36, y: f.y - 54, vx: 0, vy: 0, dir: f.dir, t: 0, r: 10, slow: true, charging: true, ch: 0 }); vaneChargeStart(f); }
       if (f.t === 9) {   // maintenir A : la sphère grossit dans la main ; relâcher pour la lancer
         const q = G.voids.find(v => v.owner === f && v.charging);
         if (q) {
           const held = f.ctl && f.ctl.held && f.ctl.held.s;
-          if (held && q.ch < 150) { q.ch++; f.t = 8; if (q.ch % 14 === 0) sfx('charge'); }
+          if (held && q.ch < 150) { q.ch++; f.t = 8; }
           else {
             const c = Math.min(1, q.ch / 90); q.charging = false; q.c = c; q.vx = f.dir * (3.2 - 2 * c);   // plus elle est grosse, plus elle est lente
             q.hit = Object.assign({}, VOID_HIT, { dmg: Math.round(8 + 24 * c), push: .6 + c * 3, chip: 1 + Math.round(c * 5), knock: c > .75 });
-            G.shake = Math.max(G.shake, 2 + c * 6); sfx('heavy'); if (c > .5) sfx('fb');
+            G.shake = Math.max(G.shake, 2 + c * 6); vaneChargeStop(f); if (!(AC && playSample('vlaunch', .8 + c * .5, 1.1 - c * .2, true))) sfx('fb');   // son de lancer, plus grave et plus fort quand la sphère est grosse
           }
         }
       }
@@ -2044,7 +2055,7 @@ function updFighter(f, o) {
       break;
     case 'airvoid':
       f.vy = Math.min(f.vy, 0) - GRAV * .6;
-      if (f.t === 6) { G.voids.push({ owner: f, x: f.x + f.dir * 20, y: f.y - 46, vx: f.dir * 4.2, vy: 4.2, dir: f.dir, t: 0, r: 13, big: true }); sfx('fb'); sfx('heavy'); }
+      if (f.t === 6) { G.voids.push({ owner: f, x: f.x + f.dir * 20, y: f.y - 46, vx: f.dir * 4.2, vy: 4.2, dir: f.dir, t: 0, r: 13, big: true }); if (!(AC && playSample('vlaunch', 1, 1, true))) sfx('fb'); sfx('heavy'); }
       if (f.t >= 18) setState(f, 'jump');
       break;
     case 'pteleport':   // recule d'un mètre en se désintégrant, puis se réintègre dans le dos de l'adversaire
@@ -2675,7 +2686,7 @@ function updVane() {
     const o = G.f.find(f => f !== q.owner);
     q.t++;
     if (q.charging) {   // sphère en charge, tenue devant Vane
-      const w = q.owner; if (w.state !== 'voidcast') { q.dead = true; continue; }
+      const w = q.owner; if (w.state !== 'voidcast') { q.dead = true; vaneChargeStop(w); continue; }
       q.r = 10 + Math.min(1, q.ch / 90) * 28; q.x = w.x + w.dir * (26 + q.r * .9); q.y = w.y - 54 - floatOff(w) - Math.max(0, q.r - 24) * .6;
       if (q.t % 2 === 0) for (let k = 0; k < 2; k++) { const a = Math.random() * 6.28, d = q.r * 2.4; G.vdust.push({ x: q.x + Math.cos(a) * d, y: q.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 11, vy: -Math.sin(a) * d / 11, t: 0, pink: Math.random() < .7 }); }
       continue;
