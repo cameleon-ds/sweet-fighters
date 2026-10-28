@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v93';
+const VERSION = 'v94';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1092,7 +1092,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     const N = 15;
     for (let pass = 0; pass < 3; pass++) for (let i = 0; i <= N; i++) {
       const th = -.55 + i / N * 2.75, vx = -dir * Math.sin(th), vy = -Math.cos(th);
-      const L = (i % 2 ? 3.2 : 5.2) * (1 - Math.max(0, i - 11) * .12) * (i < 2 ? .7 : 1);
+      const L = (i % 2 ? 3.2 : 5.2) * (1 - Math.max(0, i - 6) * .09) * (i < 2 ? .7 : 1);   // plus courte derrière la tête
       if (pass === 0) { for (let r2 = 4.2; r2 <= 6; r2 += .5) sR(Math.round(cx + vx * r2), Math.round(cy + vy * r2), 1, 1, hp.a); continue; }   // base sombre sur le crâne
       for (let r2 = 5.2; r2 <= 5.2 + L; r2 += .5) {
         const t = (r2 - 5.2) / L, col = pass === 1 ? hp.a : t > .7 ? hp.L : t > .35 ? hp.H : hp.h;
@@ -1875,7 +1875,7 @@ function updFighter(f, o) {
       break;
     case 'sonic':   // direct du droit supersonique
       f.vx = f.t < 6 ? f.dir * 1.5 : 0;
-      if (f.t === 6) { G.sonics.push({ owner: f, x: f.x + f.dir * 30, y: f.y - 56, dir: f.dir, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; sfx('heavy'); sfx('fb'); G.shake = Math.max(G.shake, 2); }
+      if (f.t === 6) { G.sonics.push({ owner: f, x: f.x + f.dir * 30, x0: f.x + f.dir * 30, y: f.y - 56, dir: f.dir, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; sfx('heavy'); sfx('fb'); G.shake = Math.max(G.shake, 2); }
       if (f.t >= 26) setState(f, 'idle');
       break;
     case 'plasmawall':   // bras levé, vu de face : mur électrique du sol jusqu'en haut de l'écran
@@ -2330,16 +2330,20 @@ function drawKaelFx() {
     for (const g of f.ghosts) { ctx.save(); ctx.globalAlpha = .4 * (1 - g.t / 12); ctx.globalCompositeOperation = 'lighter'; ctx.filter = 'hue-rotate(180deg) saturate(3)'; drawFighter(Object.assign({}, f, { flash: 0 }), g.x, f.y); ctx.restore(); }
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-  for (const q of G.sonics || []) {   // onde de choc rectiligne : anneaux et faisceau
-    const sc = q.big ? 1.5 : 1, x = q.x, y = q.y;
-    const g = ctx.createLinearGradient(x - q.dir * 70 * sc, 0, x, 0); g.addColorStop(0, 'rgba(90,240,255,0)'); g.addColorStop(1, 'rgba(200,250,255,.75)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x - q.dir * 35 * sc, y, 38 * sc, 9 * sc, 0, 0, Math.PI * 2); ctx.fill();
-    for (let k = 0; k < 4; k++) {
-      const rx = x - q.dir * k * 12 * sc, rr = (14 - k * 2.5) * sc;
-      ctx.strokeStyle = k ? `rgba(90,240,255,${.7 - k * .15})` : '#ffffff'; ctx.lineWidth = k ? 2 : 2.5;
-      ctx.beginPath(); ctx.ellipse(rx, y, rr * .35, rr, 0, q.dir > 0 ? -1.6 : 1.55, q.dir > 0 ? 1.6 : 4.7); ctx.stroke();
+  for (const q of G.sonics || []) {   // longue onde électrique avec halo
+    const sc = q.big ? 1.6 : 1, x = q.x, y = q.y, tail = q.dir > 0 ? Math.max(q.x0, x - 190) : Math.min(q.x0, x + 190);
+    const x1 = Math.min(tail, x), x2 = Math.max(tail, x), hw = 9 * sc;
+    const g = ctx.createLinearGradient(0, y - hw * 2, 0, y + hw * 2);
+    g.addColorStop(0, 'rgba(26,120,208,0)'); g.addColorStop(.35, 'rgba(60,170,255,.45)'); g.addColorStop(.5, 'rgba(230,250,255,.9)'); g.addColorStop(.65, 'rgba(60,170,255,.45)'); g.addColorStop(1, 'rgba(26,120,208,0)');
+    const fade = ctx.createLinearGradient(tail, 0, x, 0); fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(.3, 'rgba(0,0,0,1)');
+    ctx.save(); ctx.fillStyle = g; ctx.globalAlpha = .9; ctx.fillRect(x1, y - hw * 2, x2 - x1, hw * 4); ctx.restore();
+    for (let b = 0; b < 4; b++) {   // éclairs qui courent le long du faisceau
+      const L = [], n2 = 18; for (let s2 = 0; s2 <= n2; s2++) L.push([tail + (x - tail) * s2 / n2, y + (Math.random() - .5) * hw * 1.6 * (b < 2 ? 1 : 1.8)]);
+      elecArc(L, b < 2 ? '#ffffff' : 'rgba(120,220,255,.85)', b < 2 ? 1.5 : 1);
     }
-    for (let k = 0; k < 4; k++) { const yy = y - 10 * sc + k * 7 * sc; ctx.strokeStyle = 'rgba(200,250,255,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - q.dir * (20 + k * 6), yy); ctx.lineTo(x - q.dir * (50 + k * 10) * sc, yy); ctx.stroke(); }
+    const hg = ctx.createRadialGradient(x, y, 1, x, y, 22 * sc); hg.addColorStop(0, 'rgba(255,255,255,.95)'); hg.addColorStop(.4, 'rgba(120,220,255,.6)'); hg.addColorStop(1, 'rgba(26,120,208,0)');
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, 22 * sc, 0, Math.PI * 2); ctx.fill();   // tête lumineuse
+    for (let k = 0; k < 3; k++) { ctx.strokeStyle = `rgba(200,250,255,${.8 - k * .25})`; ctx.lineWidth = 2 - k * .5; ctx.beginPath(); ctx.ellipse(x - q.dir * k * 8, y, (5 + k * 2) * sc * .5, (12 + k * 3) * sc, 0, 0, Math.PI * 2); ctx.stroke(); }
   }
   for (const w of G.pwalls || []) {   // mur électrique du sol jusqu'en haut de l'écran
     const a = Math.min(1, w.t / 4, (40 - w.t) / 12), half = (w.big ? 26 : 20) * (w.t < 4 ? .4 + w.t * .15 : 1), top = -40, bot = GROUND + 2;
@@ -3512,7 +3516,7 @@ const MOVES = [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'KAEL SPECIALS', lines: [
-    ['A', 'SONIC WAVE'], ['', 'SUPERSONIC JAB, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
+    ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
   { title: 'NYX SPECIALS', lines: [
     ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC MIST'], ['', 'REVERSES FOE CONTROLS, STOPS SHOTS'],
