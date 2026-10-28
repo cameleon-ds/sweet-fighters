@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v124';
+const VERSION = 'v125';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1411,16 +1411,67 @@ for (let i = 0; i < WALK_N; i++) {
   POSES['wk' + i] = [4, -57 + bob, 2, -49 + bob, .5, hipY, ...A1, ...A2, ...L1, ...L2].map(v => Math.round(v * 2) / 2);
 }
 
-const KEYMAP = {
-  ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd',
-  KeyJ: 'p', KeyK: 'k', KeyL: 's', Space: 'x', KeyI: 'x', Enter: 'start', Escape: 'back', Backspace: 'back',
-};
+// Touches du clavier (personnalisables dans OPTIONS > KEYBOARD) et boutons de manette (OPTIONS > GAMEPAD)
+const KEY_DEF = { l: 'ArrowLeft', r: 'ArrowRight', u: 'ArrowUp', d: 'ArrowDown', p: 'KeyJ', k: 'KeyK', s: 'KeyL', x: 'Space', start: 'Enter', back: 'Escape' };
+const PAD_DEF = { p: 3, k: 1, s: 0, x: 2, start: 9, back: 8 };   // manette Xbox : Y = coup de poing, B = pied, A = spécial, X = contre
+let KEYS = Object.assign({}, KEY_DEF), PADB = Object.assign({}, PAD_DEF);
+try { const sv = JSON.parse(localStorage.getItem('sf2keys') || 'null'); if (sv) { Object.assign(KEYS, sv.k || {}); Object.assign(PADB, sv.p || {}); } } catch (e) {}
+const saveKeys = () => { try { localStorage.setItem('sf2keys', JSON.stringify({ k: KEYS, p: PADB })); } catch (e) {} };
+function keyAction(code) {
+  for (const a in KEYS) if (KEYS[a] === code) return a;
+  if (code === 'Enter') return 'start'; if (code === 'Escape' || code === 'Backspace') return 'back';   // toujours utilisables dans les menus
+  return null;
+}
+let bindWait = null;   // { dev: 'kb' | 'pad', act } : attente d'une touche / d'un bouton à associer
 addEventListener('keydown', e => {
   initAudio();
-  const m = KEYMAP[e.code];
+  if (bindWait && bindWait.dev === 'kb') {   // capture de la nouvelle touche
+    e.preventDefault();
+    if (e.code !== 'Escape') bindKey('kb', bindWait.act, e.code);
+    bindWait = null; keys.clear(); return;
+  }
+  const m = keyAction(e.code);
   if (m) { keys.add(m); latched.add(m); e.preventDefault(); }
 });
-addEventListener('keyup', e => { const m = KEYMAP[e.code]; if (m) keys.delete(m); });
+addEventListener('keyup', e => { const m = keyAction(e.code); if (m) keys.delete(m); });
+function bindKey(dev, act, val) {   // associe et échange si la touche était déjà utilisée
+  const M = dev === 'kb' ? KEYS : PADB;
+  for (const a in M) if (M[a] === val && a !== act) M[a] = M[act];
+  M[act] = val; saveKeys(); sfx('select');
+}
+// Manette (Xbox en Bluetooth, etc.) : API Gamepad du navigateur
+let padPrev = [];
+function padList() { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean); } catch (e) { return []; } }
+function readPad(i) {
+  const gp = padList()[i], o = {}; if (!gp) return o;
+  const B = n => !!(gp.buttons[n] && gp.buttons[n].pressed), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, menu = inMenu(), dz = menu ? .6 : .38;
+  o.l = B(14) || ax < -dz; o.r = B(15) || ax > dz; o.u = B(12) || ay < -dz; o.d = B(13) || ay > dz;
+  for (const a in PADB) if (B(PADB[a])) o[a] = true;
+  if (i === 0 && bindWait && bindWait.dev === 'pad') {   // capture du nouveau bouton
+    const now = gp.buttons.map(b => b.pressed);
+    const n = now.findIndex((p, k) => p && !padPrev[k] && k !== 12 && k !== 13 && k !== 14 && k !== 15);
+    padPrev = now;
+    if (n >= 0) { bindKey('pad', bindWait.act, n); bindWait = null; G.padLock = 12; }
+    return {};
+  }
+  if (i === 0) padPrev = gp.buttons.map(b => b.pressed);
+  if (G.padLock > 0) { G.padLock--; return {}; }
+  return o;
+}
+const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'XBOX'];
+const padName = n => PAD_NAMES[n] || 'B' + n;
+function keyName(c) {
+  if (!c) return '-';
+  const M = { ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', ArrowUp: 'UP', ArrowDown: 'DOWN', Space: 'SPACE', Enter: 'ENTER', Escape: 'ESC', Backspace: 'BKSP', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL', ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB' };
+  return M[c] || c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'NUM ').toUpperCase();
+}
+const padOn = () => padList().length > 0;
+// libellé d'un bouton du jeu (Y/B/A/X) selon l'appareil utilisé : clavier, manette ou tactile
+function btnLabel(b) {
+  const act = { Y: 'p', B: 'k', A: 's', X: 'x' }[b];
+  if (isTouch && !padOn()) return b;
+  return padOn() ? padName(PADB[act]) : keyName(KEYS[act]);
+}
 addEventListener('blur', () => keys.clear());
 
 const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || /[?&]touch/.test(location.search);
@@ -1532,6 +1583,7 @@ function readPlayer() {
     back: K('back'),
   };
   latched.clear();
+  const gp = readPad(0); for (const b in gp) if (gp[b]) r[b] = true;   // manette branchée sur le PC
   const rm = readRemote(1);   // manette smartphone du joueur 1
   for (const b in rm) if (rm[b]) r[b] = true;
   return r;
@@ -1679,7 +1731,7 @@ function makeFighter(def, id, x, dir, cpu) {
 }
 
 const chargeMax = f => f.hp <= 80 ? 60 : 120;
-function setState(f, s) { if (s !== 'pteleport') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
+function setState(f, s) { if (f.chSnd && s !== f.state) vaneChargeStop(f); if (s !== 'pteleport') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
 const VANE_NORMALS = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'flame'];
@@ -1911,12 +1963,13 @@ function updFighter(f, o) {
         if (h.s && f.t >= 6 && live) {
           // A maintenu : position de charge
           f.chargeT = (f.chargeT || 0) + 1; f.t = Math.min(f.t, 10);
+          if (f.chargeT === 8) vaneChargeStart(f);   // son de charge
           if (f.chargeT === chargeMax(f)) {   // 2 s (1 s si l'énergie est à 80 % ou moins) : charge maximale
             f.charged = true; G.darkT = 60; G.flashT = 12;
-            G.boltX = f.x - f.dir * 14; G.boltY = f.y - 44; sfx('parry');
+            G.boltX = f.x - f.dir * 14; G.boltY = f.y - 44; vaneChargeStop(f); sfx('counter');   // signal : charge complète
             addPopup(f.x, f.y - 100, 'MAX!', '#ffd23a');
           }
-        } else if (f.t >= 12) { spawnFireball(f, f.charged); f.fired = true; }
+        } else if (f.t >= 12) { vaneChargeStop(f); spawnFireball(f, f.charged); f.fired = true; }
       }
       if (f.t >= 40) setState(f, 'idle');
       break;
@@ -1930,7 +1983,7 @@ function updFighter(f, o) {
         else if (f.t === 15) { f.vy = -7.4; f.vx = 2.8 * f.dir; }
         else if (f.t > 15 && f.vy < 0) f.vx *= .88;
         if (f.t > 15 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
-        if (f.t >= 4 && f.t < 24 && G.frame % 2 === 0) addSpark(f.x + f.dir * 22, f.y - 70 - Math.random() * 20, 'fb', f.def.fb);   // traînée de flammes
+        if (f.t >= 4) { const [hp] = grogArm(f, 4, 4); (f.ftrail = f.ftrail || []).push({ x: hp[0], y: hp[1], bx: f.x, by: f.y, t: f.t, rotAng: f.rotAng }); if (f.ftrail.length > 12) f.ftrail.shift(); }   // traînée de feu du poing
         break;
       }
       if (f.t >= 5 && f.t <= 10) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 5]; }
@@ -3203,6 +3256,21 @@ function grogArm(f, i0, i1) {   // position monde d'un point de squelette
   const P = POSES[poseOf(f)] || POSES.idle0, S = K * UP * (f.def.size || 1);
   return [i0, i1].map(i => [f.x + f.dir * P[i * 2] * S, f.y + P[i * 2 + 1] * S]);
 }
+function drawFireTrail() {   // John : le poing enflammé laisse une traînée de feu en écho
+  for (const f of G.f) {
+    if (!f.ftrail || !f.ftrail.length) continue;
+    if (f.state !== 'uppercut') { f.ftrail.shift(); if (!f.ftrail.length) continue; }
+    const pal = f.def.fb, T = f.ftrail;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    T.forEach((p, i) => {
+      const k = (i + 1) / T.length, r = 4 + k * 9;
+      if (i % 3 === 0 && i < T.length - 2) { ctx.save(); ctx.globalAlpha = .22 * k; drawFighter(Object.assign({}, f, { state: 'uppercut', t: p.t, flash: 0, tint: pal[2] }), p.bx, p.by); ctx.restore(); }   // écho orangé du corps
+      const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r * 1.8); g.addColorStop(0, pal[1] + 'dd'); g.addColorStop(.45, pal[2] + '99'); g.addColorStop(1, pal[3] + '00');
+      ctx.globalAlpha = k; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x + (Math.random() - .5) * 2, p.y - k * 2, r * 1.8, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+}
 function drawGrogFx() {   // ondes électriques bleues de Grog
   for (const f of G.f) {
     if (f.def.kit !== 'grog') continue;
@@ -3571,10 +3639,29 @@ function stepMoves() {
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
+const OPT_BACK = () => isTouch && !padOn() ? 6 : 8;   // sur PC : lignes KEYBOARD et GAMEPAD en plus
+const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
+const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
+function stepKeys() {
+  if (bindWait) return;   // en attente d'une touche
+  const rows = bindRows(), N = rows.length + 2, m = navStep();
+  const kc = Math.max(0, Math.min(N - 1, (G.kcur || 0) + m)); if (kc !== (G.kcur || 0)) { G.kcur = kc; sfx('beep'); }
+  const ok = edge(pctl, 's') || edge(pctl, 'start');
+  if (edge(pctl, 'back') || (ok && G.kcur === N - 1)) { G.showKeys = null; sfx('beep'); return; }
+  if (!ok) return;
+  if (G.kcur === N - 2) {   // réinitialiser
+    if (G.showKeys === 'pad') PADB = Object.assign({}, PAD_DEF); else KEYS = Object.assign({}, KEY_DEF);
+    saveKeys(); sfx('select'); return;
+  }
+  bindWait = { dev: G.showKeys, act: rows[G.kcur][0] }; keys.clear(); sfx('beep');
+}
 function stepOptions() {
-  const m = navStep(), oc = Math.max(0, Math.min(6, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
-  const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's');
-  if (backPress(pctl) || (ok && G.ocur === 6)) { G.showOpts = false; sfx('beep'); return; }
+  if (G.showKeys) { stepKeys(); return; }
+  const OB = OPT_BACK();
+  const m = navStep(), oc = Math.max(0, Math.min(OB, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
+  const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's') || edge(pctl, 'start');
+  if (backPress(pctl) || (ok && G.ocur === OB)) { G.showOpts = false; sfx('beep'); return; }
+  if (OB === 8 && ok && (G.ocur === 6 || G.ocur === 7)) { G.showKeys = G.ocur === 6 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
   if (G.ocur === 5 && (l || r || ok)) {
     OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
     saveOpt(); sfx('select');
@@ -3595,7 +3682,7 @@ function stepOptions() {
   }
 }
 function stepPause() {
-  if (edge(pctl, 'start')) { G.paused = false; G.showMoves = false; G.showOpts = false; sfx('beep'); return; }   // START = reprendre
+  if (edge(pctl, 'start') && !G.showOpts) { G.paused = false; G.showMoves = false; G.showOpts = false; sfx('beep'); return; }   // START = reprendre
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
@@ -4084,7 +4171,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawDiveTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawVaneFx(); drawClashFx();
+  drawDiveTrail(); drawFireTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawVaneFx(); drawClashFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -4183,7 +4270,7 @@ function drawMoves() {
     if (fa <= 0) return;
     ctx.globalAlpha = fa;
     if (k === '#') { R(x0, y + 10, 2 * CX - 2 * x0, 1, '#5a3a2a'); text(v, CX, y, 8, '#ffd23a', 'center'); return; }
-    if (k) text(k, x0, y, 8, '#7af0ff', 'left');
+    if (k) text((isTouch && !padOn() ? k : k.replace('STICK ', '')).replace(/\b([YBAX])\b/g, (m0, b) => btnLabel(b)), x0, y, 8, '#7af0ff', 'left');   // touches du clavier / boutons de la manette
     if (v) text(v, k ? x0 + 112 : CX, y, 8, '#ffffff', k ? 'left' : 'center');
   });
   ctx.globalAlpha = 1; ctx.restore();
@@ -4193,7 +4280,7 @@ function drawMoves() {
     const bh = Math.max(12, view * view / total), by = top + (view - bh) * (sc / Math.max(1, total - 128));
     R(W - 8, top, 3, view, '#2a1e30'); R(W - 8, Math.min(bot - bh, by), 3, bh, '#ffd23a');
   }
-  if (!isTouch) text('PC: J=Y  K=B  L=A  SPACE=X  ENTER=START', CX, 176, 8, '#9a8a70', 'center');
+  if (!isTouch || padOn()) text((padOn() ? 'GAMEPAD' : 'KEYBOARD') + ' - CHANGE IN OPTIONS', CX, 176, 8, '#9a8a70', 'center');
   text(isTouch ? 'UP/DOWN: SCROLL    B: BACK' : 'UP/DOWN: SCROLL    ESC: BACK', CX, 196, 8, '#d8c8a8', 'center');
 }
 function drawStar(x, y, r, on) {
@@ -4211,6 +4298,7 @@ function panel(y0, h, title) {
   text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
+  if (G.showKeys) { drawKeys(); return; }
   panel(20, 180, 'OPTIONS');
   const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84, bx = CX + 64;
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
@@ -4218,8 +4306,9 @@ function drawOptions() {
     if (v === 0) { text('OFF', CX + 62, y, 8, '#ff5a4a', 'center'); return; }
     for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
   };
-  const Y = i => 46 + i * 17;
-  if (c < 6) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
+  if (G.showKeys) { drawKeys(); return; }
+  const OB = OPT_BACK(), Y = i => OB === 8 ? 48 + i * 13 : 46 + i * 17;
+  if (c < OB) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
   for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
@@ -4228,8 +4317,28 @@ function drawOptions() {
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
-  text((c === 6 ? '> ' : '') + 'BACK' + (c === 6 ? ' <' : ''), CX, 154, 8, col(6), 'center');
+  if (OB === 8) {
+    text('KEYBOARD', x0, Y(6), 8, col(6), 'left'); text('SET >', CX + 62, Y(6), 8, col(6), 'center');
+    text('GAMEPAD', x0, Y(7), 8, col(7), 'left'); text(padOn() ? 'SET >' : 'NONE', CX + 62, Y(7), 8, padOn() ? col(7) : '#5a4a60', 'center');
+  }
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, OB === 8 ? 164 : 154, 8, col(OB), 'center');
   text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 180, 8, '#7a6a80', 'center');
+}
+function drawKeys() {   // écran de configuration des touches / boutons
+  const pad = G.showKeys === 'pad', rows = bindRows(), N = rows.length + 2, c = G.kcur || 0;
+  panel(12, 196, pad ? 'GAMEPAD' : 'KEYBOARD');
+  const x0 = CX - 84, step = pad ? 14 : 12, y0 = pad ? 48 : 42;
+  rows.forEach(([a, nm], i) => {
+    const y = y0 + i * step, sel = c === i, waiting = bindWait && bindWait.act === a;
+    if (sel) text('>', x0 - 4, y, 8, '#ffd23a', 'right');
+    text(nm, x0, y, 8, sel ? '#ffffff' : '#9a8aa0', 'left');
+    const v = waiting ? ((G.frame >> 4) % 2 ? 'PRESS...' : '') : pad ? padName(PADB[a]) : keyName(KEYS[a]);
+    text(v, CX + 62, y, 8, waiting ? '#ffd23a' : '#7af0ff', 'center');
+  });
+  const yR = y0 + rows.length * step + 6;
+  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ff7a6a' : '#9a8aa0', 'center');
+  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffffff' : '#9a8aa0', 'center');
+  text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, '#7a6a80', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
