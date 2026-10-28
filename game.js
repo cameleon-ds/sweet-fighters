@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v105';
+const VERSION = 'v106';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1285,36 +1285,59 @@ function initAudio() {
 }
 // volume des bruitages (option SFX, 0 à 4 barres ; 4 = 100 %)
 const sfxVol = () => (typeof OPT === 'undefined' ? 4 : OPT.sfx) / 4;
-function tone(type, f0, f1, dur, vol) {
-  const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+// Chaîne audio « 16 bits » : bus des bruitages → légère saturation quantifiée → compresseur → sortie ; écho pour les sons de menu
+let SFXBUS = null, CRUNCH = null, ECHO = null;
+function sfxBus() {
+  if (SFXBUS) return SFXBUS;
+  const comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = .002; comp.release.value = .12;
+  comp.connect(AC.destination);
+  SFXBUS = AC.createGain(); SFXBUS.gain.value = 1; SFXBUS.connect(comp);
+  CRUNCH = AC.createWaveShaper(); const n = 1024, cv2 = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1, y = Math.tanh(x * 2.2); cv2[i] = Math.round(y * 24) / 24; }   // saturation + quantification (grain 16 bits)
+  CRUNCH.curve = cv2; CRUNCH.connect(SFXBUS);
+  ECHO = AC.createDelay(1); ECHO.delayTime.value = .11; const fb = AC.createGain(); fb.gain.value = .38; const wet = AC.createGain(); wet.gain.value = .5;
+  ECHO.connect(fb).connect(ECHO); ECHO.connect(wet).connect(SFXBUS);
+  return SFXBUS;
+}
+function tone(type, f0, f1, dur, vol, at = 0, out) {
+  const t = AC.currentTime + at, o = AC.createOscillator(), g = AC.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t);
   o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   const v = Math.max(.0011, vol * sfxVol()); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur);
+  o.connect(g).connect(out || (sfxBus(), CRUNCH)); o.start(t); o.stop(t + dur + .02);
+  return g;
 }
-function noise(dur, vol, freq) {
-  const t = AC.currentTime, s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
-  s.buffer = NOISE; fl.type = 'bandpass'; fl.frequency.value = freq;
+function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
+  const t = AC.currentTime + at, s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = NOISE; fl.type = type; fl.frequency.setValueAtTime(freq, t); fl.Q.value = q;
+  if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
   const v = Math.max(.0011, vol * sfxVol()); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  s.connect(fl).connect(g).connect(AC.destination); s.start(t); s.stop(t + dur);
+  s.connect(fl).connect(g).connect((sfxBus(), CRUNCH)); s.start(t); s.stop(t + dur + .02);
 }
+// impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
+const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 function sfx(n) {
   if (!AC || (typeof OPT !== 'undefined' && OPT.sfx === 0)) return;
   try {
     switch (n) {
-      case 'whoosh': noise(.08, .22, 1800); break;
-      case 'hit': noise(.14, .6, 700); tone('square', 170, 50, .14, .22); break;
-      case 'heavy': noise(.22, .75, 480); tone('square', 120, 40, .22, .3); break;
-      case 'block': noise(.06, .35, 3200); tone('square', 620, 300, .05, .1); break;
-      case 'fb': tone('sawtooth', 540, 130, .38, .16); noise(.32, .22, 1100); break;
-      case 'upper': tone('square', 220, 900, .25, .14); break;
-      case 'ko': tone('sawtooth', 320, 45, 1.3, .25); noise(.9, .3, 380); break;
-      case 'thud': noise(.18, .45, 180); break;
-      case 'crash': noise(.25, .5, 2600); noise(.12, .4, 900); tone('triangle', 1400, 500, .12, .1); break;
-      case 'beep': tone('square', 880, 880, .1, .12); break;
-      case 'go': tone('square', 660, 1320, .3, .16); break;
-      case 'select': tone('square', 440, 880, .08, .1); break;
-      case 'parry': tone('square', 1200, 2200, .12, .14); noise(.08, .3, 4200); break;
+      case 'whoosh': noise(.13, .4, 500, 'bandpass', 2600, 1.4); break;   // fouetté qui siffle vers l'aigu
+      case 'hit': smack(2400, .8, 190, 60, .12, .9); break;                 // coup léger : « pak »
+      case 'heavy': smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); break;   // gros coup : « BAM »
+      case 'block': tone('square', 1100, 700, .045, .35); noise(.06, .6, 3800, 'bandpass', 0, 2); tone('triangle', 320, 160, .07, .4); break;   // garde : « tchk »
+      case 'fb': tone('sawtooth', 300, 90, .45, .3); tone('square', 600, 140, .3, .14); noise(.45, .45, 1400, 'bandpass', 300, .8); break;   // projectile : souffle d'énergie
+      case 'upper': noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); break;
+      case 'ko': tone('sine', 140, 28, 1.2, 1); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
+      case 'thud': tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); break;   // chute au sol
+      case 'crash': noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
+      case 'beep': tone('square', 1320, 1320, .035, .16); tone('square', 1980, 1980, .03, .1, .035); break;   // déplacement du curseur : « tic »
+      case 'go': tone('square', 660, 1320, .3, .2); break;
+      case 'select': {   // validation : arpège très rapide vers l'aigu avec écho (style Street Fighter)
+        sfxBus(); const N = [523, 659, 784, 1047, 1319, 1568, 2093];
+        N.forEach((fq, i) => { const g = tone('square', fq, fq, .07, .32, i * .028, CRUNCH); g.connect(ECHO); });
+        tone('triangle', 2093, 2093, .25, .2, N.length * .028);
+        break;
+      }
+      case 'parry': tone('square', 1800, 1800, .09, .22); tone('triangle', 2700, 2600, .35, .25); noise(.08, .5, 5000, 'highpass'); break;   // « ting » métallique
     }
   } catch (e) {}
 }
@@ -2205,12 +2228,21 @@ function updThrow(f) {
 }
 /* ---------- Objets du décor : chaise et vases (cassables, lançables avec X) ---------- */
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
-const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38] };
+const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38], lantern: [18, 36], sake: [14, 20], barrel: [20, 26], candle: [16, 38], drum: [20, 30], brazier: [20, 30], stool: [20, 22], bucket: [16, 14], canister: [16, 32], hazard: [20, 28] };
 function makeProps() {
   const X = f => Math.round(SW * f);
-  const list = URBAN.includes(G.stage)
-    ? [['trash', X(.05), 0], ['bottle', X(.12), 0], ['cone', X(.2), 0], ['bottle', X(.8), 0], ['cone', X(.88), 0], ['trash', X(.95), 0]]
-    : [['crate', X(.05), 0], ['vase', X(.12), 0], ['chair', X(.2), 0], ['pot', X(.8), 0], ['tallvase', X(.88), 1], ['crate', X(.95), 0]];
+  const SET = {   // objets adaptés au thème de chaque décor
+    dojo:    [['crate', 0], ['vase', 0], ['chair', 0], ['pot', 0], ['tallvase', 1], ['crate', 0]],
+    city:    [['trash', 0], ['bottle', 0], ['cone', 0], ['bottle', 0], ['cone', 0], ['trash', 0]],
+    temple:  [['lantern', 0], ['sake', 0], ['tallvase', 2], ['sake', 1], ['pot', 0], ['lantern', 0]],
+    hall:    [['barrel', 0], ['candle', 0], ['chair', 0], ['tallvase', 1], ['candle', 0], ['barrel', 0]],
+    terrace: [['drum', 0], ['brazier', 0], ['crate', 0], ['drum', 0], ['brazier', 0], ['drum', 0]],
+    alley:   [['trash', 0], ['bottle', 0], ['crate', 0], ['cone', 0], ['bottle', 0], ['trash', 0]],
+    ring:    [['bucket', 0], ['stool', 0], ['bottle', 0], ['bottle', 0], ['stool', 0], ['bucket', 0]],
+    lab:     [['hazard', 0], ['canister', 0], ['canister', 1], ['hazard', 0], ['canister', 0], ['hazard', 0]],
+  }[G.stage] || [];
+  const XS = [.05, .12, .2, .8, .88, .95];
+  const list = SET.map(([t, v], i) => [t, X(XS[i]), v]);
   return list
     .map(([type, x, v]) => ({ type, x, y: GROUND, v, alive: true, held: null, fly: null }));
 }
@@ -2235,7 +2267,10 @@ function aimProp(p, owner, target) {
 function breakProp(p, x = p.x, y = p.y - 10) {
   if (!p.alive) return;
   p.alive = false; p.held = null; p.fly = null;
-  const cols = p.type === 'bottle' ? ['#2a7a2a', '#5ac85a', '#1a4a1a', '#c8f0c8'] : p.type === 'cone' ? ['#ff6a1a', '#ffffff', '#c84a0a'] : p.type === 'trash' ? ['#7a7a88', '#a8a8b8', '#4a4a56', '#3a6a2a'] : p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v];
+  const EXTRA = { lantern: ['#5a5e56', '#8a8e84', '#3a3e38', '#6a7a4a'], sake: ['#e8e0d0', '#2a2a30', '#b8b0a0', '#7a1a14'], barrel: ['#6a4020', '#8a5a30', '#3a2010', '#5a5a64'], candle: ['#24242c', '#4a4a56', '#f0e0b0', '#ffb040'],
+    drum: ['#6a2a10', '#9a4a1a', '#3a1a0a', '#4a4a50'], brazier: ['#2a2a30', '#4a4a56', '#ff8a2a', '#ffd040'], stool: ['#2a2a30', '#5a5a64', '#a82a1a', '#1a1a20'], bucket: ['#7a7a88', '#a8a8b8', '#4a8ad0', '#c8e8ff'],
+    canister: ['#a8b8c0', '#4a5a64', '#3aff8a', '#c8ffd8'], hazard: ['#d8b81a', '#1a1a20', '#a88a10', '#5a5a64'] };
+  const cols = EXTRA[p.type] || (p.type === 'bottle' ? ['#2a7a2a', '#5ac85a', '#1a4a1a', '#c8f0c8'] : p.type === 'cone' ? ['#ff6a1a', '#ffffff', '#c84a0a'] : p.type === 'trash' ? ['#7a7a88', '#a8a8b8', '#4a4a56', '#3a6a2a'] : p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v]);
   for (let i = 0; i < 14; i++) G.shards.push({ x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 10,
     vx: (Math.random() - .5) * 5, vy: -1.5 - Math.random() * 3.5, col: cols[i % cols.length], s: 1 + (Math.random() * 3 | 0), t: 0 });
   sfx('crash'); G.shake = Math.max(G.shake, 2);
@@ -2305,6 +2340,14 @@ const PP = {
   glass: ['#062a0a', '#0e4a16', '#1e7a28', '#3aa848', '#c8f4c8'],
   cone:  ['#5a1a04', '#a8380a', '#e85a14', '#ff8a3a', '#ffd0a0'],
   metal: ['#24242c', '#4a4a56', '#7a7a88', '#a8a8b8', '#e0e0ec'],
+  stone: ['#24281e', '#40463a', '#62695a', '#858c7a', '#b0b6a2'],
+  moss:  ['#142a0e', '#24461a', '#3a6a26', '#5a8a3a', '#8ab85a'],
+  iron:  ['#0e0e12', '#1e1e24', '#34343e', '#50505c', '#80808e'],
+  rust:  ['#2a0e04', '#5a220a', '#8a3a14', '#b05a24', '#d88a4a'],
+  porc:  ['#7a7468', '#b0a898', '#ddd6c6', '#f2ece0', '#ffffff'],
+  red2:  ['#3a0606', '#6a0e0c', '#a01c16', '#d0402a', '#f0806a'],
+  yel:   ['#4a3a04', '#8a6a0a', '#c8a014', '#e8c83a', '#fff08a'],
+  lab:   ['#2a3038', '#4a5662', '#7a8a96', '#a8b8c4', '#e0ecf4'],
 };
 function drawProp(p, x, y) {
   const F = (px, py, w, h, c) => R(x + px, y + py, w, h, c);
@@ -2381,6 +2424,72 @@ function drawProp(p, x, y) {
     F(-4, -36, 9, 2, P[2]); F(-4, -36, 9, 1, P[4]); F(-4, -35, 1, 1, P[0]); F(4, -35, 1, 1, P[0]);   // poignée
     F(-9, -38, 5, 5, '#2a5a1a'); F(-8, -38, 2, 2, '#4a8a2a'); F(-9, -34, 5, 1, '#123a0a');       // sac poubelle qui dépasse
     F(-12, -1, 25, 1, P[0]);
+  } else if (T === 'lantern') {   // lanterne de pierre japonaise (tōrō) avec mousse
+    const S = PP.stone, M = PP.moss;
+    F(-8, -5, 16, 5, S[2]); F(-8, -5, 16, 1, S[3]); F(-8, -1, 16, 1, S[0]); F(7, -5, 1, 5, S[1]);      // socle
+    for (let r = 0; r < 12; r++) cylRow(-17 + r, 2, S);                                                 // pilier
+    F(-6, -21, 12, 4, S[2]); F(-6, -21, 12, 1, S[3]); F(5, -21, 1, 4, S[1]);                             // plateau
+    F(-5, -28, 10, 7, S[1]); F(-3, -27, 6, 5, (G.frame >> 3) % 2 ? '#ffc860' : '#ffb040'); F(-2, -26, 4, 3, '#fff0b0');   // foyer allumé
+    F(-5, -28, 2, 7, S[2]); F(3, -28, 2, 7, S[0]);
+    for (let r = 0; r < 5; r++) { const hw = Math.round(3 + r * 1.6); F(-hw, -33 + r, hw * 2, 1, r < 2 ? S[3] : S[2]); }   // toit
+    F(-9, -29, 18, 1, S[0]); F(-1, -36, 2, 3, S[3]); F(-2, -34, 4, 1, S[2]);
+    F(-8, -31, 5, 1, M[3]); F(4, -30, 4, 1, M[2]); F(-7, -4, 4, 1, M[3]); F(3, -3, 3, 1, M[2]);           // mousse
+  } else if (T === 'sake') {   // jarre à saké en porcelaine
+    const P = PP.porc;
+    for (let r = 0; r < 18; r++) { const t = r / 18, w = t < .12 ? 2 : Math.round(2 + Math.sin((t - .12) / .88 * Math.PI) * 5); cylRow(-18 + r, w, P); }
+    F(-2, -20, 5, 2, '#7a1a14'); F(-2, -20, 5, 1, '#b8261c');                                             // bouchon rouge
+    F(-3, -11, 7, 6, '#f4ecd8'); F(-2, -10, 1, 4, '#1a1a20'); F(0, -10, 2, 1, '#1a1a20'); F(1, -8, 1, 3, '#1a1a20');   // étiquette calligraphiée
+    F(-5, -1, 11, 1, P[0]);
+  } else if (T === 'barrel') {   // tonneau de chêne cerclé de fer
+    const P = PP.wood, I = PP.iron;
+    for (let r = 0; r < 26; r++) { const t = r / 26, w = Math.round(8 + Math.sin(t * Math.PI) * 2); cylRow(-26 + r, w, P); }
+    for (const yy of [-23, -14, -4]) { for (let px = -10; px <= 10; px++) F(px, yy, 1, 2, Math.abs(px) > 8 ? I[1] : px < -3 ? I[4] : I[2]); }
+    for (const xx of [-5, 0, 5]) for (let r = 0; r < 24; r++) F(xx, -25 + r, 1, 1, P[1]);
+    F(-8, -27, 17, 2, P[3]); F(-6, -27, 13, 1, P[4]); F(-9, -1, 19, 1, P[0]);
+  } else if (T === 'candle') {   // chandelier de fer forgé à trois bougies
+    const I = PP.iron;
+    F(-7, -3, 14, 3, I[2]); F(-7, -3, 14, 1, I[3]); F(-5, -5, 10, 2, I[1]);                              // pied
+    F(-1, -30, 2, 26, I[2]); F(-1, -30, 1, 26, I[4]);                                                    // tige
+    F(-8, -30, 16, 2, I[2]); F(-8, -30, 16, 1, I[3]);                                                    // bras
+    for (const xx of [-7, -1, 5]) {
+      F(xx, -33, 2, 3, I[3]); F(xx, -37, 2, 4, '#f0e4c0'); F(xx, -37, 1, 4, '#fff8e0');                  // bougies
+      const fl = (G.frame + xx * 7) % 12 < 6; F(xx, fl ? -40 : -39, 2, fl ? 3 : 2, '#ffb040'); F(xx, -39, 1, 1, '#fff0a0');   // flammes vacillantes
+    }
+  } else if (T === 'drum') {   // baril de pétrole rouillé
+    const P = PP.rust;
+    for (let r = 0; r < 30; r++) cylRow(-30 + r, 9, P);
+    for (const yy of [-27, -19, -10, -3]) for (let px = -9; px <= 9; px++) F(px, yy, 1, 1, Math.abs(px) === 9 ? P[0] : P[1]);
+    F(-9, -31, 19, 2, P[3]); F(-6, -31, 12, 1, '#1a0a04'); F(3, -31, 2, 1, P[4]);
+    F(-4, -22, 4, 3, '#3a1a0a'); F(2, -14, 3, 2, '#3a1a0a'); F(-6, -8, 2, 2, P[4]);                        // taches de rouille
+  } else if (T === 'brazier') {   // brasero de fer avec flammes
+    const I = PP.iron;
+    F(-7, -2, 3, 2, I[2]); F(4, -2, 3, 2, I[2]); F(-5, -14, 2, 12, I[1]); F(3, -14, 2, 12, I[1]); F(-1, -14, 2, 12, I[2]);   // pieds
+    for (let r = 0; r < 7; r++) cylRow(-20 + r, 9 - Math.round(r * .6), I);                              // coupe
+    F(-9, -21, 19, 1, I[3]);
+    for (let k = 0; k < 9; k++) { const fx = -7 + k * 1.8, h = 4 + ((G.frame * 3 + k * 37) % 9); F(Math.round(fx), -21 - h, 2, h, k % 2 ? '#ff6a1a' : '#ffa030'); F(Math.round(fx), -21 - h, 1, 2, '#ffe080'); }
+  } else if (T === 'stool') {   // tabouret de coin de ring
+    const I = PP.iron, Rd = PP.red2;
+    F(-9, -22, 18, 4, Rd[2]); F(-9, -22, 18, 1, Rd[4]); F(-9, -19, 18, 1, Rd[0]);                        // assise en vinyle rouge
+    F(-8, -18, 2, 18, I[3]); F(6, -18, 2, 18, I[1]); F(-4, -18, 2, 16, I[2]); F(2, -18, 2, 16, I[1]);   // pieds
+    F(-7, -8, 14, 1, I[2]); F(-9, -1, 18, 1, I[0]);
+  } else if (T === 'bucket') {   // seau d'eau du soigneur
+    const P = PP.metal;
+    for (let r = 0; r < 12; r++) cylRow(-12 + r, 7 - Math.round(r / 6), P);
+    F(-6, -13, 13, 2, '#3a7ac0'); F(-4, -13, 6, 1, '#a8d8ff');                                          // eau
+    for (let i = 0; i <= 10; i++) F(-6 + i + (i > 5 ? 1 : 0), -16 + Math.abs(i - 5) * .5, 1, 1, P[3]);  // anse
+    F(-6, -1, 13, 1, P[0]);
+  } else if (T === 'canister') {   // tube de laboratoire au liquide luminescent
+    const L = PP.lab, liq = p.v ? ['#3a0a5a', '#7a2ad0', '#b06aff', '#e0c0ff'] : ['#0a4a2a', '#1aa858', '#3aff8a', '#c8ffd8'];
+    F(-7, -4, 14, 4, L[1]); F(-7, -4, 14, 1, L[3]); F(-7, -32, 14, 4, L[1]); F(-7, -32, 14, 1, L[4]);   // culots métalliques
+    for (let r = 0; r < 24; r++) { const yy = -28 + r, lvl = r > 5; for (let px = -6; px <= 6; px++) F(px, yy, 1, 1, Math.abs(px) === 6 ? L[2] : !lvl ? 'rgba(200,230,240,.25)' : px < -3 ? liq[3] : px < 2 ? liq[2] : liq[1]); }
+    for (let b = 0; b < 3; b++) { const by = -6 - ((G.frame + b * 13) % 20); F(-2 + b * 2, by, 1, 1, '#ffffff'); }   // bulles
+    F(-5, -27, 1, 20, 'rgba(255,255,255,.5)');
+  } else if (T === 'hazard') {   // fût de produit toxique (biohazard)
+    const P = PP.yel;
+    for (let r = 0; r < 28; r++) cylRow(-28 + r, 9, P);
+    for (const yy of [-25, -3]) for (let px = -9; px <= 9; px++) F(px, yy, 1, 1, P[0]);
+    F(-4, -18, 9, 9, '#1a1a20'); F(-1, -17, 3, 3, P[3]); F(-3, -13, 2, 2, P[3]); F(2, -13, 2, 2, P[3]); F(0, -14, 1, 1, '#1a1a20');   // symbole
+    F(-9, -29, 19, 2, P[3]); F(-9, -29, 19, 1, P[4]);
   } else {
     const pal = [PP.blue, PP.red, PP.green][p.v] || PP.blue, tall = T === 'tallvase', h = tall ? 30 : 22;
     for (let r = 0; r < h; r++) {
@@ -4121,16 +4230,16 @@ function drawStageSelect() {
   text('SELECT STAGE', CX, 14, 8, '#ffd23a', 'center');
   const COLS = 4, gap = 8, cw = Math.floor(Math.min(104, (W - 24 - gap * (COLS - 1)) / COLS)), ch = Math.round(cw * 9 / 16), x0 = Math.round(CX - (COLS * cw + (COLS - 1) * gap) / 2);
   STAGES.forEach(([id, name], i) => {
-    const x = x0 + (i % COLS) * (cw + gap), y = 36 + Math.floor(i / COLS) * (ch + 30), on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
+    const x = x0 + (i % COLS) * (cw + gap), y = 34 + Math.floor(i / COLS) * (ch + 12), on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
     popIn(ent(i, 2, 9), x + cw / 2, y + ch / 2, () => {
     R(x - 3, y - 3, cw + 6, ch + 6, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
     R(x - 1, y - 1, cw + 2, ch + 2, '#000');
     const bg = BGS[id];
     if (bg) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bg, (bg.width - bg.height * 16 / 9) / 2, 0, bg.height * 16 / 9, bg.height, x, y, cw, ch); ctx.restore(); }
     if (!on) R(x, y, cw, ch, 'rgba(0,0,0,.45)');
-    text(name, x + cw / 2, y + ch + 10, 8, on ? '#ffffff' : '#9a8aa0', 'center');
     });
   });
+  { const nm = STAGES[G.scur || 0][1], k = Math.min(1, (G.st || 0) / 1); text(nm, CX, 178, 16, '#ffd23a', 'center'); }   // seul le nom du stage sélectionné
   text(isTouch ? '< >: CHOOSE   A: FIGHT   B: BACK' : '< >: CHOOSE   ENTER: FIGHT   ESC: BACK', CX, 200, 8, '#d8c8a8', 'center');
 }
 
@@ -4216,5 +4325,5 @@ if (document.fonts && document.fonts.load) {
 } else go();
 
 // Accès debug pour les tests
-window.__SF = G; window.__NET = NET; window.__BGM = BGM; window.__bgmGain = () => bgmGain; window.__mkqr = () => makeQRs(); window.__start = (a, b, s) => startMatch(a, b, s); window.__spr = (f, skip) => { const keep = ctx; window.__skip = skip; drawFighter(f, -999, -999); window.__skip = null; return SPR.toDataURL(); };
+window.__SF = G; window.__sfx = n => { initAudio(); sfx(n); }; window.__NET = NET; window.__BGM = BGM; window.__bgmGain = () => bgmGain; window.__mkqr = () => makeQRs(); window.__start = (a, b, s) => startMatch(a, b, s); window.__spr = (f, skip) => { const keep = ctx; window.__skip = skip; drawFighter(f, -999, -999); window.__skip = null; return SPR.toDataURL(); };
 })();
