@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v96';
+const VERSION = 'v97';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1642,7 +1642,7 @@ function poseOf(f) {
     case 'hover': return 'tuck';
     case 'flask': return f.t < 8 ? 'special0' : 'punch1';
     case 'sonic': return f.t < 5 ? 'fpunch0' : f.t < 16 ? 'fpunch1' : 'fpunch0';
-    case 'voidcast': return f.t < 9 ? 'special0' : 'special1';
+    case 'voidcast': return f.t < 7 ? 'fpunch0' : f.t < 26 ? 'fpunch1' : 'fpunch0';   // un seul bras tendu
     case 'airvoid': return f.t < 6 ? 'jump' : 'jpunch';
     case 'pteleport': return 'idle0';
     case 'tpstrike': return f.t < 3 ? 'fpunch0' : f.t < 14 ? 'fpunch1' : 'fpunch0';
@@ -1943,8 +1943,8 @@ function updFighter(f, o) {
       break;
     case 'voidcast':
       f.vx = 0;
-      if (f.t === 9) { G.voids.push({ owner: f, x: f.x + f.dir * 26, y: GROUND - 14, vx: f.dir * 5.6, vy: 0, dir: f.dir, t: 0, r: 9 }); sfx('fb'); }
-      if (f.t >= 28) setState(f, 'idle');
+      if (f.t === 9) { G.voids.push({ owner: f, x: f.x + f.dir * 40, y: f.y - 54, vx: f.dir * 2.3, vy: 0, dir: f.dir, t: 0, r: 19, slow: true }); sfx('fb'); sfx('heavy'); }
+      if (f.t >= 30) setState(f, 'idle');
       break;
     case 'airvoid':
       f.vy = Math.min(f.vy, 0) - GRAV * .6;
@@ -2407,9 +2407,9 @@ function updVane() {
     const o = G.f.find(f => f !== q.owner);
     q.t++; q.x += q.vx; q.y += q.vy;
     if (q.vy > 0 && q.y >= GROUND - q.r - 2) { q.y = GROUND - q.r - 2; q.vy = 0; q.vx = q.dir * 6; }   // touche le sol puis glisse
-    if (q.x < (G.camL || 0) - 40 || q.x > (G.camL || 0) + W + 40) q.dead = true;
+    if (q.x < (G.camL || 0) - 60 || q.x > (G.camL || 0) + W + 60) q.dead = true;
     if (q.dead || !o) continue;
-    if (hurtbox(o) && Math.abs(o.x - q.x) < q.r + 8 && q.y > o.y - 84 && q.y < o.y + 4) {
+    if (hurtbox(o) && Math.abs(o.x - q.x) < q.r + 6 && q.y > o.y - 84 - (q.slow ? 10 : 0) && q.y < o.y + 4 + (q.slow ? 10 : 0)) {
       q.dead = true; applyHit(q.owner, o, q.big ? VOID_BIG : VOID_HIT, q.x, q.y, q.x - q.dir * 10, true);
       if (o.state === 'hit') { o.paraT = 54; addPopup(o.x, o.y - 100, 'PARALYZED!', '#c88aff'); }
     }
@@ -2426,13 +2426,19 @@ function drawVaneFx() {
     const R = q.r, x = q.x, y = q.y;
     const g = ctx.createRadialGradient(x, y, 1, x, y, R * 2.4); g.addColorStop(0, 'rgba(200,120,255,.7)'); g.addColorStop(.4, 'rgba(138,42,208,.5)'); g.addColorStop(1, 'rgba(40,10,74,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * 2.4, 0, Math.PI * 2); ctx.fill();
-    for (let b = 0; b < 4; b++) { const a = Math.random() * 6.28, L = [[x, y]]; for (let s2 = 1; s2 <= 3; s2++) L.push([x + Math.cos(a + (Math.random() - .5) * .6) * R * (.7 + s2 * .45), y + Math.sin(a + (Math.random() - .5) * .6) * R * (.7 + s2 * .45)]); elecArc(L, 'rgba(220,160,255,.9)', 1.2); }
+    if (q.slow) { const g2 = ctx.createRadialGradient(x, y, R, x, y, R * 3.4); g2.addColorStop(0, 'rgba(120,40,200,.45)'); g2.addColorStop(1, 'rgba(30,6,60,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(x, y, R * 3.4, 0, Math.PI * 2); ctx.fill(); }
+    for (let b = 0; b < (q.slow ? 9 : 4); b++) { const a = Math.random() * 6.28, L = [[x, y]]; for (let s2 = 1; s2 <= 3; s2++) L.push([x + Math.cos(a + (Math.random() - .5) * .6) * R * (.7 + s2 * .45), y + Math.sin(a + (Math.random() - .5) * .6) * R * (.7 + s2 * .45)]); elecArc(L, 'rgba(220,160,255,.9)', 1.2); }
     for (let k = 0; k < 3; k++) { ctx.strokeStyle = `rgba(200,140,255,${.8 - k * .2})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, R * (.5 + k * .25), q.t * .3 + k * 2, q.t * .3 + k * 2 + 3.6); ctx.stroke(); }
   }
   ctx.restore();
-  for (const q of G.voids || []) {   // cœur noir
+  for (const q of G.voids || []) {   // cœur noir et éclairs noirs
     ctx.fillStyle = '#0a0412'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * .62, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#6a2ab0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * .62, 0, Math.PI * 2); ctx.stroke();
+    if (q.slow) for (let b = 0; b < 4; b++) {   // éclairs noirs qui jaillissent du cœur
+      const a = Math.random() * 6.28, L = [[q.x, q.y]]; for (let s2 = 1; s2 <= 4; s2++) L.push([q.x + Math.cos(a + (Math.random() - .5) * .8) * q.r * (.5 + s2 * .4), q.y + Math.sin(a + (Math.random() - .5) * .8) * q.r * (.5 + s2 * .4)]);
+      elecArc(L, '#06020c', 2.2); elecArc(L, 'rgba(160,80,240,.8)', .8);
+    }
+    if (q.slow) { ctx.strokeStyle = 'rgba(220,170,255,.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (.85 + Math.sin(q.t * .3) * .05), 0, Math.PI * 2); ctx.stroke(); }
   }
   for (const s2 of G.shadowFx || []) {   // gerbe d'ombre de la téléportation
     const a = 1 - s2.t / 24;
@@ -3680,7 +3686,7 @@ const MOVES = [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'LORD VANE SPECIALS', lines: [
-    ['A', 'VOID FLARE'], ['', 'GROUND SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
+    ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
     ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'] ] },
   { title: 'KAEL SPECIALS', lines: [
     ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
