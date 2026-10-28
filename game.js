@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v127';
+const VERSION = 'v128';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3700,7 +3700,8 @@ function stepPause() {
 }
 /* ---------------- Musiques ---------------- */
 const BGM = new Audio(); BGM.loop = true; BGM.preload = 'auto';
-const MUSIC = { title: 'music/music_title.mp3', select: 'music/music_select.mp3', dojo: 'music/music_dojo.mp3', city: 'music/music_city.mp3' };
+const MUSIC = { title: 'music/music_title.mp3', select: 'music/music_select.mp3', dojo: 'music/music_dojo.mp3', city: 'music/music_city.mp3',
+  alley: 'music/back-halley.mp3', temple: 'music/misty-temple.mp3', hall: 'music/gargoyle-hall.mp3', lab: 'music/bio-lab.mp3', terrace: 'music/inferno-terrace.mp3' };
 let bgmKey = null, bgmUnlocked = false, bgmGain = null, bgmMul = 1;
 const MUSIC_MAX = .55;   // niveau maximal de la musique (les MP3 sont mixés fort)
 // Le volume d'un élément <audio> est ignoré sur iPhone/iPad : on fait passer la musique par Web Audio (GainNode)
@@ -3713,7 +3714,7 @@ function bgmRoute() {
 function musicWanted() {
   if (G.scene === 'title') return 'title';
   if (G.scene === 'select' || G.scene === 'stage' || G.scene === 'over') return 'select';
-  return G.stage === 'dojo' ? 'dojo' : 'city';   // nouveaux décors : musique de la ville en attendant
+  return MUSIC[G.stage] ? G.stage : 'city';   // musique propre à chaque décor (sinon celle de la ville)
 }
 function updateMusic() {
   const want = musicWanted();
