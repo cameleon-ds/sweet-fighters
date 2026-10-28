@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v120';
+const VERSION = 'v121';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1322,11 +1322,11 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'], wh4: ['wh4'], tele: ['tele1', 'tele2', 'tele3', 'tele4'], counter: ['ctr1', 'ctr2', 'ctr3', 'ctr4'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=120').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=121').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
@@ -1367,6 +1367,9 @@ function sfx(n) {
         break;
       }
       case 'charge': tone('sawtooth', 180, 260, .18, .12); break;   // sphère en charge
+      case 'swing4': if (!playSample('wh4', .8)) noise(.13, .4, 500, 'bandpass', 2600, 1.4); break;   // accroupi + Y
+      case 'tele': if (!playSample('tele', .9)) tone('square', 1200, 2200, .12, .14); break;   // téléportations
+      case 'counter': if (!playSample('counter', 1.1)) { tone('square', 1800, 1800, .09, .22); tone('triangle', 2700, 2600, .35, .25); } break;   // contre réussi
       case 'go': tone('square', 660, 1320, .3, .2); break;
       case 'select': {   // validation : arpège très rapide vers l'aigu avec écho (style Street Fighter)
         sfxBus(); const N = [784, 1175, 1568];   // tonique, quinte, octave
@@ -1802,7 +1805,7 @@ function updFighter(f, o) {
       if (take(c, 's')) {
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
-          if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('whoosh'); break; }
+          if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }
           if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
           break;
         }
@@ -1815,7 +1818,7 @@ function updFighter(f, o) {
         }
         if (f.def.kit === 'kael') {   // Kael : Uppercut Plasma / Esquive Éclair / Onde Sonique
           if (h.u) { setState(f, 'plasmawall'); f.vx = 0; break; }
-          if (back) { setState(f, 'flashstep'); f.invuln = 12; sfx('whoosh'); break; }
+          if (back) { setState(f, 'flashstep'); f.invuln = 12; sfx('tele'); break; }
           if (!G.sonics.some(q => q.owner === f)) { setState(f, 'sonic'); f.vx = 0; break; }
           break;
         }
@@ -1828,7 +1831,7 @@ function updFighter(f, o) {
         }
         if (f.def.kit === 'zephyr') {   // Zephyr : Tornade Ascendante / Cyclone Rétrograde / Lame de Fond
           if (h.u) { setState(f, 'tornado'); f.vx = 0; f.invuln = 10; break; }
-          if (back) { setState(f, 'sink'); f.vx = 0; f.invuln = 50; sfx('parry'); break; }   // passe sous terre et ressort derrière l'adversaire
+          if (back) { setState(f, 'sink'); f.vx = 0; f.invuln = 50; sfx('tele'); break; }   // passe sous terre et ressort derrière l'adversaire
           if (!G.blades.some(q => q.owner === f)) { setState(f, 'gust'); f.vx = 0; break; }
           break;
         }
@@ -1863,7 +1866,7 @@ function updFighter(f, o) {
       // Accroupi : coups bas, garde basse avec bas + arrière
       if (h.d) {
         f.vx = 0;
-        if (take(c, 'p')) { setState(f, 'rupper'); sfx('upper'); break; }   // accroupi + Y : uppercut montant (anti-aérien)
+        if (take(c, 'p')) { setState(f, 'rupper'); sfx('swing4'); break; }   // accroupi + Y : uppercut montant (anti-aérien)
         if (take(c, 'k')) { setState(f, 'ckick'); sfx('whoosh'); break; }
         const want = back && threatened(f, o) ? 'cblock' : 'crouch';
         if (f.state !== want) { setState(f, want); f.bstun = 0; }
@@ -2027,7 +2030,7 @@ function updFighter(f, o) {
     case 'sink': {   // s'enfonce dans le sol dans un éclair, puis ressort juste derrière l'adversaire
       f.vx = 0; f.invuln = Math.max(f.invuln, 2);
       if (f.t <= 20) f.sinkK = f.t / 20;
-      if (f.t === 21) { f.x = Math.max(18, Math.min(SW - 18, o.x + Math.sign(o.x - f.x || 1) * 34)); f.dir = o.x > f.x ? 1 : -1; sfx('parry'); G.flashT = Math.max(G.flashT, 3); }
+      if (f.t === 21) { f.x = Math.max(18, Math.min(SW - 18, o.x + Math.sign(o.x - f.x || 1) * 34)); f.dir = o.x > f.x ? 1 : -1; sfx('tele'); G.flashT = Math.max(G.flashT, 3); }
       if (f.t > 21) f.sinkK = Math.max(0, 1 - (f.t - 21) / 16);
       if (f.t >= 44) { f.sinkK = 0; setState(f, 'idle'); }
       break;
@@ -2060,8 +2063,8 @@ function updFighter(f, o) {
       break;
     case 'pteleport':   // recule d'un mètre en se désintégrant, puis se réintègre dans le dos de l'adversaire
       if (f.t < 14) { f.vx = -f.dir * 3.2; f.fadeK = f.t / 14; if (f.t % 2 === 0) vaneDust(f, false); }
-      if (f.t === 1) sfx('parry');
-      if (f.t === 14) { f.vx = 0; f.x = Math.max(18, Math.min(SW - 18, o.x - (o.dir || 1) * 76)); f.dir = o.x > f.x ? 1 : -1; sfx('parry'); }
+      if (f.t === 1) sfx('tele');
+      if (f.t === 14) { f.vx = 0; f.x = Math.max(18, Math.min(SW - 18, o.x - (o.dir || 1) * 76)); f.dir = o.x > f.x ? 1 : -1; sfx('tele'); }
       if (f.t >= 14) { f.vx = Math.abs(o.x - f.x) > 26 ? f.dir * 3.6 : 0; f.fadeK = Math.max(0, 1 - (f.t - 14) / 14); if (f.t % 2 === 0) vaneDust(f, true); }   // réapparaît en s'approchant de l'adversaire
       if (f.t >= 28) { f.vx = 0; f.fadeK = 0; setState(f, 'tpstrike'); sfx('whoosh'); }
       break;
@@ -3337,7 +3340,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   }
   // Contre réussi : l'attaquant est bloqué une demi-seconde
   if (def.state === 'parry' && def.t <= 12) {
-    G.freeze = 10; addSpark(sx, sy, 'parry'); sfx('parry');
+    G.freeze = 10; addSpark(sx, sy, 'parry'); sfx('counter');
     if (projectile) return;
     // l'adversaire passe au ralenti pendant une seconde, éclair + fond assombri
     att.hasHit = true; att.slowT = 60;
