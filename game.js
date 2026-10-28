@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v134';
+const VERSION = 'v135';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1326,7 +1326,7 @@ const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hi
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=132').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=135').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 const VOX = 1;   // hauteur des voix de l'annonceur (1 = voix d'origine)
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
