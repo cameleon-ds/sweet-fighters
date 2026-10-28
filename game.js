@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v99';
+const VERSION = 'v100';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1953,7 +1953,19 @@ function updFighter(f, o) {
       break;
     case 'voidcast':
       f.vx = 0;
-      if (f.t === 9) { G.voids.push({ owner: f, x: f.x + f.dir * 40, y: f.y - 54, vx: f.dir * 2.3, vy: 0, dir: f.dir, t: 0, r: 19, slow: true }); sfx('fb'); sfx('heavy'); }
+      if (f.t === 8) { G.voids.push({ owner: f, x: f.x + f.dir * 36, y: f.y - 54, vx: 0, vy: 0, dir: f.dir, t: 0, r: 10, slow: true, charging: true, ch: 0 }); sfx('fb'); }
+      if (f.t === 9) {   // maintenir A : la sphère grossit dans la main ; relâcher pour la lancer
+        const q = G.voids.find(v => v.owner === f && v.charging);
+        if (q) {
+          const held = f.ctl && f.ctl.held && f.ctl.held.s;
+          if (held && q.ch < 150) { q.ch++; f.t = 8; if (q.ch % 14 === 0) sfx('fb'); }
+          else {
+            const c = Math.min(1, q.ch / 90); q.charging = false; q.c = c; q.vx = f.dir * (3.2 - 2 * c);   // plus elle est grosse, plus elle est lente
+            q.hit = Object.assign({}, VOID_HIT, { dmg: Math.round(8 + 24 * c), push: .6 + c * 3, chip: 1 + Math.round(c * 5), knock: c > .75 });
+            G.shake = Math.max(G.shake, 2 + c * 6); sfx('heavy'); if (c > .5) sfx('fb');
+          }
+        }
+      }
       if (f.t >= 30) setState(f, 'idle');
       break;
     case 'airvoid':
@@ -2433,15 +2445,24 @@ function updVane() {
   }
   for (const q of G.voids || []) {
     const o = G.f.find(f => f !== q.owner);
-    q.t++; q.x += q.vx; q.y += q.vy;
+    q.t++;
+    if (q.charging) {   // sphère en charge, tenue devant Vane
+      const w = q.owner; if (w.state !== 'voidcast') { q.dead = true; continue; }
+      q.r = 10 + Math.min(1, q.ch / 90) * 28; q.x = w.x + w.dir * (26 + q.r * .9); q.y = w.y - 54 - floatOff(w) - Math.max(0, q.r - 24) * .6;
+      if (q.t % 2 === 0) for (let k = 0; k < 2; k++) { const a = Math.random() * 6.28, d = q.r * 2.4; G.vdust.push({ x: q.x + Math.cos(a) * d, y: q.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 11, vy: -Math.sin(a) * d / 11, t: 0, pink: Math.random() < .7 }); }
+      continue;
+    }
+    if (q.t % 2 === 0) { (q.trail = q.trail || []).push([q.x, q.y]); if (q.trail.length > 7) q.trail.shift(); }   // échos roses derrière la sphère
+    q.x += q.vx; q.y += q.vy;
     if (q.vy > 0 && q.y >= GROUND - q.r - 2) { q.y = GROUND - q.r - 2; q.vy = 0; q.vx = q.dir * 6; }   // touche le sol puis glisse
     if (q.x < (G.camL || 0) - 60 || q.x > (G.camL || 0) + W + 60) q.dead = true;
     if (q.dead || !o) continue;
-    if (hurtbox(o) && Math.abs(o.x - q.x) < q.r + 6 && q.y > o.y - 84 - (q.slow ? 10 : 0) && q.y < o.y + 4 + (q.slow ? 10 : 0)) {
-      q.dead = true; applyHit(q.owner, o, q.big ? VOID_BIG : VOID_HIT, q.x, q.y, q.x - q.dir * 10, true);
-      if (o.state === 'hit') { o.paraT = 54; addPopup(o.x, o.y - 100, 'PARALYZED!', '#c88aff'); }
+    if (hurtbox(o) && Math.abs(o.x - q.x) < q.r + 6 && q.y + q.r * .8 > o.y - 94 && q.y - q.r * .8 < o.y + 4) {
+      q.dead = true; applyHit(q.owner, o, q.big ? VOID_BIG : (q.hit || VOID_HIT), q.x, q.y, q.x - q.dir * 10, true);
+      if (q.c > .5) G.shake = Math.max(G.shake, 4 + q.c * 6);
+      if (o.state === 'hit' || o.state === 'fall') { o.paraT = 54 + Math.round((q.c || 0) * 30); addPopup(o.x, o.y - 100, 'PARALYZED!', '#c88aff'); }
     }
-    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== q.owner && Math.abs(fb.x - q.x) < 20 && Math.abs(fb.y - q.y) < 30) { fb.alive = false; if (!q.big) q.dead = true; addSpark(q.x, q.y, 'parry'); }
+    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== q.owner && Math.abs(fb.x - q.x) < 20 && Math.abs(fb.y - q.y) < 30) { fb.alive = false; if (!q.big && !(q.c > .5)) q.dead = true; addSpark(q.x, q.y, 'parry'); }
   }
   if (G.voids) G.voids = G.voids.filter(q => !q.dead);
   for (const s2 of G.shadowFx || []) s2.t++;
@@ -2490,9 +2511,17 @@ function drawVaneFx() {
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y - 40, 46, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
   }
+  for (const q of G.voids || []) (q.trail || []).forEach(([tx, ty], i, A) => {   // échos rose et noir derrière la sphère
+    const a = (i + 1) / (A.length + 1); let R = q.r * (.55 + .45 * a);
+    ctx.save();
+    if (i % 2) { ctx.globalAlpha = .4 * a; ctx.fillStyle = '#0a0014'; }
+    else { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(tx, ty, 1, tx, ty, R * 1.5); g.addColorStop(0, `rgba(255,90,220,${.55 * a})`); g.addColorStop(1, 'rgba(120,0,120,0)'); ctx.fillStyle = g; R *= 1.5; }
+    ctx.beginPath(); ctx.arc(tx, ty, i % 2 ? R * .8 : R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  });
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const q of G.voids || []) {   // sphère d'énergie noire crépitante
-    const R = q.r, x = q.x, y = q.y;
+    const R = q.r, x = q.x, y = q.y, pc = q.charging ? Math.min(1, q.ch / 90) : (q.c || 0);
+    if (pc > 0) { const gp = ctx.createRadialGradient(x, y, R * .4, x, y, R * (2.6 + pc)); gp.addColorStop(0, `rgba(255,80,220,${.25 + .25 * pc})`); gp.addColorStop(.5, `rgba(220,40,200,${.12 + .15 * pc})`); gp.addColorStop(1, 'rgba(60,0,60,0)'); ctx.fillStyle = gp; ctx.beginPath(); ctx.arc(x, y, R * (2.6 + pc), 0, Math.PI * 2); ctx.fill(); }   // glow rose qui grandit avec la charge
     const g = ctx.createRadialGradient(x, y, 1, x, y, R * 2.4); g.addColorStop(0, 'rgba(200,120,255,.7)'); g.addColorStop(.4, 'rgba(138,42,208,.5)'); g.addColorStop(1, 'rgba(40,10,74,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * 2.4, 0, Math.PI * 2); ctx.fill();
     if (q.slow) { const g2 = ctx.createRadialGradient(x, y, R, x, y, R * 3.4); g2.addColorStop(0, 'rgba(120,40,200,.45)'); g2.addColorStop(1, 'rgba(30,6,60,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(x, y, R * 3.4, 0, Math.PI * 2); ctx.fill(); }
