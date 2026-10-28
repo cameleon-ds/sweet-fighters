@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v115';
+const VERSION = 'v116';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1322,11 +1322,11 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'] };   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=112').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=116').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
@@ -1341,7 +1341,8 @@ function sfx(n) {
   if (!AC || (typeof OPT !== 'undefined' && OPT.sfx === 0)) return;
   try {
     switch (n) {
-      case 'whoosh': noise(.13, .4, 500, 'bandpass', 2600, 1.4); break;   // fouetté qui siffle vers l'aigu
+      case 'whoosh': if (!playSample('swing', .8)) noise(.13, .4, 500, 'bandpass', 2600, 1.4); break;   // coup donné dans l'air
+      case 'jump': if (!playSample('jump', .55, .9)) noise(.18, .3, 400, 'bandpass', 1600, 1.2); break;   // saut   // fouetté qui siffle vers l'aigu
       case 'hit': if (!playSample('light', 1)) smack(2400, .8, 190, 60, .12, .9); break;                 // coup léger
       case 'heavy': if (!playSample('heavy', 1.1)) { smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); } break;   // gros coup
       case 'block': tone('square', 1100, 700, .045, .35); noise(.06, .6, 3800, 'bandpass', 0, 2); tone('triangle', 320, 160, .07, .4); break;   // garde : « tchk »
@@ -1843,7 +1844,7 @@ function updFighter(f, o) {
         f.jumpQ = (f.jumpQ || 0) + 1;
         if (f.jumpQ >= 4) {
           f.jumpQ = 0;
-          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = fwd ? 1 : back ? -1 : 0;
+          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = fwd ? 1 : back ? -1 : 0; sfx('jump');
           f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir; break;
         }
       } else f.jumpQ = 0;
