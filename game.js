@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v101';
+const VERSION = 'v103';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -367,6 +367,20 @@ const HEAD_VANE = [   // crâne d'extraterrestre chauve, grands yeux noirs, ment
   "..eSsss...",
   "...eSSe...",
 ];
+const HEAD_GROG2 = [   // tête de Lord Vane : crâne gris, visage vert délavé, yeux noirs à pupille rouge, barbe mauve
+  "..aaaaaa..",
+  ".aHHHLLHa.",
+  "aHHHHHLLHa",
+  "ahHHHHHHLa",
+  "eShhhhhhh.",
+  "eSSSkkskk.",
+  "eSSSkcskc.",
+  "ebSsssSsB.",
+  ".bBBSkSBb.",
+  "..bBnBBnb.",
+  "...bBnBb..",
+  "....bbb...",
+];
 const HEAD_KAEL = [   // tête de Kaito rasée sur les côtés (la crête est dessinée à part)
   "..eeeeee..",
   ".eSsslsse.",
@@ -483,19 +497,17 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG, headBack: HEAD_KAITO_BACK, vneck: true, minBelt: true, shoes: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG2, headBack: HEAD_GROG2, vneck: true, torn: true, softNeck: true, size: 1.1, traps: true, minBelt: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
-    skin:  ['#1e3424', '#3c6448', '#5a9068', '#82b890'],               // peau verte de mutant
-    eye:   '#ff2a1a',
-    hair:  { a: '#1c1e24', h: '#34373e', H: '#4c5058', L: '#9a9ea8' },   // cheveux gris comme le casque
-    bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],               // bandeau noir (comme Kaito)
-    top:   ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'],               // t-shirt noir (comme Kaito v2)
-    legs:  ['#1e2210', '#3a4220', '#525c2e', '#6a7640'],               // pantalon cargo kaki ample
-    belt:  ['#1e0e06', '#4a2414', '#6e3a1e', '#8a5230'],               // ceinture de cuir
-    armorP:['#2a2e36', '#5a6270', '#8c96a6', '#d4dce8'],
-    glove: ['#2a2e36', '#5a6270', '#9aa4b4', '#e4ecf6'],               // gants métallisés
-    shoe:  { hunt: true },                                              // baskets de John en noir et gris
-    fb: ['#ffffff', '#ffe0a0', '#ff8a2a', '#8a3a10'] },
+    skin:  ['#2c3a30', '#5a6e5e', '#80968a', '#a8bcaa'],               // vert délavé
+    eye:   '#ff2a1a',                                                   // pupille rouge dans l'œil noir
+    hair:  { a: '#24262c', h: '#4a4e56', H: '#6e737c', L: '#a4a8b0' },   // crâne gris
+    bandP: ['#2a2032', '#4a3c56', '#6a5a78', '#8e7e9c'],               // barbe mauve délavé
+    top:   ['#2c3a30', '#5a6e5e', '#80968a', '#a8bcaa'],               // torse nu
+    legs:  ['#141518', '#26282c', '#3a3d42', '#55585e'],               // pantalon gris foncé déchiré
+    belt:  ['#141518', '#26282c', '#26282c', '#3a3d42'],               // pas de ceinture : simple taille du pantalon
+    glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],               // gants noirs
+    fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
   { name: 'ZEPHYR', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, kasa: true, tornTop: true, softNeck: true, flaps: true, sword: true, shoes: true, kit: 'zephyr',
     skin:  ['#6a3c24', '#b07650', '#e0aa80', '#fcd4b0'],
     hair:  { a: '#4a5262', h: '#8a92a4', H: '#c4ccda', L: '#ffffff' },   // cheveux argentés
@@ -977,16 +989,16 @@ function drawFighter(f, x = f.x, y = f.y) {
       for (let t = 0; t <= 1; t += .1) { const q = mix(add(sh, fwd, 4.5), add(at(.6), fwd, -1), t); sR(q[0], q[1], 1, 1, top[0]); }
     }
   }
-  if (d.muscles && !backView && !fullBack) {   // Grog : trapèzes, deltoïdes ronds, pectoraux détaillés
+  if ((d.muscles || d.traps) && !backView && !fullBack) {   // Grog : trapèzes, deltoïdes ronds, pectoraux détaillés
     const S0 = sk[0], S1 = sk[1], S2 = sk[2], S3 = sk[3];
     // trapèzes : pente musclée du cou vers les épaules
-    const nk = add(n, [0, -3]);   // trapèzes énormes qui montent jusqu'au bas du crâne
+    const nk = add(n, [0, -5]);   // trapèzes énormes qui montent jusqu'au bas du crâne
     sPoly([add(nk, fwd, -3.5), add(nk, fwd, 4), add(sh, fwd, 8), add(at(.08), fwd, 6), add(at(.08), fwd, -6), add(sh, fwd, -7.5)], S1);
     sPoly([add(nk, fwd, -2.5), add(nk, fwd, 3), add(sh, fwd, 7), add(at(.05), fwd, 4.5), add(at(.05), fwd, -4.5), add(sh, fwd, -6.5)], S1);
     sPoly([add(nk, fwd, -1.5), add(nk, fwd, 2.5), add(sh, fwd, 5.5), add(at(.02), fwd, 3), add(at(.02), fwd, -3), add(sh, fwd, -5)], S2);
     const tr = add(nk, fwd, 2.5); sR(tr[0], tr[1] + 2, 2, 1, S3); sR(tr[0] + dir * 2, tr[1] + 3, 2, 1, S3); sR(tr[0] + dir * 3, tr[1] + 4, 2, 1, S3);
     const tl = add(nk, fwd, -2); sR(tl[0], tl[1] + 2, 1, 2, S3);
-    // pectoraux : deux grandes masses bombées qui occupent le haut du torse
+    if (d.muscles) {   // pectoraux : deux grandes masses bombées qui occupent le haut du torse
     sPoly([add(at(.03), fwd, 1), add(at(.03), fwd, 7), add(at(.2), fwd, 8), add(at(.38), fwd, 6.5), add(at(.46), fwd, 3.5), add(at(.46), fwd, 1)], S2);   // pectoral avant
     sPoly([add(at(.03), fwd, 0), add(at(.03), fwd, -5.5), add(at(.2), fwd, -6.5), add(at(.38), fwd, -5.5), add(at(.46), fwd, -2.5), add(at(.46), fwd, 0)], S2);   // pectoral arrière
     sPoly([add(at(.06), fwd, 2), add(at(.06), fwd, 6.5), add(at(.16), fwd, 7), add(at(.26), fwd, 5), add(at(.26), fwd, 2)], S3);        // reflet avant (grand)
@@ -996,6 +1008,7 @@ function drawFighter(f, x = f.x, y = f.y) {
       sR(q[0], q[1], 1, 2, S1);
     }
     for (let t = .04; t <= .46; t += .03) { const q = add(at(t), fwd, .5); sR(q[0], q[1], 1, 1, S1); }   // sillon entre les pectoraux
+    }
   }
   if (d.scars && !backView) {   // cicatrices en X sur le torse
     for (const [t, o] of [[.25, 3.5], [.55, -2]]) { const q = add(at(t), fwd, o); sR(q[0] - 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] - 1, 1, 1, '#7a3a2a'); sR(q[0], q[1], 1, 1, '#7a3a2a'); sR(q[0] - 1, q[1] + 1, 1, 1, '#7a3a2a'); sR(q[0] + 1, q[1] + 1, 1, 1, '#7a3a2a'); }
@@ -1573,13 +1586,14 @@ const ATK = {
   plunge:   { act: [0, 99], box: [-10, -34, 16, 6], high: true, dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.5, sfx: 'heavy' },
   tornado:  { act: [3, 26], box: [-24, -104, 30, -8], dmg: 13, knock: true, lift: 7.5, bstun: 16, push: 1.5, sfx: 'heavy' },
   gust:     { dur: 26, act: [7, 12], box: [10, -70, 46, -30], dmg: 6, stun: 14, bstun: 10, push: 1.6, sfx: 'hit' },
+  gpound:   { act: [7, 99], box: [-18, -40, 18, 4], high: true, dmg: 15, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   crushD:   { act: [0, 99], box: [-10, -46, 28, 4], high: true, dmg: 16, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   zenith:   { dur: 60, act: [4, 26], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1642,8 +1656,9 @@ function poseOf(f) {
     case 'quake': return f.t < 12 ? 'gq0' : 'gq1';
     case 'rampart': return 'rampart';
     case 'rburst': return 'rburst';
-    case 'crush': return f.t < 6 ? 'crouch' : 'crush0';
+    case 'crush': return f.t < 6 ? 'crouch' : 'tuck';
     case 'crushD': return 'crush0';
+    case 'gpound': return f.t < 7 ? 'tuck' : 'crush0';
     case 'crushLand': return 'gq1';
     case 'gust': return f.t < 6 ? 'special0' : f.t < 16 ? 'punch1' : 'punch0';
     case 'cyclone': return f.t < 4 ? 'crouch' : f.air ? 'tuck' : 'special1';
@@ -1683,6 +1698,7 @@ function poseOf(f) {
     case 'held': return 'fall';
     case 'throw':
       if (f.throwType === 'toss') return f.t >= 6 && f.t < 26 ? 'tuck' : 'throw0';
+      if (f.throwType === 'rocket') return f.t < 6 ? 'throw0' : f.t < 34 ? 'win' : f.t < 52 ? 'crush0' : 'gq1';
       return f.t < 6 ? 'throw0' : f.t < 22 ? 'throwT' : 'throwS';
   }
   return 'idle0';
@@ -1720,6 +1736,7 @@ function updFighter(f, o) {
       face(f, o);
       if (!live) { f.vx = 0; if (f.state !== 'idle') setState(f, 'idle'); break; }
       // 4e coup d'un enchaînement Y Y B / B B Y : A = frappe enflammée
+      if (f.def.kit === 'grog' && f.counterT > 0 && o.slowT > 0 && Math.abs(o.x - f.x) < 80 && take(c, 's')) { doThrow(f, o, 'rocket'); f.invuln = 90; addPopup(f.x, f.y - 120, 'ROCKET!', '#5ad0ff'); break; }   // contre + A : fusée électrique
       if (comboReady(f, o) && take(c, 's')) { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); break; }
       if (take(c, 's')) {
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
@@ -1757,7 +1774,7 @@ function updFighter(f, o) {
         if (f.def.kit === 'grog') {   // Grog : Écrasement Céleste / Rempart de Fer / Impact Sismique
           f.vx = 0;
           if (h.u) { setState(f, 'crush'); break; }
-          if (back) { setState(f, 'rampart'); sfx('block'); break; }
+          if (back) { setState(f, 'rampart'); f.rampT = 180; sfx('block'); sfx('parry'); break; }   // bras électrisés pendant 3 s
           if (!G.waves.some(w => w.owner === f && !w.small)) { setState(f, 'quake'); break; }
           break;
         }
@@ -1852,6 +1869,9 @@ function updFighter(f, o) {
         else if (f.def.kit === 'zephyr' && take(c, 's')) {   // Zephyr : arrêt en l'air puis plongeon sabre pointé vers le sol
           setState(f, 'hover'); f.airAtk = true; f.vx = 0; f.vy = 0; sfx('whoosh');
         }
+        else if (f.def.kit === 'grog' && take(c, 's')) {   // Grog : chute verticale comme un poids énorme
+          setState(f, 'gpound'); f.airAtk = true; f.vx = 0; f.vy = -1.2; sfx('whoosh');
+        }
         else if (f.def.kit === 'vesper' && take(c, 's')) {
           // Vesper : coup de pied plongeant en diagonale avec traînée néon
           setState(f, 'dive'); f.airAtk = true; f.trail = []; f.bounced = false; sfx('upper');
@@ -1902,7 +1922,7 @@ function updFighter(f, o) {
       }
       if (f.t >= f.stun) { setState(f, 'idle'); if (f.dizzy) { f.dizzy = false; f.dizzyEnd = G.frame; } }
       break;
-    case 'throw': f.vx = 0; updThrow(f); if (f.t >= 38) { f.rotAng = null; f.victim = null; setState(f, 'idle'); } break;
+    case 'throw': f.vx = 0; updThrow(f); if (f.t >= (f.throwType === 'rocket' ? 74 : 38)) { f.y = GROUND; f.rotAng = null; f.victim = null; setState(f, 'idle'); } break;
     case 'held': return;   // positionné par le lanceur
     case 'holo':
       f.vx = 0;
@@ -1922,16 +1942,19 @@ function updFighter(f, o) {
       if (f.t === 12) { G.waves.push({ owner: f, x: f.x + f.dir * 22, dir: f.dir, t: 0, life: 75 }); G.shake = Math.max(G.shake, 5); sfx('thud'); sfx('heavy'); }
       if (f.t >= 34) setState(f, 'idle');
       break;
-    case 'rampart': f.vx = 0; if (f.t >= 46) setState(f, 'idle'); break;
+    case 'rampart': f.vx = 0; if (f.t >= 18) setState(f, 'idle'); break;
     case 'rburst': f.vx = 0; if (f.t >= 22) setState(f, 'idle'); break;
     case 'crush':   // grand bond vertical, suit l'adversaire en montant
       if (f.t < 6) { f.vx = 0; break; }
       if (f.t === 6) { f.air = true; f.vy = -9.6; sfx('upper'); }
-      f.vx = Math.max(-2.4, Math.min(2.4, (o.x - f.x) / 26));
-      if (f.t > 8 && f.vy >= -.5) { setState(f, 'crushD'); f.vx = Math.max(-3.2, Math.min(3.2, (o.x - f.x) / 12)); sfx('whoosh'); }
+      f.vx = f.dir * .8; f.rotAng = f.dir * Math.min(1, (f.t - 6) / 24) * Math.PI * 2;   // roulade en l'air
+      if (f.t > 8 && f.vy >= -.5) { f.rotAng = null; setState(f, 'crushD'); f.vx = f.dir * 4.2; sfx('whoosh'); sfx('fb'); }
       break;
     case 'crushD':   // plongeon poings en avant
-      f.rotAng = f.dir * 2.7; f.vy = 8.5 - GRAV;
+      f.rotAng = f.dir * 2.3; f.vy = 6.2 - GRAV; f.vx = f.dir * 4.2;   // descente en diagonale électrique
+      break;
+    case 'gpound':
+      f.vx = 0; if (f.t < 7) f.vy = Math.min(f.vy, 0) - GRAV * .85; else f.vy = 10 - GRAV;
       break;
     case 'crushLand': f.vx = 0; if (f.t >= 20) setState(f, 'idle'); break;
     case 'gust':   // coup de sabre qui libère une lame d'air en croissant
@@ -2055,6 +2078,10 @@ function updFighter(f, o) {
         setState(f, 'land'); f.landT = 16; G.shake = Math.max(G.shake, 7); G.flashT = Math.max(G.flashT, 4); sfx('thud'); sfx('heavy');
         for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 8, dir: dd, t: 0, life: 200, speed: 5.5 });
       }
+      else if (f.state === 'gpound') {   // impact : onde de choc sur tout le sol, l'écran tremble
+        setState(f, 'crushLand'); G.shake = Math.max(G.shake, 18); G.flashT = Math.max(G.flashT, 5); G.quakeT = 40; sfx('thud'); sfx('heavy');
+        for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 200, speed: 6.5 });
+      }
       else if (f.state === 'crushD' || f.state === 'crush') {
         const hit = f.hasHit; f.rotAng = null; setState(f, 'crushLand'); G.shake = Math.max(G.shake, 8); sfx('thud'); sfx('heavy');
         for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 12, small: true, done: hit });
@@ -2082,7 +2109,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
+  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
   let [x0, y0, x1, y1] = a.box;
   if (f.def.float && VANE_NORMALS.includes(f.state)) { x0 += 26; x1 += 26; y0 -= floatOff(f); y1 -= floatOff(f); }   // c'est le double, plus loin devant, qui frappe
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
@@ -2132,6 +2159,23 @@ function updThrow(f) {
   const o = f.victim; if (!o) return;
   const d = f.dir, t = f.t, T0 = 6, T1 = 26;
   const k = Math.max(0, Math.min(1, (t - T0) / (T1 - T0)));
+  if (f.throwType === 'rocket') {   // s'envole très haut avec l'adversaire puis s'écrase comme une météorite
+    const top = 84;
+    if (t < 6) { o.x = f.x + d * 18; o.y = f.y; }
+    else if (t < 34) { const e = 1 - Math.pow(1 - (t - 6) / 28, 2); f.y = GROUND - (GROUND - top) * e; o.x = f.x + d * 4; o.y = f.y - 64; o.rotAng = d * Math.PI / 2; if (t === 6) { sfx('upper'); G.shake = Math.max(G.shake, 4); } }
+    else if (t < 40) { f.y = top; o.x = f.x + d * 4; o.y = f.y - 64 + (t - 34) * 4; o.rotAng = d * (Math.PI / 2 + (t - 34) / 6 * Math.PI); f.rotAng = d * (t - 34) / 6 * 2.3; }
+    else if (t < 52) { const k2 = (t - 40) / 12; f.y = top + (GROUND - top) * k2 * k2; f.rotAng = d * 2.3; o.x = f.x + d * 24; o.y = Math.min(GROUND, f.y + 6); o.rotAng = d * Math.PI * 1.5; if (t === 40) sfx('whoosh'); }
+    else if (t === 52) {
+      f.y = GROUND; f.rotAng = null; o.y = GROUND; o.rotAng = null;
+      setState(o, 'fall'); o.air = true; o.vx = d * 2.5; o.vy = -3.5;
+      o.hp = Math.max(0, o.hp - dmgK(24)); o.lagT = 40; o.flash = 4;
+      G.shake = 18; G.quakeT = 24; G.flashT = Math.max(G.flashT, 8); G.freeze = 6; sfx('thud'); sfx('heavy');
+      G.waves.push({ owner: f, x: f.x + d * 20, dir: d, t: 0, life: 22, small: true, ring: true, dome: true, done: true });
+      for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 18, small: true, done: true });
+    }
+    if (t > 52) f.victim = null;
+    return;
+  }
   if (f.throwType === 'toss') {
     // roulade arrière du lanceur
     f.rotAng = t >= T0 && t < T1 ? -d * k * Math.PI * 2 : null;
@@ -2467,7 +2511,7 @@ function updVane() {
   if (G.voids) G.voids = G.voids.filter(q => !q.dead);
   for (const s2 of G.shadowFx || []) s2.t++;
   if (G.shadowFx) G.shadowFx = G.shadowFx.filter(s2 => s2.t < 24);
-  for (const f of G.f) if (f.paraT > 0) f.paraT--;
+  for (const f of G.f) { if (f.paraT > 0) f.paraT--; if (f.rampT > 0) f.rampT--; }
 }
 function drawVaneBehind() {   // échos derrière Vane
   for (const f of G.f) {
@@ -2880,6 +2924,19 @@ function drawZephyrFx() {
   ctx.restore();
 }
 function updGrog() {
+  for (const g of G.f) {   // Rempart : renvoie les projectiles comme un miroir
+    if (g.def.kit !== 'grog' || !(g.state === 'rampart' || g.rampT > 0)) continue;
+    const mir = (q, vk) => { if (q.owner === g || q.dead || q.alive === false) return; const v = vk ? q[vk] : q.dir; if (Math.sign(v) !== Math.sign(g.x - q.x) || Math.abs(q.x - g.x) > 36) return;
+      if (q.owner && q.owner.fb === q) q.owner.fb = null;
+      q.owner = g; q.dir = -(q.dir || Math.sign(v)); if (vk) q[vk] = -q[vk]; if ('x0' in q) q.x0 = q.x; q.x = g.x + q.dir * 38; q.t = 0;
+      addSpark(q.x, q.y || g.y - 50, 'parry'); sfx('parry'); G.flashT = Math.max(G.flashT, 4); G.freeze = Math.max(G.freeze || 0, 4);
+      G.waves.push({ owner: g, x: g.x, dir: g.dir, t: 0, life: 12, small: true, ring: true, done: true });
+    };
+    for (const q of G.fbs || []) mir(q, 'vx');
+    for (const q of G.blades || []) mir(q, null);
+    for (const q of G.sonics || []) mir(q, null);
+    for (const q of G.voids || []) if (!q.charging) mir(q, 'vx');
+  }
   for (const w of G.waves || []) {
     const o = G.f.find(f => f !== w.owner);
     w.t++; if (!w.ring) w.x += w.dir * (w.speed || (w.small ? 3 : 4.2));
@@ -2898,9 +2955,53 @@ function elecArc(pts, col, w) {   // trait électrique en zigzag le long d'une s
   pts.forEach(([x, y], k) => { const jx = (Math.random() - .5) * 3, jy = (Math.random() - .5) * 3; k ? ctx.lineTo(x + jx, y + jy) : ctx.moveTo(x, y); });
   ctx.stroke();
 }
+function grogArm(f, i0, i1) {   // position monde d'un point de squelette
+  const P = POSES[poseOf(f)] || POSES.idle0, S = K * UP * (f.def.size || 1);
+  return [i0, i1].map(i => [f.x + f.dir * P[i * 2] * S, f.y + P[i * 2 + 1] * S]);
+}
 function drawGrogFx() {   // ondes électriques bleues de Grog
+  for (const f of G.f) {
+    if (f.def.kit !== 'grog') continue;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    if (f.rampT > 0 && !f.rotAng) {   // bras électrisés pendant le Rempart (3 s)
+      const fade = Math.min(1, f.rampT / 20);
+      for (const [a, b] of [[1, 3], [3, 4], [1, 5], [5, 6]]) {
+        const [p0, p1] = grogArm(f, a, b), L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([p0[0] + (p1[0] - p0[0]) * s2 / 4 + (Math.random() - .5) * 6, p0[1] + (p1[1] - p0[1]) * s2 / 4 + (Math.random() - .5) * 6]);
+        ctx.globalAlpha = fade; elecArc(L, 'rgba(20,120,255,.6)', 3.5); elecArc(L, 'rgba(168,244,255,.95)', 1.1);
+      }
+      for (const i of [4, 6]) { const [p] = grogArm(f, i, i), g = ctx.createRadialGradient(p[0], p[1], 1, p[0], p[1], 12); g.addColorStop(0, `rgba(168,244,255,${.7 * fade})`); g.addColorStop(1, 'rgba(20,88,196,0)'); ctx.fillStyle = g; ctx.fillRect(p[0] - 12, p[1] - 12, 24, 24); }
+    }
+    const air = (f.state === 'crush' && f.t >= 6) || f.state === 'crushD' || f.state === 'gpound' || (f.state === 'throw' && f.throwType === 'rocket' && f.t >= 6 && f.t < 53);
+    if (air) {   // glow et électricité autour du corps (roulade, plongeon, fusée)
+      const cx = f.x, cy = f.y - 40, g = ctx.createRadialGradient(cx, cy, 3, cx, cy, 60);
+      g.addColorStop(0, 'rgba(168,244,255,.55)'); g.addColorStop(.5, 'rgba(47,140,255,.3)'); g.addColorStop(1, 'rgba(20,60,196,0)');
+      ctx.fillStyle = g; ctx.fillRect(cx - 62, cy - 62, 124, 124);
+      for (let b = 0; b < 4; b++) { const a0 = Math.random() * 6.28, L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx + Math.cos(a0 + s2 * .5) * (14 + s2 * 6), cy + Math.sin(a0 + s2 * .5) * (18 + s2 * 6)]); elecArc(L, b % 2 ? 'rgba(168,244,255,.9)' : 'rgba(47,180,255,.9)', 1.3); }
+      const tr = f.state === 'throw' ? (f.t < 34 ? 1 : f.t >= 40 ? -1 : 0) : f.state === 'gpound' ? -1 : 0;   // traînée verticale de la fusée / météorite
+      if (tr) for (let b = 0; b < 3; b++) { const ox = (b - 1) * 10, L = []; for (let s2 = 0; s2 <= 5; s2++) L.push([cx + ox + (Math.random() - .5) * 6, f.y + (tr > 0 ? s2 * 16 : -60 - s2 * 16)]); elecArc(L, 'rgba(47,180,255,.7)', 3); elecArc(L, '#ffffff', 1); }
+      if (f.state === 'crushD') for (let b = 0; b < 3; b++) { const L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx - f.dir * (10 + s2 * 12), cy - s2 * 13 + (b - 1) * 10]); elecArc(L, 'rgba(120,220,255,.8)', 2); }
+    }
+    ctx.restore();
+  }
   for (const w of G.waves || []) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (w.dome) {   // dôme électrique qui éclate depuis le sol
+      const k = w.t / w.life, a = 1 - k, rx = 18 + w.t * 5.2, ry = 16 + w.t * 4.6, cx = w.x, cy = GROUND;
+      const g = ctx.createRadialGradient(cx, cy - ry * .3, 2, cx, cy, Math.max(rx, ry));
+      g.addColorStop(0, `rgba(220,250,255,${.55 * a})`); g.addColorStop(.6, `rgba(47,180,255,${.3 * a})`); g.addColorStop(1, 'rgba(20,88,196,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.15, ry * 1.15, 0, Math.PI, 0); ctx.fill();
+      ctx.globalAlpha = a;
+      for (const [sc, col, lw] of [[1, 'rgba(20,88,196,.9)', 6], [1, 'rgba(47,180,255,1)', 3], [1, '#ffffff', 1.2], [.7, 'rgba(168,244,255,.8)', 1.5]]) {
+        const pts = []; for (let i = 0; i <= 26; i++) { const t = Math.PI + i / 26 * Math.PI; pts.push([cx + Math.cos(t) * rx * sc, cy + Math.sin(t) * ry * sc]); }
+        elecArc(pts, col, lw);
+      }
+      for (let b = 0; b < 6; b++) {   // nervures électriques du dôme
+        const t = Math.PI + (b + .5) / 6 * Math.PI, L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx + Math.cos(t) * rx * s2 / 4, cy + Math.sin(t) * ry * s2 / 4]);
+        elecArc(L, 'rgba(168,244,255,.85)', 1.2);
+      }
+      ctx.fillStyle = `rgba(120,220,255,${.5 * a})`; ctx.fillRect(Math.round(cx - rx * 1.2), cy - 1, Math.round(rx * 2.4), 2);
+      ctx.restore(); continue;
+    }
     if (w.ring) {   // Rempart de Fer : onde de choc électrique qui part du corps
       const k = w.t / w.life, a = 1 - k, rx = 12 + w.t * 5, ry = 20 + w.t * 5.5, cx = w.x, cy = GROUND - 42;
       const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, ry);
@@ -3026,11 +3127,11 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     }
   }
   // Rempart de Fer : absorbe totalement le coup puis repousse l'attaquant
-  if (def.state === 'rampart' && def.t >= 3 && def.t < 42) {
-    G.freeze = 8; addSpark(sx, sy, 'parry'); sfx('parry');
-    setState(def, 'rburst'); G.flashT = Math.max(G.flashT, 6); G.boltX = def.x; G.boltY = def.y - 50;
-    G.waves.push({ owner: def, x: def.x, dir: def.dir, t: 0, life: 14, small: true, ring: true, done: true });
-    if (!projectile && Math.abs(att.x - def.x) < 90) { att.hasHit = true; applyHit(def, att, RAMPART_HIT, (att.x + def.x) / 2, att.y - 50, def.x, true); }
+  if ((def.state === 'rampart' && def.t >= 2) || (def.rampT > 0 && !def.air && !['fall', 'down', 'getup', 'held', 'throw'].includes(def.state))) {
+    G.freeze = 8; addSpark(sx, sy, 'parry'); sfx('parry'); sfx('heavy'); def.rampT = 0;
+    setState(def, 'rburst'); G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); G.boltX = def.x; G.boltY = def.y - 50;
+    G.waves.push({ owner: def, x: def.x, dir: def.dir, t: 0, life: 22, small: true, ring: true, dome: true, done: true });   // dôme électrique
+    if (Math.abs(att.x - def.x) < 100) { att.hasHit = true; applyHit(def, att, RAMPART_HIT, (att.x + def.x) / 2, att.y - 50, def.x, true); }
     return;
   }
   const away = fromX < def.x ? 1 : -1;
@@ -3160,7 +3261,7 @@ const ALT = [
   { top: ['#08080c', '#18181e', '#2e2e3a', '#4c4c5c'], belt: ['#2a0404', '#4a0808', '#6e1010', '#962222'] },   // Kaito : t-shirt noir, ceinture rouge foncé
   { top: ['#0c1a4a', '#18348c', '#2a5ad0', '#6a9cff'], legs: ['#06060a', '#14141c', '#26262e', '#8a8a9c'] }, // John : t-shirt bleu, pantalon presque noir brillant
   { top: ['#14040e', '#3a0a26', '#6a1446', '#c83a8a'], legs: ['#14040e', '#3a0a26', '#5a1240', '#a83a7a'], hair: { a: '#0a1a1a', h: '#0a5a5a', H: '#1ab8b8', L: '#8af4f4' } },   // Vesper : rose néon, cheveux turquoise
-  { skin: ['#2a1a16', '#5a3a30', '#7e5446', '#a8786a'], top: ['#2a0404', '#4a0808', '#6e1010', '#962222'], legs: ['#0e1016', '#1e2230', '#30364a', '#4a5268'], armorP: ['#2a1a06', '#7a5a1a', '#c8962a', '#ffe08a'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#c8962a', L: '#ffe08a' }, eye: '#3af0ff' },   // Grog : peau rougeâtre, métal bronze
+  { legs: ['#2a1608', '#4a2c14', '#6a4220', '#8a5a30'], belt: ['#2a1608', '#4a2c14', '#4a2c14', '#6a4220'], hair: { a: '#2a1a06', h: '#7a5a1a', H: '#a8803a', L: '#d8b870' }, bandP: ['#1a1a24', '#34344a', '#4e4e6a', '#6e6e8c'], eye: '#3af0ff' },   // Grog : même peau vert délavé, pantalon brun, crâne bronze, yeux cyan
   { top: ['#0a1a26', '#16324a', '#24506e', '#3a7aa0'], hair: { a: '#1a1a22', h: '#2e2e3a', H: '#4a4a5a', L: '#8a8a9c' } },   // Zephyr : kimono bleu nuit, cheveux noirs
   { top: ['#04140e', '#0a3624', '#165a3c', '#2e8a5e'], hair: { a: '#2a0606', h: '#5a0e0e', H: '#8e1a1a', L: '#d04040' } },   // Nyx : corset vert, cheveux rouges
   { vestP: ['#2a0a04', '#8a2a10', '#e0561c', '#ff9a5a'], hair: { a: '#06203a', h: '#0e4a7a', H: '#1c7ab8', L: '#5ab8f0' } },   // Kael : gilet orange, crête bleue
@@ -3182,12 +3283,12 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [] });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [], rampT: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
+  G.quakeT = 0; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3403,6 +3504,7 @@ function stepFight() {
   if (a.cpu && !G.noAI) ctlUpdate(a.ctl, confuse(aiInput(a, b), a));
   if (b.cpu && !G.noAI) ctlUpdate(b.ctl, confuse(aiInput(b, a), b));
 
+  if (G.quakeT > 0) { G.quakeT--; G.shake = Math.max(G.shake, 3 + G.quakeT * .15); }   // vibration prolongée
   if (G.shake > 0) G.shake *= .8;
   if (G.shake < .3) G.shake = 0;
   if (G.freeze > 0) { G.freeze--; return; }
@@ -3554,8 +3656,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=101'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=101'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=103'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=103'; return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
