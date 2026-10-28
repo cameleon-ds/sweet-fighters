@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v129';
+const VERSION = 'v130';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3674,7 +3674,7 @@ function stepOptions() {
   }
   if (G.ocur === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
   if (G.ocur === 2 && (l || r || ok)) {
-    OPT.diff = l ? Math.max(0, OPT.diff - 1) : r ? Math.min(3, OPT.diff + 1) : (OPT.diff + 1) % 4;
+    OPT.diff = l ? (OPT.diff + 3) % 4 : (OPT.diff + 1) % 4;   // en boucle : TRAINING avant EASY et après HARD
     saveOpt(); sfx('select');
   }
   if (G.ocur === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
