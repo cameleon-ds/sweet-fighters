@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v113';
+const VERSION = 'v114';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2252,7 +2252,7 @@ function updThrow(f) {
 }
 /* ---------- Objets du décor : chaise et vases (cassables, lançables avec X) ---------- */
 const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0, sfx: 'heavy', unblock: true };
-const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38], lantern: [18, 36], sake: [14, 20], barrel: [20, 26], candle: [16, 38], drum: [20, 30], brazier: [20, 30], stool: [20, 22], bucket: [16, 14], canister: [16, 32], hazard: [20, 28] };
+const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38], lantern: [18, 36], sake: [14, 20], barrel: [20, 26], candle: [16, 38], drum: [20, 30], brazier: [20, 30], stool: [20, 22], bucket: [16, 14], canister: [16, 32], hazard: [20, 28], labdrum: [20, 30] };
 function makeProps() {
   const X = f => Math.round(SW * f);
   const SET = {   // objets adaptés au thème de chaque décor
@@ -2263,7 +2263,7 @@ function makeProps() {
     terrace: [['drum', 0], ['brazier', 0], ['crate', 0], ['drum', 0], ['brazier', 0], ['drum', 0]],
     alley:   [['trash', 0], ['bottle', 0], ['crate', 0], ['cone', 0], ['bottle', 0], ['trash', 0]],
     ring:    [['bucket', 0], ['stool', 0], ['bottle', 0], ['bottle', 0], ['stool', 0], ['bucket', 0]],
-    lab:     [['hazard', 0], ['canister', 0], ['canister', 1], ['hazard', 0], ['canister', 0], ['hazard', 0]],
+    lab:     [['labdrum', 0], ['labdrum', 1], ['labdrum', 0], ['labdrum', 1], ['labdrum', 0], ['labdrum', 1]],   // tonneaux gris acier et orange
   }[G.stage] || [];
   const XS = [.05, .12, .2, .8, .88, .95];
   const list = SET.map(([t, v], i) => [t, X(XS[i]), v]);
@@ -2293,7 +2293,7 @@ function breakProp(p, x = p.x, y = p.y - 10) {
   p.alive = false; p.held = null; p.fly = null;
   const EXTRA = { lantern: ['#5a5e56', '#8a8e84', '#3a3e38', '#6a7a4a'], sake: ['#e8e0d0', '#2a2a30', '#b8b0a0', '#7a1a14'], barrel: ['#6a4020', '#8a5a30', '#3a2010', '#5a5a64'], candle: ['#24242c', '#4a4a56', '#f0e0b0', '#ffb040'],
     drum: ['#6a2a10', '#9a4a1a', '#3a1a0a', '#4a4a50'], brazier: ['#2a2a30', '#4a4a56', '#ff8a2a', '#ffd040'], stool: ['#2a2a30', '#5a5a64', '#a82a1a', '#1a1a20'], bucket: ['#7a7a88', '#a8a8b8', '#4a8ad0', '#c8e8ff'],
-    canister: ['#a8b8c0', '#4a5a64', '#3aff8a', '#c8ffd8'], hazard: ['#d8b81a', '#1a1a20', '#a88a10', '#5a5a64'] };
+    labdrum: ['#4a5662', '#7a8a96', '#c8641a', '#2a3038'], canister: ['#a8b8c0', '#4a5a64', '#3aff8a', '#c8ffd8'], hazard: ['#d8b81a', '#1a1a20', '#a88a10', '#5a5a64'] };
   const cols = EXTRA[p.type] || (p.type === 'bottle' ? ['#2a7a2a', '#5ac85a', '#1a4a1a', '#c8f0c8'] : p.type === 'cone' ? ['#ff6a1a', '#ffffff', '#c84a0a'] : p.type === 'trash' ? ['#7a7a88', '#a8a8b8', '#4a4a56', '#3a6a2a'] : p.type === 'chair' || p.type === 'crate' ? ['#8a5a30', '#6a4020', '#b07a44'] : p.type === 'pot' ? ['#b8642e', '#3e7a2a', '#7a3a18', '#5c9a3a'] : VASE_COLS[p.v]);
   for (let i = 0; i < 14; i++) G.shards.push({ x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 10,
     vx: (Math.random() - .5) * 5, vy: -1.5 - Math.random() * 3.5, col: cols[i % cols.length], s: 1 + (Math.random() * 3 | 0), t: 0 });
@@ -2372,6 +2372,8 @@ const PP = {
   red2:  ['#3a0606', '#6a0e0c', '#a01c16', '#d0402a', '#f0806a'],
   yel:   ['#4a3a04', '#8a6a0a', '#c8a014', '#e8c83a', '#fff08a'],
   lab:   ['#2a3038', '#4a5662', '#7a8a96', '#a8b8c4', '#e0ecf4'],
+  steel: ['#141a20', '#28323c', '#3e4a56', '#5a6874', '#8a9aa8'],   // gris bleuté du laboratoire
+  orng:  ['#3a1604', '#6e2c08', '#a8480e', '#d86a1c', '#f0a050'],   // orange industriel, un peu sombre
 };
 function drawProp(p, x, y) {
   const F = (px, py, w, h, c) => R(x + px, y + py, w, h, c);
@@ -2508,6 +2510,14 @@ function drawProp(p, x, y) {
     for (let r = 0; r < 24; r++) { const yy = -28 + r, lvl = r > 5; for (let px = -6; px <= 6; px++) F(px, yy, 1, 1, Math.abs(px) === 6 ? L[2] : !lvl ? 'rgba(200,230,240,.25)' : px < -3 ? liq[3] : px < 2 ? liq[2] : liq[1]); }
     for (let b = 0; b < 3; b++) { const by = -6 - ((G.frame + b * 13) % 20); F(-2 + b * 2, by, 1, 1, '#ffffff'); }   // bulles
     F(-5, -27, 1, 20, 'rgba(255,255,255,.5)');
+  } else if (T === 'labdrum') {   // tonneau métallique de laboratoire (gris acier ou orange)
+    const P = p.v ? PP.orng : PP.steel, D = PP.steel;
+    for (let r = 0; r < 30; r++) cylRow(-30 + r, 9, P);
+    for (const yy of [-26, -15, -4]) { for (let px = -9; px <= 9; px++) F(px, yy, 1, 2, Math.abs(px) === 9 ? P[0] : px < -3 ? P[4] : P[1]); }   // cerclages
+    F(-9, -31, 19, 2, P[3]); F(-9, -31, 19, 1, P[4]); F(-6, -31, 4, 1, D[0]); F(3, -31, 3, 1, D[1]);   // couvercle, bondes
+    if (p.v) { F(-4, -22, 9, 5, '#1a1a20'); F(-3, -21, 7, 3, '#e8e0c8'); F(-2, -20, 5, 1, '#1a1a20'); }   // étiquette
+    else { F(-5, -11, 11, 2, '#3ab8e0'); F(-5, -11, 11, 1, '#8ae8ff'); }   // bande lumineuse cyan
+    F(-9, -1, 19, 1, P[0]);
   } else if (T === 'hazard') {   // fût de produit toxique (biohazard)
     const P = PP.yel;
     for (let r = 0; r < 28; r++) cylRow(-28 + r, 9, P);
