@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v118';
+const VERSION = 'v119';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1322,11 +1322,11 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=116').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=119').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
@@ -1346,7 +1346,7 @@ function sfx(n) {
       case 'hit': if (!playSample('light', 1)) smack(2400, .8, 190, 60, .12, .9); break;                 // coup léger
       case 'heavy': if (!playSample('heavy', 1.1)) { smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); } break;   // gros coup
       case 'block': if (!playSample('thud', .85, 1.35)) { tone('square', 1100, 700, .045, .35); noise(.06, .6, 3800, 'bandpass', 0, 2); } break;   // garde : son de chute, joué plus aigu
-      case 'fb': tone('sawtooth', 300, 90, .45, .3); tone('square', 600, 140, .3, .14); noise(.45, .45, 1400, 'bandpass', 300, .8); break;   // projectile : souffle d'énergie
+      case 'fb': if (playSample('fb', 1)) break; tone('sawtooth', 300, 90, .45, .3); tone('square', 600, 140, .3, .14); noise(.45, .45, 1400, 'bandpass', 300, .8); break;   // projectile : souffle d'énergie
       case 'upper': noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); break;
       case 'ko': playSample('ko', 1.2, .85); tone('sine', 140, 28, 1.2, .6); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
       case 'thud': if (!playSample('thud', 1)) { tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); } break;   // chute au sol
@@ -1355,6 +1355,7 @@ function sfx(n) {
         sfxBus(); const g = tone('square', 1760, 1760, .5, .14, 0, SFXBUS); g.connect(ECHO); g.connect(VERB);
         break;
       }
+      case 'charge': tone('sawtooth', 180, 260, .18, .12); break;   // sphère en charge
       case 'go': tone('square', 660, 1320, .3, .2); break;
       case 'select': {   // validation : arpège très rapide vers l'aigu avec écho (style Street Fighter)
         sfxBus(); const N = [784, 1175, 1568];   // tonique, quinte, octave
@@ -2031,7 +2032,7 @@ function updFighter(f, o) {
         const q = G.voids.find(v => v.owner === f && v.charging);
         if (q) {
           const held = f.ctl && f.ctl.held && f.ctl.held.s;
-          if (held && q.ch < 150) { q.ch++; f.t = 8; if (q.ch % 14 === 0) sfx('fb'); }
+          if (held && q.ch < 150) { q.ch++; f.t = 8; if (q.ch % 14 === 0) sfx('charge'); }
           else {
             const c = Math.min(1, q.ch / 90); q.charging = false; q.c = c; q.vx = f.dir * (3.2 - 2 * c);   // plus elle est grosse, plus elle est lente
             q.hit = Object.assign({}, VOID_HIT, { dmg: Math.round(8 + 24 * c), push: .6 + c * 3, chip: 1 + Math.round(c * 5), knock: c > .75 });
