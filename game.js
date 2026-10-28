@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v108';
+const VERSION = 'v109';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1320,16 +1320,16 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'] };
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'] };   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=108').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=109').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
-function playSample(k, vol = 1, rate = 1) {
+function playSample(k, vol = 1, rate = 1, exact = false) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
   const src = AC.createBufferSource(), g = AC.createGain();
-  src.buffer = L[Math.random() * L.length | 0]; src.playbackRate.value = rate * (.94 + Math.random() * .12);   // légère variation à chaque coup
+  src.buffer = L[Math.random() * L.length | 0]; src.playbackRate.value = exact ? rate : rate * (.94 + Math.random() * .12);   // légère variation à chaque coup
   g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); src.start();
   return true;
 }
@@ -3660,9 +3660,9 @@ function stepFight() {
   G.t++;
 
   if (G.scene === 'intro') {
-    if (G.t === 1) sfx('beep');
-    if (G.t === 70) sfx('go');
-    if (G.t >= 110) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
+    if (G.t === 1 && !(AC && playSample('r' + Math.min(3, G.round), 1.3, 1, true))) sfx('beep');   // annonceur : « ROUND 1/2/3 »
+    if (G.t === 84 && !(AC && playSample('fight', 1.4, 1, true))) sfx('go');                       // « FIGHT! »
+    if (G.t >= 124) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
   }
 
   // Entrées
@@ -4042,7 +4042,7 @@ function drawFight() {
   drawHUD();
 
   if (G.scene === 'intro') {
-    if (G.t < 70) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
+    if (G.t < 84) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
     else bigMsg('FIGHT!', 24, '#ff4a2a');
   } else if (G.scene === 'ko') {
     if (G.t < 120) { if ((G.t >> 2) % 2 || G.t > 40) bigMsg('K.O.', 32, '#ff3a2a', 76); }
