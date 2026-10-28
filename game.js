@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v125';
+const VERSION = 'v126';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1909,6 +1909,8 @@ function updFighter(f, o) {
         if (take(c, 'k')) { doThrow(f, o, 'toss'); break; }
       }
       // Contre (X) : fenêtre de parade
+      // X collé à l'adversaire : prise automatique (arrière + X : projection derrière soi)
+      if (c.buf.x > 0 && Math.abs(o.x - f.x) < 36 && !o.air && !o.ko && !(o.invuln > 0) && ['idle', 'walk', 'crouch', 'block', 'cblock', 'land'].includes(o.state)) { take(c, 'x'); doThrow(f, o, back ? 'toss' : 'slam'); break; }
       if (c.buf.x > 0 && nearProp(f)) { take(c, 'x'); pickProp(f, nearProp(f)); break; }   // X près d'un objet : on le lance
       if (take(c, 'x')) { setState(f, 'parry'); f.vx = 0; sfx('whoosh'); break; }
       // Saut : stick vers le haut (court délai pour laisser passer haut + A)
