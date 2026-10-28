@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v104';
+const VERSION = 'v105';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2924,6 +2924,38 @@ function drawZephyrFx() {
   }
   ctx.restore();
 }
+// Deux projectiles adverses qui se rencontrent s'écrasent et s'annulent avec un flash au milieu
+function clashProjectiles() {
+  const L = [];
+  for (const q of G.fbs || []) if (q.alive) L.push([q, q.y, 16 * (q.sc || 1)]);
+  for (const q of G.blades || []) if (!q.dead) L.push([q, q.y, 18]);
+  for (const q of G.sonics || []) if (!q.dead) L.push([q, q.y, 16]);
+  for (const q of G.voids || []) if (!q.dead && !q.charging) L.push([q, q.y, q.r || 14]);
+  for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 10]);
+  for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14]);
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+    const [a, ay, ar] = L[i], [b, by, br] = L[j];
+    if (!a.owner || !b.owner || a.owner === b.owner || a.dead || b.dead || a.alive === false || b.alive === false) continue;
+    if (Math.abs(a.x - b.x) < ar + br && Math.abs(ay - by) < ar + br + 16) {
+      for (const q of [a, b]) { if ('alive' in q) q.alive = false; q.dead = true; if (q.owner.fb === q) q.owner.fb = null; }
+      (G.clashFx = G.clashFx || []).push({ x: (a.x + b.x) / 2, y: (ay + by) / 2, t: 0 });
+      G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); G.freeze = Math.max(G.freeze || 0, 4); sfx('parry'); sfx('heavy');
+    }
+  }
+  for (const c of G.clashFx || []) c.t++;
+  if (G.clashFx) G.clashFx = G.clashFx.filter(c => c.t < 20);
+}
+function drawClashFx() {
+  for (const c of G.clashFx || []) {
+    const k = c.t / 20, a = 1 - k, R0 = 8 + c.t * 3.2;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(c.x, c.y, 1, c.x, c.y, R0 * 1.6); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(.35, `rgba(255,230,150,${.7 * a})`); g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, R0 * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, R0, 0, Math.PI * 2); ctx.stroke();
+    for (let r = 0; r < 10; r++) { const an = r * .628 + c.t * .05, l1 = R0 * .6, l2 = R0 * (1.4 + (r % 2) * .5); ctx.strokeStyle = `rgba(255,240,200,${a})`; ctx.lineWidth = r % 2 ? 1 : 2; ctx.beginPath(); ctx.moveTo(c.x + Math.cos(an) * l1, c.y + Math.sin(an) * l1); ctx.lineTo(c.x + Math.cos(an) * l2, c.y + Math.sin(an) * l2); ctx.stroke(); }
+    ctx.restore();
+  }
+}
 function updGrog() {
   for (const g of G.f) {   // Rempart : renvoie les projectiles comme un miroir
     if (g.def.kit !== 'grog' || !(g.state === 'rampart' || g.rampT > 0)) continue;
@@ -3289,7 +3321,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.quakeT = 0; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
+  G.quakeT = 0; G.clashFx = []; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3368,7 +3400,7 @@ function stepPause() {
 /* ---------------- Musiques ---------------- */
 const BGM = new Audio(); BGM.loop = true; BGM.preload = 'auto';
 const MUSIC = { title: 'music/music_title.mp3', select: 'music/music_select.mp3', dojo: 'music/music_dojo.mp3', city: 'music/music_city.mp3' };
-let bgmKey = null, bgmUnlocked = false, bgmGain = null;
+let bgmKey = null, bgmUnlocked = false, bgmGain = null, bgmMul = 1;
 const MUSIC_MAX = .55;   // niveau maximal de la musique (les MP3 sont mixés fort)
 // Le volume d'un élément <audio> est ignoré sur iPhone/iPad : on fait passer la musique par Web Audio (GainNode)
 function bgmRoute() {
@@ -3384,11 +3416,11 @@ function musicWanted() {
 }
 function updateMusic() {
   const want = musicWanted();
-  if (want !== bgmKey) {
-    bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0;
-    if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {});
-  }
-  const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1)));
+  if (want !== bgmKey) {   // fondu sortant de l'ancienne musique, puis fondu entrant de la nouvelle
+    if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {}); }
+    else bgmMul = Math.max(0, bgmMul - 1 / 36);
+  } else bgmMul = Math.min(1, bgmMul + 1 / 60);
+  const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1) * bgmMul));
   if (bgmGain) bgmGain.gain.value = vol; else BGM.volume = vol;   // réglage appliqué en temps réel
   if (bgmGain && AC && AC.state !== 'running' && bgmUnlocked && !document.hidden) AC.resume().catch(() => {});
   if (OPT.music === 0 && !BGM.paused) BGM.pause();
@@ -3407,7 +3439,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.p
 
 function step() {
   updateMusic();
-  G.frame++;
+  G.frame++; G.st = (G.st || 0) + 1;
   ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
   ctlUpdate(p2ctl, confuse(readRemote(2), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
 
@@ -3586,7 +3618,7 @@ function stepFight() {
     }
   }
 
-  updProps(); updBlood(); updVesper(); updGrog(); updZephyr(); updNyx(); updKael(); updVane();
+  updProps(); updBlood(); updVesper(); updGrog(); updZephyr(); updNyx(); updKael(); updVane(); clashProjectiles();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -3836,7 +3868,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawDiveTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawVaneFx();
+  drawDiveTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawVaneFx(); drawClashFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -4057,20 +4089,26 @@ function drawSelect() {
   drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
   const BS = 74, y0 = 20;
+  const e1 = ent(0), e2 = ent(1), ev = ent(3, 3, 8);   // les deux grands portraits glissent depuis les bords, puis le VS frappe
+  ctx.save(); ctx.globalAlpha = e1; ctx.translate(-(1 - e1) * 120, 0);
   drawPortrait(p1, CX - 22 - BS, y0, BS, '#5ac8ff', 1);
   text('1P', CX - 22 - BS, y0 + BS + 4, 8, '#5ac8ff', 'left');
   text(p1 == null ? '???' : DEFS[p1].name, CX - 22, y0 + BS + 4, 8, '#ffffff', 'right');
+  ctx.restore(); ctx.save(); ctx.globalAlpha = e2; ctx.translate((1 - e2) * 120, 0);
   drawPortrait(p2, CX + 22, y0, BS, '#ff7a6a', -1);
   text(L2, CX + 22 + BS, y0 + BS + 4, 8, '#ff7a6a', 'right');
   text(p2 == null ? '???' : DEFS[p2].name + (p2 === G.p1 ? ' 2P' : ''), CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
-  text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
+  ctx.restore();
+  if (ev > 0) { const sc = 1 + (1 - ev) * 2.5; ctx.save(); ctx.globalAlpha = ev; ctx.translate(CX, y0 + BS / 2); ctx.scale(sc, sc); ctx.translate(-CX, -(y0 + BS / 2)); text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center'); ctx.restore(); }
   // grille 4 x 2 : tous regardent à droite
   const S = 34, gap = 4, gx = CX - (4 * S + 3 * gap) / 2, gy = 120;
   for (let i = 0; i < 8; i++) {
     const x = gx + (i % 4) * (S + gap), y = gy + (i >> 2) * (S + gap);
     const on = i === sel, blink = (G.frame >> 3) % 2;
-    drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : (ph ? '#ff3a2a' : '#ff6a1a')) : '#5a4a60', 1);
-    if (on) text(ph ? L2 : '1P', x + 1, y - 1, 8, ph ? '#ff7a6a' : '#5ac8ff', 'left');
+    popIn(ent(4 + i, 2, 8), x + S / 2, y + S / 2, () => {   // les vignettes apparaissent une par une
+      drawPortrait(ROSTER[i], x, y, S, on ? (blink ? '#ffd23a' : (ph ? '#ff3a2a' : '#ff6a1a')) : '#5a4a60', 1);
+      if (on) text(ph ? L2 : '1P', x + 1, y - 1, 8, ph ? '#ff7a6a' : '#5ac8ff', 'left');
+    });
   }
   if (hov == null) text('COMING SOON', CX, 196, 8, '#9a8aa0', 'center');
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
@@ -4084,12 +4122,14 @@ function drawStageSelect() {
   const COLS = 4, gap = 8, cw = Math.floor(Math.min(104, (W - 24 - gap * (COLS - 1)) / COLS)), ch = Math.round(cw * 9 / 16), x0 = Math.round(CX - (COLS * cw + (COLS - 1) * gap) / 2);
   STAGES.forEach(([id, name], i) => {
     const x = x0 + (i % COLS) * (cw + gap), y = 36 + Math.floor(i / COLS) * (ch + 30), on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
+    popIn(ent(i, 2, 9), x + cw / 2, y + ch / 2, () => {
     R(x - 3, y - 3, cw + 6, ch + 6, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
     R(x - 1, y - 1, cw + 2, ch + 2, '#000');
     const bg = BGS[id];
     if (bg) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bg, (bg.width - bg.height * 16 / 9) / 2, 0, bg.height * 16 / 9, bg.height, x, y, cw, ch); ctx.restore(); }
     if (!on) R(x, y, cw, ch, 'rgba(0,0,0,.45)');
     text(name, x + cw / 2, y + ch + 10, 8, on ? '#ffffff' : '#9a8aa0', 'center');
+    });
   });
   text(isTouch ? '< >: CHOOSE   A: FIGHT   B: BACK' : '< >: CHOOSE   ENTER: FIGHT   ESC: BACK', CX, 200, 8, '#d8c8a8', 'center');
 }
@@ -4118,15 +4158,46 @@ function drawOver() {
 
 function render() {
   ctx.save();
-  if (G.shake) ctx.translate(Math.round((Math.random() - .5) * G.shake * 2), Math.round((Math.random() - .5) * G.shake * 2));
+  const grp = ['intro', 'fight', 'ko', 'timeup'].includes(G.scene) ? 'fight' : G.scene;
+  if (prevGroup && grp !== prevGroup) {   // changement d'écran : on garde une image de l'ancien pour le volet de transition
+    SNAP.width = cv.width; SNAP.height = cv.height; SNAP.getContext('2d').drawImage(cv, 0, 0); transT = 0; G.st = 0;
+  }
+  prevGroup = grp;
+  if (G.shake && !G.paused) ctx.translate(Math.round((Math.random() - .5) * G.shake * 2), Math.round((Math.random() - .5) * G.shake * 2));   // en pause : image figée
   switch (G.scene) {
     case 'title': drawTitle(); break;
     case 'select': drawSelect(); break;
     case 'stage': drawStageSelect(); break;
     case 'over': drawOver(); break;
-    default: drawFight(); if (G.paused) drawPause();
+    default: drawFight();
   }
   ctx.restore();
+  if (G.paused && grp === 'fight') drawPause();   // menu pause jamais secoué
+  if (transT < TRANS_N) { drawTransition(transT / TRANS_N); transT++; }
+}
+// Transition entre écrans : un volet diagonal noir bordé d'une lame de lumière balaie l'ancien écran
+let prevGroup = null, transT = 99;
+const TRANS_N = 26, SNAP = document.createElement('canvas');
+function drawTransition(p) {
+  const e = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2, slant = H * .45;
+  const ex = -slant - 30 + (W + slant + 60) * e;          // bord du volet (en bas)
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(ex + slant, 0); ctx.lineTo(W + 10, 0); ctx.lineTo(W + 10, H); ctx.lineTo(ex, H); ctx.closePath(); ctx.clip();
+  ctx.drawImage(SNAP, 0, 0, W, H);
+  ctx.fillStyle = `rgba(0,0,0,${Math.min(.6, p * 1.4)})`; ctx.fillRect(0, 0, W, H);   // l'ancien écran s'assombrit
+  ctx.restore();
+  ctx.save();   // bande noire + lame de lumière
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(ex + slant - 26, 0); ctx.lineTo(ex + slant + 2, 0); ctx.lineTo(ex + 2, H); ctx.lineTo(ex - 26, H); ctx.closePath(); ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const [w, c] of [[7, 'rgba(255,90,20,.35)'], [3, 'rgba(255,170,60,.8)'], [1, '#fff4d0']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(ex + slant + 2, 0); ctx.lineTo(ex + 2, H); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(255,120,40,.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex + slant - 26, 0); ctx.lineTo(ex - 26, H); ctx.stroke();
+  ctx.restore();
+}
+// apparition échelonnée des éléments d'un écran (0 → 1), après le volet
+const ent = (i, d = 3, len = 10) => { const k = Math.max(0, Math.min(1, ((G.st || 0) - 12 - i * d) / len)); return 1 - Math.pow(1 - k, 3); };
+function popIn(k, cx, cy, fn) {   // agrandit depuis le centre avec un léger rebond
+  if (k <= 0) return; const sc = k < 1 ? .4 + .6 * k + Math.sin(k * Math.PI) * .12 : 1;
+  ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.5); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.translate(-cx, -cy); fn(); ctx.restore();
 }
 
 resize();
