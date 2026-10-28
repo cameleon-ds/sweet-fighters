@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v106';
+const VERSION = 'v107';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1286,7 +1286,7 @@ function initAudio() {
 // volume des bruitages (option SFX, 0 à 4 barres ; 4 = 100 %)
 const sfxVol = () => (typeof OPT === 'undefined' ? 4 : OPT.sfx) / 4;
 // Chaîne audio « 16 bits » : bus des bruitages → légère saturation quantifiée → compresseur → sortie ; écho pour les sons de menu
-let SFXBUS = null, CRUNCH = null, ECHO = null;
+let SFXBUS = null, CRUNCH = null, ECHO = null, VERB = null;
 function sfxBus() {
   if (SFXBUS) return SFXBUS;
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = .002; comp.release.value = .12;
@@ -1297,6 +1297,9 @@ function sfxBus() {
   CRUNCH.curve = cv2; CRUNCH.connect(SFXBUS);
   ECHO = AC.createDelay(1); ECHO.delayTime.value = .11; const fb = AC.createGain(); fb.gain.value = .38; const wet = AC.createGain(); wet.gain.value = .5;
   ECHO.connect(fb).connect(ECHO); ECHO.connect(wet).connect(SFXBUS);
+  VERB = AC.createConvolver(); const len = Math.round(AC.sampleRate * 2.2), ir = AC.createBuffer(2, len, AC.sampleRate);   // réverbe : salle synthétique
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  VERB.buffer = ir; const vg = AC.createGain(); vg.gain.value = .55; VERB.connect(vg).connect(SFXBUS); ECHO.connect(VERB);
   return SFXBUS;
 }
 function tone(type, f0, f1, dur, vol, at = 0, out) {
@@ -1329,12 +1332,15 @@ function sfx(n) {
       case 'ko': tone('sine', 140, 28, 1.2, 1); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
       case 'thud': tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); break;   // chute au sol
       case 'crash': noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
-      case 'beep': tone('square', 1320, 1320, .035, .16); tone('square', 1980, 1980, .03, .1, .035); break;   // déplacement du curseur : « tic »
+      case 'beep': {   // déplacement du curseur : note aiguë 8 bits (une noire) avec delay et réverbe
+        sfxBus(); const g = tone('square', 1760, 1760, .5, .14, 0, SFXBUS); g.connect(ECHO); g.connect(VERB);
+        break;
+      }
       case 'go': tone('square', 660, 1320, .3, .2); break;
       case 'select': {   // validation : arpège très rapide vers l'aigu avec écho (style Street Fighter)
-        sfxBus(); const N = [523, 659, 784, 1047, 1319, 1568, 2093];
-        N.forEach((fq, i) => { const g = tone('square', fq, fq, .07, .32, i * .028, CRUNCH); g.connect(ECHO); });
-        tone('triangle', 2093, 2093, .25, .2, N.length * .028);
+        sfxBus(); const N = [784, 1175, 1568];   // tonique, quinte, octave
+        N.forEach((fq, i) => { const last = i === N.length - 1, g = tone('square', fq, fq, last ? .45 : .11, .3, i * .075, SFXBUS); g.connect(ECHO); g.connect(VERB); });
+        const g2 = tone('triangle', 1568, 1568, .6, .18, 2 * .075, SFXBUS); g2.connect(VERB);
         break;
       }
       case 'parry': tone('square', 1800, 1800, .09, .22); tone('triangle', 2700, 2600, .35, .25); noise(.08, .5, 5000, 'highpass'); break;   // « ting » métallique
