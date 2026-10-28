@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v109';
+const VERSION = 'v110';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1320,17 +1320,17 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'] };   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'] };   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=109').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=110').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
-function playSample(k, vol = 1, rate = 1, exact = false) {
+function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
   const src = AC.createBufferSource(), g = AC.createGain();
   src.buffer = L[Math.random() * L.length | 0]; src.playbackRate.value = exact ? rate : rate * (.94 + Math.random() * .12);   // légère variation à chaque coup
-  g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); src.start();
+  g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); src.start(AC.currentTime + at);
   return true;
 }
 function sfx(n) {
@@ -3761,7 +3761,7 @@ function stepFight() {
       const loser = a.hp <= 0 ? a : b;
       loser.ko = true;
       endRound(a.hp <= 0 && b.hp <= 0 ? null : (loser === a ? b : a));
-      G.scene = 'ko'; G.t = 0; sfx('ko'); G.freeze = 20;
+      G.scene = 'ko'; G.t = 0; sfx('ko'); if (AC) playSample('kov', 1.4, 1, true, .25); G.freeze = 20;   // annonceur : « K.O. ! »
     } else if (G.timer <= 0) {
       endRound(a.hp === b.hp ? null : (a.hp > b.hp ? a : b));
       G.scene = 'timeup'; G.t = 0;
