@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v97';
+const VERSION = 'v99';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -527,7 +527,7 @@ const DEFS = [
     glove: ['#2a2e36', '#5a6270', '#9aa4b4', '#e4ecf6'],
     shoe:  ['#1a0e06', '#4a2a14', '#2a1a0c', '#1a0e06'],               // bottes marron
     fb: ['#ffffff', '#c8f8ff', '#5af0ff', '#1a78d0'] },
-  { name: 'VANE', style: 'tshirt', head: HEAD_VANE, headBack: HEAD_VANE, cape: true, epaulettes: true, uniform: true, float: true, sleeves: true, shoes: true, softNeck: true, noAbs: true, kit: 'vane',
+  { name: 'LORD VANE', style: 'tshirt', head: HEAD_VANE, headBack: HEAD_VANE, cape: true, epaulettes: true, uniform: true, float: true, sleeves: true, shoes: true, softNeck: true, noAbs: true, kit: 'vane',
     tough: .9, power: 1.08,
     skin:  ['#2e3a4c', '#6a7a94', '#a8b8d0', '#dce8f6'],
     hair:  { a: '#2e3a4c', h: '#6a7a94', H: '#a8b8d0', L: '#dce8f6' },
@@ -1216,6 +1216,14 @@ function drawFighter(f, x = f.x, y = f.y) {
       sR(x, y, 1, 1, k > 18 ? '#ffffff' : '#e6eef2'); sR(Math.round(x - nx), Math.round(y - ny), 1, 1, '#8a98a4');
     }
   }
+  if (f.tintKeep) {   // teinte qui garde tous les détails (double rose de Vane)
+    const T = TINTC || (TINTC = document.createElement('canvas')); T.width = SPR.width; T.height = SPR.height; const tx = T.getContext('2d');
+    tx.clearRect(0, 0, T.width, T.height); tx.drawImage(SPR, 0, 0);
+    sx.save(); sx.globalCompositeOperation = 'color'; sx.globalAlpha = .7; sx.fillStyle = f.tintKeep; sx.fillRect(0, 0, SPR.width, SPR.height);
+    sx.globalAlpha = 1; sx.globalCompositeOperation = 'soft-light'; sx.fillStyle = 'rgba(255,90,210,.4)'; sx.fillRect(0, 0, SPR.width, SPR.height);
+    sx.globalCompositeOperation = 'destination-in'; sx.drawImage(T, 0, 0); sx.restore();
+  }
+  if (f.tint) { sx.save(); sx.globalCompositeOperation = 'source-atop'; sx.fillStyle = f.tint; sx.fillRect(0, 0, SPR.width, SPR.height); sx.restore(); }   // silhouette teintée (échos, doubles)
   if (f.flash > 0) {
     const img = sx.getImageData(0, 0, SPR.width, SPR.height), dd = img.data;
     for (let i = 0; i < dd.length; i += 4) if (dd[i + 3]) { dd[i] = dd[i + 1] = dd[i + 2] = 255; }
@@ -1558,7 +1566,7 @@ const ATK = {
   dive:     { act: [3, 60], box: [8, -30, 38, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   wallslash:{ dur: 34, act: [9, 17], box: [6, -96, 48, 0], dmg: 14, knock: true, stun: 22, bstun: 16, push: 3.2, sfx: 'heavy' },
-  tpstrike: { dur: 22, act: [3, 10], box: [8, -76, 46, -36], dmg: 11, knock: true, unblock: true, stun: 20, bstun: 14, push: 3, sfx: 'heavy' },
+  tpstrike: { dur: 22, act: [4, 12], box: [8, -60, 50, -28], dmg: 11, knock: true, unblock: true, stun: 20, bstun: 14, push: 3, sfx: 'heavy' },
   meteor:   { act: [2, 40], box: [-22, -80, 26, -10], dmg: 9, knock: true, bstun: 12, push: 2, sfx: 'heavy', sym: true },
   meteorD:  { act: [0, 99], box: [6, -40, 40, 2], high: true, dmg: 14, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   sonic:    { dur: 26, act: [6, 10], box: [10, -70, 44, -40], dmg: 8, stun: 16, bstun: 10, push: 2.5, sfx: 'heavy' },
@@ -1595,7 +1603,9 @@ const chargeMax = f => f.hp <= 80 ? 60 : 120;
 function setState(f, s) { if (s !== 'pteleport') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
+const VANE_NORMALS = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'flame'];
 function poseOf(f) {
+  if (f.def.float && !f.ghostDraw && VANE_NORMALS.includes(f.state)) return 'vidle';   // Vane reste immobile : c'est son double qui frappe
   switch (f.state) {
     case 'idle': if (f.def.float) return 'vidle'; return ((G.frame / 18 | 0) + f.id) % 2 ? 'idle1' : 'idle0';
     case 'walk': {
@@ -1645,7 +1655,7 @@ function poseOf(f) {
     case 'voidcast': return f.t < 7 ? 'fpunch0' : f.t < 26 ? 'fpunch1' : 'fpunch0';   // un seul bras tendu
     case 'airvoid': return f.t < 6 ? 'jump' : 'jpunch';
     case 'pteleport': return 'idle0';
-    case 'tpstrike': return f.t < 3 ? 'fpunch0' : f.t < 14 ? 'fpunch1' : 'fpunch0';
+    case 'tpstrike': return f.t < 4 ? 'kick0' : f.t < 15 ? 'kick1' : 'kick0';   // coup de pied à la réapparition
     case 'meteor': return 'tuck';
     case 'meteorD': return 'dive';
     case 'flashstep': return 'block';
@@ -1951,12 +1961,12 @@ function updFighter(f, o) {
       if (f.t === 6) { G.voids.push({ owner: f, x: f.x + f.dir * 20, y: f.y - 46, vx: f.dir * 4.2, vy: 4.2, dir: f.dir, t: 0, r: 13, big: true }); sfx('fb'); sfx('heavy'); }
       if (f.t >= 18) setState(f, 'jump');
       break;
-    case 'pteleport':
-      f.vx = 0;
-      if (f.t === 1) { G.shadowFx.push({ x: f.x, y: f.y - 40, t: 0 }); sfx('parry'); }
-      f.fadeK = f.t < 10 ? f.t / 10 : Math.max(0, 1 - (f.t - 12) / 4);
-      if (f.t === 12) { f.x = Math.max(18, Math.min(SW - 18, o.x - (o.dir || 1) * 34)); f.dir = o.x > f.x ? 1 : -1; G.shadowFx.push({ x: f.x, y: f.y - 40, t: 0 }); }
-      if (f.t >= 16) { f.fadeK = 0; setState(f, 'tpstrike'); sfx('whoosh'); }
+    case 'pteleport':   // recule d'un mètre en se désintégrant, puis se réintègre dans le dos de l'adversaire
+      if (f.t < 14) { f.vx = -f.dir * 3.2; f.fadeK = f.t / 14; if (f.t % 2 === 0) vaneDust(f, false); }
+      if (f.t === 1) sfx('parry');
+      if (f.t === 14) { f.vx = 0; f.x = Math.max(18, Math.min(SW - 18, o.x - (o.dir || 1) * 76)); f.dir = o.x > f.x ? 1 : -1; sfx('parry'); }
+      if (f.t >= 14) { f.vx = Math.abs(o.x - f.x) > 26 ? f.dir * 3.6 : 0; f.fadeK = Math.max(0, 1 - (f.t - 14) / 14); if (f.t % 2 === 0) vaneDust(f, true); }   // réapparaît en s'approchant de l'adversaire
+      if (f.t >= 28) { f.vx = 0; f.fadeK = 0; setState(f, 'tpstrike'); sfx('whoosh'); }
       break;
     case 'tpstrike': f.vx = 0; if (f.t >= 22) setState(f, 'idle'); break;
     case 'meteor':
@@ -2061,7 +2071,8 @@ function atkBox(f) {
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
   if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
-  const [x0, y0, x1, y1] = a.box;
+  let [x0, y0, x1, y1] = a.box;
+  if (f.def.float && VANE_NORMALS.includes(f.state)) { x0 += 26; x1 += 26; y0 -= floatOff(f); y1 -= floatOff(f); }   // c'est le double, plus loin devant, qui frappe
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
 }
 const overlap = (a, b) => a && b && a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
@@ -2402,7 +2413,24 @@ function floatOff(f) {   // Vane flotte à ~20 cm du sol quand il est debout
 }
 const VOID_HIT = { dmg: 8, stun: 54, bstun: 12, push: .6, chip: 1, sfx: 'heavy' };   // paralyse une fraction de seconde
 const VOID_BIG = { dmg: 12, stun: 54, bstun: 14, push: 1, chip: 2, sfx: 'heavy' };
+function vaneDust(f, inward) {   // particules rose électrique et noires (désintégration / réintégration)
+  for (let k = 0; k < 6; k++) {
+    const bx = f.x + (Math.random() - .5) * 26, by = f.y - 8 - Math.random() * 80, a = Math.random() * 6.28, sp = 1 + Math.random() * 2.2;
+    const p = { x: bx, y: by, vx: Math.cos(a) * sp - f.dir * 1.2, vy: Math.sin(a) * sp - .4, t: 0, pink: Math.random() < .55 };
+    if (inward) { p.x = bx - p.vx * 12; p.y = by - p.vy * 12; }   // convergent vers le corps
+    G.vdust.push(p);
+  }
+}
 function updVane() {
+  for (const p of G.vdust || []) { p.t++; p.x += p.vx; p.y += p.vy; }
+  if (G.vdust) G.vdust = G.vdust.filter(p => p.t < 12);
+  for (const f of G.f) {   // échos de l'Impact Météore
+    if (!f.def.float) continue;
+    const met = f.state === 'meteor' || f.state === 'meteorD', moving = met || (f.state === 'walk' && Math.abs(f.vx) > .1) || f.air;   // échos en marchant, en sautant et pendant l'Impact Météore
+    if (moving && !met && (G.frame % 3)) continue;
+    if (moving) { (f.echo = f.echo || []).push({ x: f.x, y: f.y - floatOff(f), state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
+    else if (f.echo && f.echo.length) f.echo.shift();
+  }
   for (const q of G.voids || []) {
     const o = G.f.find(f => f !== q.owner);
     q.t++; q.x += q.vx; q.y += q.vy;
@@ -2420,7 +2448,48 @@ function updVane() {
   if (G.shadowFx) G.shadowFx = G.shadowFx.filter(s2 => s2.t < 24);
   for (const f of G.f) if (f.paraT > 0) f.paraT--;
 }
+function drawVaneBehind() {   // échos derrière Vane
+  for (const f of G.f) {
+    if (!f.echo || !f.echo.length) continue;
+    f.echo.forEach((e, i) => {
+      const a = (i + 1) / (f.echo.length + 1);
+      ctx.save(); ctx.globalAlpha = .55 * a; if (i % 2 === 0) ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, e, { flash: 0, tint: i % 2 ? 'rgba(10,0,20,.85)' : 'rgba(255,60,200,.85)' }), e.x, e.y); ctx.restore();
+    });
+  }
+}
+let TINTC = null;
+function drawVaneGhost(f) {   // double rose électrique et noir qui frappe 20 cm devant Vane
+  if (!f.def.float || !VANE_NORMALS.includes(f.state)) return;
+  const gx = f.x + f.dir * 26, gy = f.y - floatOff(f);
+  ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { ghostDraw: true, flash: 0, tint: 'rgba(8,0,16,.9)' }), gx - f.dir * 3, gy + 1); ctx.restore();   // ombre noire décalée
+  ctx.save(); ctx.globalAlpha = .62; drawFighter(Object.assign({}, f, { ghostDraw: true, flash: 0, tintKeep: '#ff40c8' }), gx, gy); ctx.restore();   // copie détaillée teintée rose
+  ctx.save(); ctx.globalAlpha = .18; ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, { ghostDraw: true, flash: 0, tint: 'rgba(255,60,210,1)' }), gx, gy); ctx.restore();   // glow
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let b = 0; b < 2; b++) { const L = []; for (let s2 = 0; s2 <= 5; s2++) L.push([gx + (Math.random() - .5) * 30, gy - 10 - s2 * 14]); elecArc(L, 'rgba(255,120,230,.8)', 1); }
+  ctx.restore();
+}
 function drawVaneFx() {
+  for (const p of G.vdust || []) { const a = 1 - p.t / 12; ctx.fillStyle = p.pink ? `rgba(255,70,210,${a})` : `rgba(10,0,20,${a})`; ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); }
+  for (const f of G.f) {
+    if (f.state === 'pteleport' && f.def.float) {   // glow rose autour de Vane pendant la désintégration / réintégration
+      const k = f.t < 14 ? 1 - f.t / 18 : .4 + (f.t - 14) / 23, cx = f.x, cy = f.y - 46 - floatOff(f), g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 66);
+      g.addColorStop(0, `rgba(255,100,230,${.9 * k})`); g.addColorStop(.5, `rgba(220,40,200,${.45 * k})`); g.addColorStop(1, 'rgba(40,0,40,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(cx - 70, cy - 70, 140, 140);
+      if (f.t >= 14) { const L = []; for (let s2 = 0; s2 <= 5; s2++) L.push([cx + (Math.random() - .5) * 34, f.y - floatOff(f) - s2 * 16]); elecArc(L, 'rgba(255,130,235,.8)', 1); }
+      ctx.restore();
+    }
+    if (f.state === 'tpstrike' && f.t < 16) {   // glow rose et noir autour du coup de pied
+      const kx = f.x + f.dir * 30, ky = f.y - 44 - floatOff(f), g = ctx.createRadialGradient(kx, ky, 1, kx, ky, 20);
+      g.addColorStop(0, 'rgba(255,170,240,.85)'); g.addColorStop(.5, 'rgba(255,40,190,.45)'); g.addColorStop(1, 'rgba(20,0,30,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(kx, ky, 20, 0, Math.PI * 2); ctx.fill();
+      for (let b = 0; b < 3; b++) { const a = Math.random() * 6.28; elecArc([[kx, ky], [kx + Math.cos(a) * 9, ky + Math.sin(a) * 9], [kx + Math.cos(a) * 18, ky + Math.sin(a) * 18]], 'rgba(255,120,230,.9)', 1.2); }
+      ctx.restore();
+    }
+    if ((f.state === 'meteor' || f.state === 'meteorD') && f.def.float) {   // halo rose autour du corps
+      const g = ctx.createRadialGradient(f.x, f.y - 40, 2, f.x, f.y - 40, 46); g.addColorStop(0, 'rgba(255,90,220,.45)'); g.addColorStop(1, 'rgba(40,0,60,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y - 40, 46, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+  }
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const q of G.voids || []) {   // sphère d'énergie noire crépitante
     const R = q.r, x = q.x, y = q.y;
@@ -2458,8 +2527,23 @@ function drawVaneFx() {
       }
     }
     if (f.paraT > 0) {   // paralysie : éclairs violets autour de la victime
+      const k = Math.min(1, f.paraT / 20), cy = f.y - 48, fl = .6 + Math.random() * .4;
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      for (let b = 0; b < 2; b++) { const L = []; for (let s2 = 0; s2 <= 5; s2++) L.push([f.x + (Math.random() - .5) * 26, f.y - s2 * 16]); elecArc(L, 'rgba(200,140,255,.85)', 1.2); }
+      let g = ctx.createRadialGradient(f.x, cy, 4, f.x, cy, 78);   // halo de glow
+      g.addColorStop(0, `rgba(255,110,240,${.5 * k * fl})`); g.addColorStop(.45, `rgba(170,60,255,${.3 * k * fl})`); g.addColorStop(1, 'rgba(60,0,120,0)');
+      ctx.fillStyle = g; ctx.fillRect(f.x - 80, cy - 80, 160, 160);
+      if (G.frame % 4 < 2) { ctx.globalAlpha = .55 * k; drawFighter(Object.assign({}, f, { flash: 0, tint: G.frame % 8 < 4 ? 'rgba(230,140,255,.9)' : 'rgba(255,255,255,.9)' }), f.x, f.y); ctx.globalAlpha = 1; }   // silhouette électrisée
+      for (let b = 0; b < 5; b++) {   // éclairs qui parcourent le corps
+        const L = [], x0 = f.x + (Math.random() - .5) * 40; for (let s2 = 0; s2 <= 6; s2++) L.push([x0 + (Math.random() - .5) * 34, f.y + 2 - s2 * 15]);
+        elecArc(L, 'rgba(160,80,255,.55)', 4); elecArc(L, b % 2 ? 'rgba(255,120,235,.95)' : 'rgba(230,200,255,.95)', 1.3);
+      }
+      for (let b = 0; b < 3; b++) {   // arcs qui jaillissent vers l'extérieur
+        const a0 = Math.random() * 6.28, L = [[f.x, cy]]; for (let s2 = 1; s2 <= 4; s2++) L.push([f.x + Math.cos(a0) * s2 * 15 + (Math.random() - .5) * 10, cy + Math.sin(a0) * s2 * 15 + (Math.random() - .5) * 10]);
+        elecArc(L, 'rgba(255,170,250,.8)', 1);
+      }
+      g = ctx.createRadialGradient(f.x, f.y, 2, f.x, f.y, 44); g.addColorStop(0, `rgba(220,120,255,${.45 * k})`); g.addColorStop(1, 'rgba(120,0,200,0)');   // flaque de lumière au sol
+      ctx.fillStyle = g; ctx.save(); ctx.translate(f.x, f.y); ctx.scale(1, .22); ctx.fillRect(-46, -46, 92, 92); ctx.restore();
+      for (let b = 0; b < 4; b++) { ctx.fillStyle = Math.random() < .5 ? '#ffd0ff' : '#c890ff'; ctx.fillRect(Math.round(f.x + (Math.random() - .5) * 60), Math.round(f.y - Math.random() * 100), 2, 2); }
       ctx.restore();
     }
   }
@@ -2493,7 +2577,7 @@ function updKael() {
 function drawKaelFx() {
   for (const f of G.f) {   // images rémanentes bleues de l'Esquive Éclair
     if (!f.ghosts) continue;
-    for (const g of f.ghosts) { ctx.save(); ctx.globalAlpha = .4 * (1 - g.t / 12); ctx.globalCompositeOperation = 'lighter'; ctx.filter = 'hue-rotate(180deg) saturate(3)'; drawFighter(Object.assign({}, f, { flash: 0 }), g.x, f.y); ctx.restore(); }
+    for (const g of f.ghosts) { ctx.save(); ctx.globalAlpha = .4 * (1 - g.t / 12); ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, { flash: 0, tint: 'rgba(60,170,255,.75)' }), g.x, f.y); ctx.restore(); }
   }
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   for (const q of G.sonics || []) {   // longue onde électrique avec halo
@@ -3069,12 +3153,12 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0 });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [] });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = [];
+  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3603,6 +3687,7 @@ function drawFight() {
   drawProps();
   drawShadow(a); drawShadow(b);
   const order = ATTACKING.includes(a.state) && !ATTACKING.includes(b.state) ? [b, a] : [a, b];
+  drawVaneBehind();
   order.forEach(f => {
     if (f.sinkK > 0) {   // Zephyr à moitié sous terre : on coupe tout ce qui passe sous le sol
       ctx.save(); ctx.beginPath(); ctx.rect(-1000, -1000, SW + 2000, GROUND + 1000 + 1); ctx.clip();
@@ -3612,6 +3697,7 @@ function drawFight() {
     if (f.fadeK > 0) { ctx.save(); ctx.globalAlpha = Math.max(0, 1 - f.fadeK); }
     drawFighter(f, f.dizzy ? f.x + Math.round(Math.sin(G.frame * .15) * 2) : f.x, f.y - fl);
     if (f.fadeK > 0) ctx.restore();
+    drawVaneGhost(f);
   });
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
