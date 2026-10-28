@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v91';
+const VERSION = 'v92';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1087,16 +1087,17 @@ function drawFighter(f, x = f.x, y = f.y) {
     const ch = map[r][c]; if (ch === '.') continue;
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
   }
-  if (d.mohawk) {   // crête iroquoise rouge : mèches pointues séparées, couchées vers l'arrière
+  if (d.mohawk) {   // crête iroquoise pleine en éventail (étroite à la base, large en haut), pointes au sommet
     const hp = d.hair, cx = hx + (dir > 0 ? 0 : -1);
-    for (let ox = 2; ox >= -5; ox--) sR(cx + dir * ox, hy, 1, 1, hp.h);   // racines sur le crâne
-    const spikes = [[2, 6, 1.6], [0, 9, 1.4], [-2, 8, 1.2], [-4, 6, 1], [-5, 4, .8]];   // pointes couchées vers l'avant
-    spikes.forEach(([ox, hgt, lean]) => {
-      for (let k = 0; k < hgt; k++) {
-        const t = k / hgt, x = Math.round(cx + dir * ox + dir * lean * hgt * t * t * .6), w = t < .5 ? 2 : 1;
-        const col = t > .75 ? hp.L : t > .4 ? hp.H : hp.h;
-        sR(dir > 0 ? x - (w - 1) : x, hy - k, w, 1, col);
-        if (t < .5) sR(dir > 0 ? x - w : x + w, hy - k, 1, 1, hp.a);   // ombre
+    const cols = [[3, 6, -.35], [2, 9, -.2], [1, 11, -.05], [0, 12, .1], [-1, 13, .28], [-2, 13, .45], [-3, 12, .65], [-4, 10, .85], [-5, 8, 1.05]];
+    for (let pass = 0; pass < 2; pass++) cols.forEach(([ox, hgt, ang], i) => {
+      const top = hgt + (i % 2 ? 2 : 0);
+      for (let k = 0; k <= top; k++) {
+        const t = k / top, x = cx + dir * ox - dir * Math.round(k * ang * .55), y = hy + 1 - k;
+        if (pass === 0) { sR(x - 1, y, 3, 1, hp.a); continue; }   // contour sombre
+        const col = t > .82 ? hp.L : t > .5 ? hp.H : t > .18 ? hp.h : hp.a;
+        sR(x, y, 1, 1, (i % 3 === 1 && t > .25 && t < .75) ? hp.h : col);
+        if (k < top - 1) sR(x - dir, y, 1, 1, t > .6 ? hp.H : hp.h);
       }
     });
   }
