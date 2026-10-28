@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v110';
+const VERSION = 'v111';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1286,7 +1286,7 @@ function initAudio() {
 // volume des bruitages (option SFX, 0 à 4 barres ; 4 = 100 %)
 const sfxVol = () => (typeof OPT === 'undefined' ? 4 : OPT.sfx) / 4;
 // Chaîne audio « 16 bits » : bus des bruitages → légère saturation quantifiée → compresseur → sortie ; écho pour les sons de menu
-let SFXBUS = null, CRUNCH = null, ECHO = null, VERB = null;
+let SFXBUS = null, CRUNCH = null, ECHO = null, VERB = null, VECHO = null;
 function sfxBus() {
   if (SFXBUS) return SFXBUS;
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = .002; comp.release.value = .12;
@@ -1300,6 +1300,8 @@ function sfxBus() {
   VERB = AC.createConvolver(); const len = Math.round(AC.sampleRate * 2.2), ir = AC.createBuffer(2, len, AC.sampleRate);   // réverbe : salle synthétique
   for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
   VERB.buffer = ir; const vg = AC.createGain(); vg.gain.value = .55; VERB.connect(vg).connect(SFXBUS); ECHO.connect(VERB);
+  VECHO = AC.createDelay(1); VECHO.delayTime.value = .24; const vfb = AC.createGain(); vfb.gain.value = .32; const vwet = AC.createGain(); vwet.gain.value = .42;   // delay plus long pour les voix de l'annonceur
+  VECHO.connect(vfb).connect(VECHO); VECHO.connect(vwet).connect(SFXBUS); VECHO.connect(VERB);
   return SFXBUS;
 }
 function tone(type, f0, f1, dur, vol, at = 0, out) {
@@ -1330,7 +1332,8 @@ function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
   const src = AC.createBufferSource(), g = AC.createGain();
   src.buffer = L[Math.random() * L.length | 0]; src.playbackRate.value = exact ? rate : rate * (.94 + Math.random() * .12);   // légère variation à chaque coup
-  g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); src.start(AC.currentTime + at);
+  g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); if (exact) { g.connect(VECHO); g.connect(VERB); }   // voix : delay + réverbe
+  src.start(AC.currentTime + at);
   return true;
 }
 function sfx(n) {
