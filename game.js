@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v131';
+const VERSION = 'v133';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1322,11 +1322,11 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'], wh4: ['wh4'], tele: ['tele1', 'tele2', 'tele3', 'tele4'], counter: ['ctr1', 'ctr2', 'ctr3', 'ctr4'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], perfect: ['perfect'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'], wh4: ['wh4'], tele: ['tele1', 'tele2', 'tele3', 'tele4'], counter: ['ctr1', 'ctr2', 'ctr3', 'ctr4'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=121').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=132').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
 const VOX = 1;   // hauteur des voix de l'annonceur (1 = voix d'origine)
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
@@ -3584,6 +3584,7 @@ const ALT = [
 ];
 const fighterDef = (i, alt) => alt ? Object.assign({}, DEFS[i], ALT[i], { idx: i, alt: true }) : Object.assign(DEFS[i], { idx: i });
 function startMatch(p1, p2, stage) {
+  G.hurt = [false, false];   // « PERFECT » : aucun coup encaissé de tout le combat
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
@@ -3813,7 +3814,9 @@ function step() {
       break;
     case 'over':
       G.t++;
-      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.4, VOX, true); }   // annonceur : « YOU WIN » / « YOU LOSE »
+      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.4, VOX, true); }
+      if (G.t === 20) { const w = G.f[0].wins >= 2 ? 0 : G.f[1].wins >= 2 ? 1 : -1; G.perfect = w >= 0 && G.hurt && !G.hurt[w]; }   // le vainqueur (joueur ou adversaire) n'a pris aucun coup
+      if (G.t === 100 && G.perfect && AC) playSample('perfect', 1.5, VOX, true);   // « PERFECT » juste après « YOU WIN »   // annonceur : « YOU WIN » / « YOU LOSE »
       if (G.t > 30) {
         const m = navStep(), oc = Math.max(0, Math.min(1, (G.ocurOver || 0) + m));
         if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
@@ -3842,6 +3845,7 @@ function stepFight() {
   if (a.cpu && !G.noAI) ctlUpdate(a.ctl, confuse(aiInput(a, b), a));
   if (b.cpu && !G.noAI) ctlUpdate(b.ctl, confuse(aiInput(b, a), b));
 
+  if (G.hurt) G.f.forEach((f, i) => { if (f.hp < 100) G.hurt[i] = true; });
   if (G.quakeT > 0) { G.quakeT--; G.shake = Math.max(G.shake, 3 + G.quakeT * .15); }   // vibration prolongée
   if (G.shake > 0) G.shake *= .8;
   if (G.shake < .3) G.shake = 0;
@@ -4478,6 +4482,7 @@ function drawOver() {
   text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center');
   const won = a.cpu === false ? aw : bw;
   if (G.t > 20) text(won ? 'YOU WIN!' : 'YOU LOSE...', CX, 4, 8, won ? '#ffd23a' : '#ff5a4a', 'center');
+  if (G.perfect && G.t > 100) { const k = Math.min(1, (G.t - 100) / 8), sc = 1 + (1 - k) * 2; ctx.save(); ctx.globalAlpha = k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('PERFECT!', 0, -8, 16, (G.frame >> 3) % 2 ? '#ffd23a' : '#ffffff', 'center'); ctx.restore(); }
   if (G.t > 30) ['RETRY', 'SELECT CHARACTER'].forEach((m, i) => {
     const sel = (G.ocurOver || 0) === i;
     text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
