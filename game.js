@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v123';
+const VERSION = 'v124';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -470,7 +470,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
+  { name: 'KAITO', twinFb: true, style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -479,7 +479,7 @@ const DEFS = [
     belt:  ['#040406', '#121216', '#26262e', '#44444e'],
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],
     fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
-  { name: 'JOHN', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
+  { name: 'JOHN', fireUpper: true, style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
     skin:  ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],
     hair:  { a: '#8a5a14', h: '#c08a24', H: '#ecc048', L: '#fff08a' },   // blond
     top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],                 // t-shirt rouge
@@ -1328,7 +1328,7 @@ function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
   for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=121').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
-const VOX = .84;   // voix de l'annonceur : légèrement plus graves, façon Dark Vador
+const VOX = 1;   // hauteur des voix de l'annonceur (1 = voix d'origine)
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
   const src = AC.createBufferSource(), g = AC.createGain();
@@ -1779,6 +1779,10 @@ function threatened(f, o) {
 function spawnFireball(f, big) {
   f.fb = { owner: f, x: f.x + f.dir * (big ? 52 : 40), y: f.y - 56, vx: 3.8 * f.dir, dir: f.dir, t: 0, alive: true, big: !!big, sc: big ? 2 : 1 };
   G.fbs.push(f.fb);
+  if (f.def.twinFb && !big) {   // Kaito : deux boules qui ondulent en sinusoïde, en opposition de phase
+    f.fb.y0 = f.fb.y; f.fb.ph = 0;
+    G.fbs.push(Object.assign({}, f.fb, { ph: Math.PI, twin: true }));
+  }
   sfx('fb');
 }
 
@@ -1920,6 +1924,15 @@ function updFighter(f, o) {
       // trajectoire en courbe : d'abord vers l'avant, puis de plus en plus vers le haut
       if (f.t === 0) f.apexT = null;
       if (f.t === 5) { f.air = true; sfx('upper'); }
+      if (f.def.fireUpper) {   // John : part loin en avant puis monte en courbe, poing enflammé
+        if (f.t === 3) f.fireState = 'uppercut';
+        if (f.t >= 5 && f.t <= 14) { f.vx = 6 * f.dir; f.vy = [-1.3, -1.5, -1.8, -2.1, -2.5, -3, -3.6, -4.4, -5.4, -6.6][f.t - 5]; if (f.t === 5) f.y -= 2; }
+        else if (f.t === 15) { f.vy = -7.4; f.vx = 2.8 * f.dir; }
+        else if (f.t > 15 && f.vy < 0) f.vx *= .88;
+        if (f.t > 15 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
+        if (f.t >= 4 && f.t < 24 && G.frame % 2 === 0) addSpark(f.x + f.dir * 22, f.y - 70 - Math.random() * 20, 'fb', f.def.fb);   // traînée de flammes
+        break;
+      }
       if (f.t >= 5 && f.t <= 10) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 5]; }
       else if (f.t === 11) { f.vy = -7.7; f.vx = 2.4 * f.dir; }
       else if (f.t > 11 && f.vy < 0) f.vx *= .86;
@@ -2380,7 +2393,7 @@ function updProps() {
         if (canX && (o.ctl.buf.x > 0 || (o.state === 'parry' && o.t <= 12)) && d < 60) {
           take(o.ctl, 'x'); setState(o, 'parry'); o.vx = 0;
           G.darkT = 14; G.flashT = 12; G.boltX = p.x; G.boltY = p.y; G.slowAll = 30; G.shake = 3;
-          addPopup(o.x, o.y - 100, 'REFLECT!', '#7af0ff'); sfx('parry');
+          addPopup(o.x, o.y - 100, 'REFLECT!', '#7af0ff'); sfx('counter');   // objet du décor contré
           const back = F.owner; aimProp(p, o, back); p.fly.deflected = false; p.fly.lastBy = o;
           continue;
         }
@@ -3357,6 +3370,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
       att.kcharge = 0; G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); addPopup(def.x, def.y - 100, 'KINETIC!', '#5af0ff');
     }
   }
+  if (att.def.fireUpper && att.state === 'uppercut' && !projectile) { data = Object.assign({}, data, { dmg: 19 }); def.burn = Math.max(def.burn || 0, 70); def.burnPal = att.def.fb; }   // poing en feu : plus de dégâts, brûlure
   // Rempart de Fer : absorbe totalement le coup puis repousse l'attaquant
   if ((def.state === 'rampart' && def.t >= 2) || (def.rampT > 0 && !def.air && !['fall', 'down', 'getup', 'held', 'throw'].includes(def.state))) {
     G.freeze = 8; addSpark(sx, sy, 'parry'); sfx('parry'); sfx('heavy'); def.rampT = 0;
@@ -3709,7 +3723,7 @@ function step() {
       break;
     case 'over':
       G.t++;
-      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.5, VOX, true); }   // annonceur : « YOU WIN » / « YOU LOSE »
+      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.4, VOX, true); }   // annonceur : « YOU WIN » / « YOU LOSE »
       if (G.t > 30) {
         const m = navStep(), oc = Math.max(0, Math.min(1, (G.ocurOver || 0) + m));
         if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
@@ -3729,9 +3743,9 @@ function stepFight() {
   G.t++;
 
   if (G.scene === 'intro') {
-    if (G.t === 1 && !(AC && playSample('r' + Math.min(3, G.round), 1.4, VOX, true))) sfx('beep');   // annonceur : « ROUND 1/2/3 »
-    if (G.t === 98 && !(AC && playSample('fight', 1.5, VOX, true))) sfx('go');                       // « FIGHT! »
-    if (G.t >= 138) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
+    if (G.t === 1 && !(AC && playSample('r' + Math.min(3, G.round), 1.3, VOX, true))) sfx('beep');   // annonceur : « ROUND 1/2/3 »
+    if (G.t === 84 && !(AC && playSample('fight', 1.4, VOX, true))) sfx('go');                       // « FIGHT! »
+    if (G.t >= 124) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
   }
 
   // Entrées
@@ -3762,6 +3776,7 @@ function stepFight() {
   // Boules d'énergie
   for (const fb of G.fbs) {
     fb.x += fb.vx; fb.t++;
+    if (fb.y0 != null) fb.y = fb.y0 + Math.sin(fb.t * .16 + fb.ph) * 13;   // ondulation synchronisée des deux boules
     if (fb.x < (G.camL || 0) - 30 || fb.x > (G.camL || 0) + W + 30) fb.alive = false;
   }
   for (let i = 0; i < G.fbs.length; i++) for (let j = i + 1; j < G.fbs.length; j++) {
@@ -3783,7 +3798,7 @@ function stepFight() {
     }
   }
   G.fbs = G.fbs.filter(fb => fb.alive);
-  [a, b].forEach(f => { if (f.fb && !f.fb.alive) f.fb = null; });
+  [a, b].forEach(f => { if (f.fb && !f.fb.alive) f.fb = G.fbs.find(q => q.owner === f && q.alive) || null; });
 
   // Coups au corps à corps
   for (const [att, def] of [[a, b], [b, a]]) {
@@ -4113,7 +4128,7 @@ function drawFight() {
   drawHUD();
 
   if (G.scene === 'intro') {
-    if (G.t < 98) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
+    if (G.t < 84) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
     else bigMsg('FIGHT!', 24, '#ff4a2a');
   } else if (G.scene === 'ko') {
     if (G.t < 120) { if ((G.t >> 2) % 2 || G.t > 40) bigMsg('K.O.', 32, '#ff3a2a', 76); }
