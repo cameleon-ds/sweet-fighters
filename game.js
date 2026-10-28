@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v121';
+const VERSION = 'v122';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1358,7 +1358,7 @@ function sfx(n) {
       case 'heavy': if (!playSample('heavy', 1.1)) { smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); } break;   // gros coup
       case 'block': if (!playSample('thud', .85, 1.35)) { tone('square', 1100, 700, .045, .35); noise(.06, .6, 3800, 'bandpass', 0, 2); } break;   // garde : son de chute, joué plus aigu
       case 'fb': if (playSample('fb', 1)) break; tone('sawtooth', 300, 90, .45, .3); tone('square', 600, 140, .3, .14); noise(.45, .45, 1400, 'bandpass', 300, .8); break;   // projectile : souffle d'énergie
-      case 'upper': noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); break;
+      case 'upper': if (!playSample('jump', .7, 1)) { noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); } break;   // shoryuken et envols : même whoosh que le saut
       case 'ko': playSample('ko', 1.2, .85); tone('sine', 140, 28, 1.2, .6); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
       case 'thud': if (!playSample('thud', 1)) { tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); } break;   // chute au sol
       case 'crash': noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
