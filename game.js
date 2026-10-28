@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v107';
+const VERSION = 'v108';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1319,18 +1319,33 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 }
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
+// Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'] };
+const SFX_BUF = {}; let sfxLoading = false;
+function loadSfx() {
+  if (sfxLoading || !AC) return; sfxLoading = true;
+  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=108').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+}
+function playSample(k, vol = 1, rate = 1) {
+  const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
+  const src = AC.createBufferSource(), g = AC.createGain();
+  src.buffer = L[Math.random() * L.length | 0]; src.playbackRate.value = rate * (.94 + Math.random() * .12);   // légère variation à chaque coup
+  g.gain.value = vol * sfxVol(); src.connect(g).connect(sfxBus()); src.start();
+  return true;
+}
 function sfx(n) {
+  if (AC && !sfxLoading) loadSfx();
   if (!AC || (typeof OPT !== 'undefined' && OPT.sfx === 0)) return;
   try {
     switch (n) {
       case 'whoosh': noise(.13, .4, 500, 'bandpass', 2600, 1.4); break;   // fouetté qui siffle vers l'aigu
-      case 'hit': smack(2400, .8, 190, 60, .12, .9); break;                 // coup léger : « pak »
-      case 'heavy': smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); break;   // gros coup : « BAM »
+      case 'hit': if (!playSample('light', 1)) smack(2400, .8, 190, 60, .12, .9); break;                 // coup léger
+      case 'heavy': if (!playSample('heavy', 1.1)) { smack(1600, 1, 150, 38, .24, 1.1); noise(.3, .6, 380, 'lowpass', 90); } break;   // gros coup
       case 'block': tone('square', 1100, 700, .045, .35); noise(.06, .6, 3800, 'bandpass', 0, 2); tone('triangle', 320, 160, .07, .4); break;   // garde : « tchk »
       case 'fb': tone('sawtooth', 300, 90, .45, .3); tone('square', 600, 140, .3, .14); noise(.45, .45, 1400, 'bandpass', 300, .8); break;   // projectile : souffle d'énergie
       case 'upper': noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); break;
-      case 'ko': tone('sine', 140, 28, 1.2, 1); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
-      case 'thud': tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); break;   // chute au sol
+      case 'ko': playSample('ko', 1.2, .85); tone('sine', 140, 28, 1.2, .6); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
+      case 'thud': if (!playSample('thud', 1)) { tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); } break;   // chute au sol
       case 'crash': noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
       case 'beep': {   // déplacement du curseur : note aiguë 8 bits (une noire) avec delay et réverbe
         sfxBus(); const g = tone('square', 1760, 1760, .5, .14, 0, SFXBUS); g.connect(ECHO); g.connect(VERB);
