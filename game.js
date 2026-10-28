@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v90';
+const VERSION = 'v91';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1012,11 +1012,12 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (d.vest && !fullBack) {   // gilet sans manches : pans ouverts devant, col montant
     const V = d.vestP;
     if (!backView) {
-      sPoly([add(sh, fwd, -7), add(sh, fwd, -2.5), add(at(.5), fwd, -2), add(wa, fwd, -1.5), add(wa, fwd, -5), add(at(.5), fwd, -6.5)], V[2]);
-      sPoly([add(sh, fwd, 3), add(sh, fwd, 7.5), add(at(.4), fwd, 7.5), add(wa, fwd, 5.5), add(wa, fwd, 2.5), add(at(.5), fwd, 2.5)], V[2]);
-      sPoly([add(sh, fwd, -7), add(sh, fwd, -5.5), add(wa, fwd, -4), add(wa, fwd, -5)], V[1]);
-      for (const o of [-2.5, 3]) for (let t = 0; t <= 1; t += .08) { const q = mix(add(sh, fwd, o), add(wa, fwd, o > 0 ? 2.5 : -1.5), t); sR(q[0], q[1], 1, 1, V[0]); }   // bords
-      sR(add(at(.2), fwd, 5)[0], add(at(.2), fwd, 5)[1], 2, 1, V[3]);
+      // pan côté caméra large, pan côté adversaire étroit : le débardeur noir apparaît au centre-avant
+      sPoly([add(sh, fwd, -7.5), add(sh, fwd, -.5), add(at(.5), fwd, 0), add(wa, fwd, .5), add(wa, fwd, -5), add(at(.5), fwd, -7)], V[2]);
+      sPoly([add(sh, fwd, 5), add(sh, fwd, 7.5), add(at(.4), fwd, 7.5), add(wa, fwd, 5.5), add(wa, fwd, 4), add(at(.5), fwd, 4.5)], V[2]);
+      sPoly([add(sh, fwd, 5.8), add(sh, fwd, 7.5), add(wa, fwd, 5.5), add(wa, fwd, 4.8)], V[1]);
+      for (const o of [-.5, 5]) for (let t = 0; t <= 1; t += .08) { const q = mix(add(sh, fwd, o), add(wa, fwd, o > 0 ? 4 : .5), t); sR(q[0], q[1], 1, 1, V[0]); }   // bords
+      sR(add(at(.2), fwd, -4)[0], add(at(.2), fwd, -4)[1], 2, 1, V[3]);
     } else sPoly([add(sh, fwd, -7), add(sh, fwd, 7), add(wa, fwd, 5), add(wa, fwd, -5)], V[2]);
     const c1 = add(n, fwd, -4), c2 = add(n, fwd, 3.5);   // col montant
     sPoly([add(c1, [0, -3]), add(c1, [0, 2]), add(sh, fwd, -2.5), add(n, fwd, -1.5)], V[1]);
@@ -1089,13 +1090,13 @@ function drawFighter(f, x = f.x, y = f.y) {
   if (d.mohawk) {   // crête iroquoise rouge : mèches pointues séparées, couchées vers l'arrière
     const hp = d.hair, cx = hx + (dir > 0 ? 0 : -1);
     for (let ox = 2; ox >= -5; ox--) sR(cx + dir * ox, hy, 1, 1, hp.h);   // racines sur le crâne
-    const spikes = [[2, 5, 1.1], [0, 8, 1.3], [-2, 9, 1.6], [-4, 7, 1.9], [-5, 4, 2.2]];
+    const spikes = [[2, 6, 1.6], [0, 9, 1.4], [-2, 8, 1.2], [-4, 6, 1], [-5, 4, .8]];   // pointes couchées vers l'avant
     spikes.forEach(([ox, hgt, lean]) => {
       for (let k = 0; k < hgt; k++) {
-        const t = k / hgt, x = Math.round(cx + dir * ox - dir * lean * hgt * t * t * .6), w = t < .5 ? 2 : 1;
+        const t = k / hgt, x = Math.round(cx + dir * ox + dir * lean * hgt * t * t * .6), w = t < .5 ? 2 : 1;
         const col = t > .75 ? hp.L : t > .4 ? hp.H : hp.h;
         sR(dir > 0 ? x - (w - 1) : x, hy - k, w, 1, col);
-        if (t < .5) sR(dir > 0 ? x - w : x + w, hy - k, 1, 1, hp.a);   // ombre côté nuque
+        if (t < .5) sR(dir > 0 ? x - w : x + w, hy - k, 1, 1, hp.a);   // ombre
       }
     });
   }
