@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v103';
+const VERSION = 'v104';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -29,7 +29,7 @@ function resize() {
   if (nw !== W) {
     const old = W; W = nw; CX = W / 2; SW = W + 2 * EXT;
     cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false;
-    if (typeof makeBG === 'function') { BGS.dojo = buildStageBG('dojo'); BGS.city = buildStageBG('city'); BG = BGS[(typeof G !== 'undefined' && G.stage) || 'dojo']; }
+    if (typeof makeBG === 'function') { for (const k in STAGE_IMG) BGS[k] = buildStageBG(k); BG = BGS[(typeof G !== 'undefined' && G.stage) || 'dojo']; }
     if (typeof G !== 'undefined' && G.f) G.f.forEach(f => { f.x += (W - old) / 2; });
     if (typeof G !== 'undefined' && G.props) G.props.forEach(p => { p.x += (W - old) / 2; });
   }
@@ -217,17 +217,18 @@ let BG = null;
 const BGS = {};
 // Décors dessinés à partir des images (fidèles aux illustrations) : mis à l'échelle sur la largeur de la scène,
 // la ligne du sol de l'image est calée sur le sol du jeu
-const STAGE_IMG = { dojo: ['stage_dojo.jpg', 650], city: ['stage_city.jpg', 652] };
+const STAGE_IMG = { dojo: ['stage_dojo.jpg', 650], city: ['stage_city.jpg', 652], temple: ['stage_temple.jpg', 668], hall: ['stage_hall.jpg', 668], terrace: ['stage_terrace.jpg', 660], alley: ['stage_alley.jpg', 630], ring: ['stage_ring.jpg', 722], lab: ['stage_lab.jpg', 676] };
+const URBAN = ['city', 'terrace', 'alley', 'ring', 'lab'];   // décors urbains : poubelles, cônes, bouteilles
 const STAGE_PIC = {};
 for (const k in STAGE_IMG) {
   const im = new Image();
   im.onload = () => { BGS[k] = buildStageBG(k); if (typeof G !== 'undefined' && G.stage === k) BG = BGS[k]; };
-  im.src = STAGE_IMG[k][0] + '?v=51';
+  im.src = STAGE_IMG[k][0] + '?v=104';
   STAGE_PIC[k] = im;
 }
 function buildStageBG(k) {
   const im = STAGE_PIC[k], floor = STAGE_IMG[k][1] / 768;
-  if (!im || !im.complete || !im.naturalWidth) return k === 'city' ? makeCityBG() : makeBG();
+  if (!im || !im.complete || !im.naturalWidth) return URBAN.includes(k) ? makeCityBG() : makeBG();
   const c = document.createElement('canvas'); c.width = SW; c.height = H;
   const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
   const sc = Math.max(SW / im.naturalWidth, (H + 32) / im.naturalHeight), w = im.naturalWidth * sc, h = im.naturalHeight * sc;
@@ -2207,7 +2208,7 @@ const PROP_HIT = { dmg: 9, knock: true, stun: 22, bstun: 16, push: 3.6, chip: 0,
 const PROP_DIM = { chair: [30, 46], vase: [12, 22], tallvase: [14, 30], crate: [22, 20], pot: [18, 30], bottle: [9, 24], cone: [22, 31], trash: [27, 38] };
 function makeProps() {
   const X = f => Math.round(SW * f);
-  const list = G.stage === 'city'
+  const list = URBAN.includes(G.stage)
     ? [['trash', X(.05), 0], ['bottle', X(.12), 0], ['cone', X(.2), 0], ['bottle', X(.8), 0], ['cone', X(.88), 0], ['trash', X(.95), 0]]
     : [['crate', X(.05), 0], ['vase', X(.12), 0], ['chair', X(.2), 0], ['pot', X(.8), 0], ['tallvase', X(.88), 1], ['crate', X(.95), 0]];
   return list
@@ -3379,7 +3380,7 @@ function bgmRoute() {
 function musicWanted() {
   if (G.scene === 'title') return 'title';
   if (G.scene === 'select' || G.scene === 'stage' || G.scene === 'over') return 'select';
-  return G.stage === 'city' ? 'city' : 'dojo';
+  return G.stage === 'dojo' ? 'dojo' : 'city';   // nouveaux décors : musique de la ville en attendant
 }
 function updateMusic() {
   const want = musicWanted();
@@ -3465,8 +3466,10 @@ function step() {
     }
     case 'stage': {
       G.t++;
-      if (edge(pctl, 'l') && (G.scur || 0) > 0) { G.scur = 0; sfx('beep'); }
-      if (edge(pctl, 'r') && (G.scur || 0) < 1) { G.scur = 1; sfx('beep'); }
+      { const N = STAGES.length, c0 = G.scur || 0;   // grille 4 x 2
+        if (edge(pctl, 'l')) { G.scur = (c0 + N - 1) % N; sfx('beep'); }
+        if (edge(pctl, 'r')) { G.scur = (c0 + 1) % N; sfx('beep'); }
+        if (edge(pctl, 'u') || edge(pctl, 'd')) { G.scur = (c0 + 4) % N; sfx('beep'); } }
       if (G.t > 10 && okPress(pctl)) { startMatch(G.p1, G.p2, STAGES[G.scur || 0][0]); sfx('select'); }
       else if (G.t > 10 && backPress(pctl)) { G.scene = 'select'; G.selPhase = 1; G.t = 0; sfx('beep'); }
       break;
@@ -3656,8 +3659,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=103'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=103'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
@@ -4073,14 +4076,14 @@ function drawSelect() {
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
 }
 
-const STAGES = [['dojo', 'DOJO'], ['city', 'CITY NIGHT']];
+const STAGES = [['dojo', 'DOJO'], ['city', 'CITY NIGHT'], ['temple', 'MISTY TEMPLE'], ['hall', 'GARGOYLE HALL'], ['terrace', 'INFERNO TERRACE'], ['alley', 'BACK ALLEY'], ['ring', 'UNDERGROUND RING'], ['lab', 'BIO LAB']];
 function drawStageSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   text('SELECT STAGE', CX, 14, 8, '#ffd23a', 'center');
-  const cw = Math.min(170, (W - 40) / 2 - 6), ch = Math.round(cw * 9 / 16);
+  const COLS = 4, gap = 8, cw = Math.floor(Math.min(104, (W - 24 - gap * (COLS - 1)) / COLS)), ch = Math.round(cw * 9 / 16), x0 = Math.round(CX - (COLS * cw + (COLS - 1) * gap) / 2);
   STAGES.forEach(([id, name], i) => {
-    const x = CX - cw - 6 + i * (cw + 12), y = 54, on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
+    const x = x0 + (i % COLS) * (cw + gap), y = 36 + Math.floor(i / COLS) * (ch + 30), on = (G.scur || 0) === i, blink = (G.frame >> 3) % 2;
     R(x - 3, y - 3, cw + 6, ch + 6, on ? (blink ? '#ffd23a' : '#ff6a1a') : '#5a4a60');
     R(x - 1, y - 1, cw + 2, ch + 2, '#000');
     const bg = BGS[id];
@@ -4127,7 +4130,7 @@ function render() {
 }
 
 resize();
-if (!BG) { BGS.dojo = buildStageBG('dojo'); BGS.city = buildStageBG('city'); BG = BGS.dojo; }
+if (!BG) { for (const k in STAGE_IMG) BGS[k] = buildStageBG(k); BG = BGS.dojo; }
 
 let last = performance.now(), acc = 0;
 function loop(now) {
