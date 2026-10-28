@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v133';
+const VERSION = 'v134';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3604,7 +3604,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.quakeT = 0; G.clashFx = []; G.toxics = []; G.toxFx = []; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
+  G.rPerf = null; G.quakeT = 0; G.clashFx = []; G.toxics = []; G.toxFx = []; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3946,7 +3946,10 @@ function stepFight() {
     }
   } else if (G.scene === 'ko' || G.scene === 'timeup') {
     const w = G.winner;
-    if (w && G.t > 100 && !w.air && [...NEUTRAL, 'land'].includes(w.state)) { setState(w, 'win'); w.vx = 0; }
+    if (w && G.t > 100 && !w.air && [...NEUTRAL, 'land'].includes(w.state)) {
+      setState(w, 'win'); w.vx = 0;
+      if (w.hp >= 100 && G.rPerf == null) { G.rPerf = G.t; if (AC) playSample('perfect', 1.5, VOX, true); }   // round gagné sans prendre de coup
+    }
     if (G.t > 260) {
       if (G.f.some(f => f.wins >= 2)) { G.scene = 'over'; G.t = 0; G.ocurOver = 0; }
       else { G.round++; startRound(); }
@@ -4227,10 +4230,18 @@ function drawFight() {
   } else if (G.scene === 'ko') {
     if (G.t < 120) { if ((G.t >> 2) % 2 || G.t > 40) bigMsg('K.O.', 32, '#ff3a2a', 76); }
     else bigMsg(G.winner ? G.winner.def.name + ' WINS!' : 'DOUBLE K.O.', 16, '#ffd23a');
+    drawRoundPerfect();
   } else if (G.scene === 'timeup') {
     if (G.t < 120) bigMsg('TIME OVER', 16, '#ffd23a');
     else bigMsg(G.winner ? G.winner.def.name + ' WINS!' : 'DRAW', 16, '#ffd23a');
+    drawRoundPerfect();
   }
+}
+function drawRoundPerfect() {   // « PERFECT » qui apparaît en dézoom quand le vainqueur lève le bras
+  if (G.rPerf == null) return;
+  const dt = G.t - G.rPerf, k = Math.min(1, dt / 14), e = 1 - Math.pow(1 - k, 3), sc = 1 + (1 - e) * 3.5;
+  ctx.save(); ctx.globalAlpha = Math.min(1, dt / 6); ctx.translate(CX, 116); ctx.scale(sc, sc);
+  text('PERFECT', 0, -12, 24, (G.frame >> 3) % 2 ? '#ffd23a' : '#ffffff', 'center'); ctx.restore();
 }
 
 // ---------- Liste des coups (3 pages) ----------
