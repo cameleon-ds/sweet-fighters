@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v122';
+const VERSION = 'v123';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1328,6 +1328,7 @@ function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
   for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=121').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
 }
+const VOX = .84;   // voix de l'annonceur : légèrement plus graves, façon Dark Vador
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
   const L = (SFX_BUF[k] || []).filter(Boolean); if (!L.length) return false;
   const src = AC.createBufferSource(), g = AC.createGain();
@@ -3708,7 +3709,7 @@ function step() {
       break;
     case 'over':
       G.t++;
-      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.4, 1, true); }   // annonceur : « YOU WIN » / « YOU LOSE »
+      if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.5, VOX, true); }   // annonceur : « YOU WIN » / « YOU LOSE »
       if (G.t > 30) {
         const m = navStep(), oc = Math.max(0, Math.min(1, (G.ocurOver || 0) + m));
         if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
@@ -3728,9 +3729,9 @@ function stepFight() {
   G.t++;
 
   if (G.scene === 'intro') {
-    if (G.t === 1 && !(AC && playSample('r' + Math.min(3, G.round), 1.3, 1, true))) sfx('beep');   // annonceur : « ROUND 1/2/3 »
-    if (G.t === 84 && !(AC && playSample('fight', 1.4, 1, true))) sfx('go');                       // « FIGHT! »
-    if (G.t >= 124) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
+    if (G.t === 1 && !(AC && playSample('r' + Math.min(3, G.round), 1.4, VOX, true))) sfx('beep');   // annonceur : « ROUND 1/2/3 »
+    if (G.t === 98 && !(AC && playSample('fight', 1.5, VOX, true))) sfx('go');                       // « FIGHT! »
+    if (G.t >= 138) { G.scene = 'fight'; G.fighting = true; G.t = 0; }
   }
 
   // Entrées
@@ -4112,7 +4113,7 @@ function drawFight() {
   drawHUD();
 
   if (G.scene === 'intro') {
-    if (G.t < 84) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
+    if (G.t < 98) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
     else bigMsg('FIGHT!', 24, '#ff4a2a');
   } else if (G.scene === 'ko') {
     if (G.t < 120) { if ((G.t >> 2) % 2 || G.t > 40) bigMsg('K.O.', 32, '#ff3a2a', 76); }
