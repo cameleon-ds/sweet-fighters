@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v112';
+const VERSION = 'v113';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4248,7 +4248,7 @@ function drawSelect() {
   text(isTouch ? 'A: CONFIRM   B: BACK' : 'ENTER: CONFIRM   ESC: BACK', CX, 206, 8, '#d8c8a8', 'center');
 }
 
-const STAGES = [['dojo', 'DOJO'], ['city', 'CITY NIGHT'], ['temple', 'MISTY TEMPLE'], ['hall', 'GARGOYLE HALL'], ['terrace', 'INFERNO TERRACE'], ['alley', 'BACK ALLEY'], ['ring', 'UNDERGROUND RING'], ['lab', 'BIO LAB']];
+const STAGES = [['dojo', 'DOJO'], ['city', 'CITY NIGHT'], ['alley', 'BACK ALLEY'], ['temple', 'MISTY TEMPLE'], ['hall', 'GARGOYLE HALL'], ['lab', 'BIO LAB'], ['ring', 'UNDERGROUND RING'], ['terrace', 'INFERNO TERRACE']];
 function drawStageSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
