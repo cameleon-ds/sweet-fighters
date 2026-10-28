@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v92';
+const VERSION = 'v93';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1087,19 +1087,19 @@ function drawFighter(f, x = f.x, y = f.y) {
     const ch = map[r][c]; if (ch === '.') continue;
     sR(hx + (dir > 0 ? c - 5 : 4 - c), hy + r, 1, 1, pal[ch]);
   }
-  if (d.mohawk) {   // crête iroquoise pleine en éventail (étroite à la base, large en haut), pointes au sommet
-    const hp = d.hair, cx = hx + (dir > 0 ? 0 : -1);
-    const cols = [[3, 6, -.35], [2, 9, -.2], [1, 11, -.05], [0, 12, .1], [-1, 13, .28], [-2, 13, .45], [-3, 12, .65], [-4, 10, .85], [-5, 8, 1.05]];
-    for (let pass = 0; pass < 2; pass++) cols.forEach(([ox, hgt, ang], i) => {
-      const top = hgt + (i % 2 ? 2 : 0);
-      for (let k = 0; k <= top; k++) {
-        const t = k / top, x = cx + dir * ox - dir * Math.round(k * ang * .55), y = hy + 1 - k;
-        if (pass === 0) { sR(x - 1, y, 3, 1, hp.a); continue; }   // contour sombre
-        const col = t > .82 ? hp.L : t > .5 ? hp.H : t > .18 ? hp.h : hp.a;
-        sR(x, y, 1, 1, (i % 3 === 1 && t > .25 && t < .75) ? hp.h : col);
-        if (k < top - 1) sR(x - dir, y, 1, 1, t > .6 ? hp.H : hp.h);
+  if (d.mohawk) {   // crête iroquoise qui fait le tour du crâne, du front à la nuque, pointes rayonnantes
+    const hp = d.hair, cx = hx + (dir > 0 ? .5 : -.5), cy = hy + 5.5;
+    const N = 15;
+    for (let pass = 0; pass < 3; pass++) for (let i = 0; i <= N; i++) {
+      const th = -.55 + i / N * 2.75, vx = -dir * Math.sin(th), vy = -Math.cos(th);
+      const L = (i % 2 ? 3.2 : 5.2) * (1 - Math.max(0, i - 11) * .12) * (i < 2 ? .7 : 1);
+      if (pass === 0) { for (let r2 = 4.2; r2 <= 6; r2 += .5) sR(Math.round(cx + vx * r2), Math.round(cy + vy * r2), 1, 1, hp.a); continue; }   // base sombre sur le crâne
+      for (let r2 = 5.2; r2 <= 5.2 + L; r2 += .5) {
+        const t = (r2 - 5.2) / L, col = pass === 1 ? hp.a : t > .7 ? hp.L : t > .35 ? hp.H : hp.h;
+        const px = Math.round(cx + vx * r2), py = Math.round(cy + vy * r2);
+        if (pass === 1) { if (t < .8) sR(px - 1, py, 3, 1, col); } else sR(px, py, 1, 1, col);
       }
-    });
+    }
   }
   if (d.witchHat) {   // grand chapeau de sorcière noir, incliné vers l'arrière, pointe tordue
     const WH = ['#050508', '#121218', '#22222c', '#3a3a4a'], cx = hx + (dir > 0 ? 0 : -1), by = hy + 3;
@@ -1520,7 +1520,7 @@ const ATK = {
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1591,6 +1591,7 @@ function poseOf(f) {
     case 'flask': return f.t < 8 ? 'special0' : 'punch1';
     case 'sonic': return f.t < 5 ? 'fpunch0' : f.t < 16 ? 'fpunch1' : 'fpunch0';
     case 'flashstep': return 'block';
+    case 'plasmawall': return f.t < 6 ? 'crouch' : f.t < 34 ? 'win' : 'upper0';
     case 'smokeback': return f.t < 4 ? 'special0' : 'hit';
     case 'geyser': return f.t < 8 ? 'upper1' : 'gq1';
     case 'wallslash': return f.t < 8 ? 'upper1' : f.t < 11 ? 'fpunch1' : f.t < 28 ? 'cpunch' : 'crouch';
@@ -1660,7 +1661,7 @@ function updFighter(f, o) {
           break;
         }
         if (f.def.kit === 'kael') {   // Kael : Uppercut Plasma / Esquive Éclair / Onde Sonique
-          if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; sfx('upper'); break; }
+          if (h.u) { setState(f, 'plasmawall'); f.vx = 0; break; }
           if (back) { setState(f, 'flashstep'); f.invuln = 12; sfx('whoosh'); break; }
           if (!G.sonics.some(q => q.owner === f)) { setState(f, 'sonic'); f.vx = 0; break; }
           break;
@@ -1876,6 +1877,11 @@ function updFighter(f, o) {
       f.vx = f.t < 6 ? f.dir * 1.5 : 0;
       if (f.t === 6) { G.sonics.push({ owner: f, x: f.x + f.dir * 30, y: f.y - 56, dir: f.dir, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; sfx('heavy'); sfx('fb'); G.shake = Math.max(G.shake, 2); }
       if (f.t >= 26) setState(f, 'idle');
+      break;
+    case 'plasmawall':   // bras levé, vu de face : mur électrique du sol jusqu'en haut de l'écran
+      f.vx = 0;
+      if (f.t === 8) { G.pwalls.push({ owner: f, x: f.x + f.dir * 26, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; G.shake = Math.max(G.shake, 4); G.flashT = Math.max(G.flashT, 4); sfx('parry'); sfx('heavy'); }
+      if (f.t >= 40) setState(f, 'idle');
       break;
     case 'flashstep':   // pas de côté éclair vers l'arrière, les gants se chargent
       f.vx = f.t < 10 ? -f.dir * 6.5 : f.vx * .5;
@@ -2294,6 +2300,7 @@ const CRUSH_SHOCK = { dmg: 7, knock: true, stun: 20, bstun: 14, push: 4, chip: 0
 const RAMPART_HIT = { dmg: 6, knock: true, stun: 20, bstun: 14, push: 6, chip: 0, sfx: 'heavy', unblock: true };
 /* ---------- Kael : onde sonique, gants chargés, aura plasma ---------- */
 const SONIC_HIT = { dmg: 8, stun: 18, bstun: 12, push: 6.5, chip: 1, sfx: 'heavy' };
+const PWALL_HIT = { dmg: 14, knock: true, lift: 8.5, stun: 22, bstun: 16, push: 3, chip: 3, sfx: 'heavy' };
 const SONIC_BIG = { dmg: 15, knock: true, stun: 22, bstun: 16, push: 8, chip: 3, sfx: 'heavy' };
 function updKael() {
   for (const q of G.sonics || []) {
@@ -2307,6 +2314,14 @@ function updKael() {
     for (const b of G.sonics) if (b !== q && !b.dead && b.owner !== q.owner && Math.abs(b.x - q.x) < 20) { b.dead = true; q.dead = true; addSpark(q.x, q.y, 'parry'); }
   }
   if (G.sonics) G.sonics = G.sonics.filter(q => !q.dead);
+  for (const w of G.pwalls || []) {   // mur de plasma : touche l'adversaire collé et arrête les projectiles
+    w.t++; const o = G.f.find(f => f !== w.owner), half = w.big ? 26 : 20;
+    if (!w.done && o && w.t < 26 && hurtbox(o) && Math.abs(o.x - w.x) < half + 10) { w.done = true; applyHit(w.owner, o, w.big ? Object.assign({}, PWALL_HIT, { dmg: 20 }) : PWALL_HIT, w.x, o.y - 50, w.x - Math.sign(o.x - w.x || 1), true); }
+    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== w.owner && Math.abs(fb.x - w.x) < half) { fb.alive = false; addSpark(fb.x, fb.y, 'parry'); }
+    for (const b of G.blades || []) if (!b.dead && b.owner !== w.owner && Math.abs(b.x - w.x) < half) { b.dead = true; addSpark(b.x, b.y, 'parry'); }
+    for (const b of G.sonics || []) if (!b.dead && b.owner !== w.owner && Math.abs(b.x - w.x) < half) { b.dead = true; addSpark(b.x, b.y, 'parry'); }
+  }
+  if (G.pwalls) G.pwalls = G.pwalls.filter(w => w.t < 40);
   for (const f of G.f) { if (f.kcharge > 0) f.kcharge--; if (f.def.kit === 'kael' && f.state === 'flashstep' && G.frame % 2 === 0) (f.ghosts = f.ghosts || []).push({ x: f.x, t: 0 }); if (f.ghosts) { f.ghosts.forEach(g => g.t++); f.ghosts = f.ghosts.filter(g => g.t < 12); } }
 }
 function drawKaelFx() {
@@ -2325,6 +2340,21 @@ function drawKaelFx() {
       ctx.beginPath(); ctx.ellipse(rx, y, rr * .35, rr, 0, q.dir > 0 ? -1.6 : 1.55, q.dir > 0 ? 1.6 : 4.7); ctx.stroke();
     }
     for (let k = 0; k < 4; k++) { const yy = y - 10 * sc + k * 7 * sc; ctx.strokeStyle = 'rgba(200,250,255,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - q.dir * (20 + k * 6), yy); ctx.lineTo(x - q.dir * (50 + k * 10) * sc, yy); ctx.stroke(); }
+  }
+  for (const w of G.pwalls || []) {   // mur électrique du sol jusqu'en haut de l'écran
+    const a = Math.min(1, w.t / 4, (40 - w.t) / 12), half = (w.big ? 26 : 20) * (w.t < 4 ? .4 + w.t * .15 : 1), top = -40, bot = GROUND + 2;
+    const g = ctx.createLinearGradient(w.x - half * 2.2, 0, w.x + half * 2.2, 0);
+    g.addColorStop(0, 'rgba(26,120,208,0)'); g.addColorStop(.25, `rgba(60,170,255,${.5 * a})`); g.addColorStop(.42, `rgba(150,225,255,${.8 * a})`); g.addColorStop(.5, `rgba(240,252,255,${.95 * a})`); g.addColorStop(.58, `rgba(150,225,255,${.8 * a})`); g.addColorStop(.75, `rgba(60,170,255,${.5 * a})`); g.addColorStop(1, 'rgba(26,120,208,0)');
+    ctx.fillStyle = g; ctx.fillRect(w.x - half * 2.2, top, half * 4.4, bot - top);
+    ctx.globalAlpha = a;
+    for (let b = 0; b < 8; b++) {   // éclairs verticaux qui serpentent dans le mur
+      const L = []; for (let s2 = 0; s2 <= 14; s2++) L.push([w.x + (Math.random() - .5) * half * 1.6, bot - (bot - top) * s2 / 14]);
+      elecArc(L, b < 2 ? '#ffffff' : 'rgba(120,220,255,.9)', b < 2 ? 1.5 : 1);
+    }
+    for (let k = 0; k < 6; k++) { const yy = bot - ((G.frame * 9 + k * 37) % (bot - top)); ctx.fillStyle = 'rgba(220,250,255,.9)'; ctx.fillRect(Math.round(w.x + (k % 2 ? -1 : 1) * half * .7), yy, 2, 6); }   // particules qui montent
+    const gg = ctx.createRadialGradient(w.x, bot, 2, w.x, bot, half * 3); gg.addColorStop(0, `rgba(200,250,255,${.8 * a})`); gg.addColorStop(1, 'rgba(26,120,208,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.ellipse(w.x, bot, half * 3, 8, 0, 0, Math.PI * 2); ctx.fill();   // impact au sol
+    ctx.globalAlpha = 1;
   }
   for (const f of G.f) {
     if (f.kcharge > 0 && f.handW) {   // gants chargés : étincelles bleues autour du poing
@@ -2873,7 +2903,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = [];
+  G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3483,7 +3513,7 @@ const MOVES = [
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'KAEL SPECIALS', lines: [
     ['A', 'SONIC WAVE'], ['', 'SUPERSONIC JAB, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
-    ['UP + A', 'PLASMA UPPERCUT'], ['', 'LAUNCHES THE FOE SKY HIGH'] ] },
+    ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
   { title: 'NYX SPECIALS', lines: [
     ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC MIST'], ['', 'REVERSES FOE CONTROLS, STOPS SHOTS'],
     ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'] ] },
