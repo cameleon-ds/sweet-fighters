@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v114';
+const VERSION = 'v115';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2298,6 +2298,41 @@ function breakProp(p, x = p.x, y = p.y - 10) {
   for (let i = 0; i < 14; i++) G.shards.push({ x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 10,
     vx: (Math.random() - .5) * 5, vy: -1.5 - Math.random() * 3.5, col: cols[i % cols.length], s: 1 + (Math.random() * 3 | 0), t: 0 });
   sfx('crash'); G.shake = Math.max(G.shake, 2);
+  if (p.type === 'labdrum') {   // Bio Lab : le tonneau libère une flaque de liquide toxique vert
+    (G.toxics = G.toxics || []).push({ x: Math.max(30, Math.min(SW - 30, x)), t: 0, life: 360 });
+    for (let i = 0; i < 18; i++) G.shards.push({ x: x + (Math.random() - .5) * 8, y: y + (Math.random() - .5) * 8, vx: (Math.random() - .5) * 4.5, vy: -1 - Math.random() * 3.5, col: ['#3aff6a', '#8aff4a', '#1ac83a', '#d0ffb0'][i % 4], s: 1 + (Math.random() * 2 | 0), t: 0 });
+  }
+}
+// Flaques toxiques : rongent l'énergie de quiconque marche dedans
+function updToxics() {
+  for (const z of G.toxics || []) {
+    z.t++;
+    const R = Math.min(30, 8 + z.t * 1.5) * (z.t > z.life - 40 ? (z.life - z.t) / 40 : 1);
+    for (const f of G.f) {
+      if (f.air || f.ko || f.hp <= 0 || !G.fighting || Math.abs(f.x - z.x) > R) continue;
+      f.hp = Math.max(0, f.hp - .14); f.lagT = 30; f.toxT = 8;
+      if (G.frame % 30 === 0) { addPopup(f.x, f.y - 96, 'TOXIC!', '#6aff5a'); sfx('hit'); }
+    }
+  }
+  if (G.toxics) G.toxics = G.toxics.filter(z => z.t < z.life);
+  for (const f of G.f) if (f.toxT > 0) f.toxT--;
+}
+function drawToxics() {
+  for (const z of G.toxics || []) {
+    const k = z.t > z.life - 40 ? (z.life - z.t) / 40 : 1, R = Math.min(30, 8 + z.t * 1.5) * k, x = z.x, y = GROUND;
+    ctx.save();
+    ctx.globalAlpha = .85 * k; ctx.fillStyle = '#0e5a1a'; ctx.beginPath(); ctx.ellipse(x, y + 1, R, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2ad84a'; ctx.beginPath(); ctx.ellipse(x - 1, y, R * .82, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9aff6a'; ctx.fillRect(Math.round(x - R * .5), y - 2, Math.round(R * .4), 1);
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y - 4, 2, x, y - 4, R * 1.3); g.addColorStop(0, `rgba(80,255,90,${.35 * k})`); g.addColorStop(1, 'rgba(20,120,30,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - R * 1.3, y - 4 - R * 1.3, R * 2.6, R * 2.6);
+    for (let b = 0; b < 4; b++) {   // bulles et vapeurs toxiques
+      const ph = (G.frame * .7 + b * 23 + z.x) % 40, bx = x + Math.sin(b * 2.1 + z.x) * R * .7, by = y - ph * .9;
+      ctx.fillStyle = `rgba(140,255,110,${(1 - ph / 40) * .7 * k})`; ctx.fillRect(Math.round(bx), Math.round(by), 2, 2);
+    }
+    ctx.restore();
+  }
 }
 function rawAtkBox(f) {
   const a = ATK[f.state]; if (!a || f.t < a.act[0] || f.t >= a.act[1]) return null;
@@ -3464,7 +3499,7 @@ function startRound() {
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
   G.props = makeProps(); G.shards = []; G.slowAll = 0; G.blood = []; G.stains = []; G.camL = EXT; G.zoom = 1;
-  G.quakeT = 0; G.clashFx = []; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
+  G.quakeT = 0; G.clashFx = []; G.toxics = []; G.holos = []; G.mines = []; G.waves = []; G.blades = []; G.flasks = []; G.puddles = []; G.smokes = []; G.geysers = []; G.sonics = []; G.pwalls = []; G.voids = []; G.shadowFx = []; G.vdust = [];
   G.fbs = []; G.sparks = []; G.popups = []; G.flashT = 0; G.darkT = 0; G.timer = 99; G.tick = 0; G.fighting = false;
   G.scene = 'intro'; G.t = 0; G.winner = null;
 }
@@ -3762,7 +3797,7 @@ function stepFight() {
     }
   }
 
-  updProps(); updBlood(); updVesper(); updGrog(); updZephyr(); updNyx(); updKael(); updVane(); clashProjectiles();
+  updProps(); updBlood(); updVesper(); updGrog(); updZephyr(); updNyx(); updKael(); updVane(); clashProjectiles(); updToxics();
   // Étincelles
   G.sparks.forEach(s => s.t++);
   G.popups.forEach(pp => pp.t++);
@@ -4009,6 +4044,7 @@ function drawFight() {
     if (f.fadeK > 0) ctx.restore();
     drawVaneGhost(f);
   });
+  G.f.forEach(f => { if (f.toxT > 0) for (let b = 0; b < 3; b++) { const ph = (G.frame * 1.3 + b * 29) % 50; R(Math.round(f.x + Math.sin(b * 2.4 + G.frame * .05) * 12), Math.round(f.y - 10 - ph * 1.6), 2, 2, `rgba(120,255,100,${1 - ph / 50})`); } });   // vapeurs toxiques sur le combattant empoisonné
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
@@ -4026,7 +4062,7 @@ function drawFight() {
     ctx.restore();
     disc(cx, cy, r | 0, pal[2]); disc(cx, cy, Math.max(1, r * .55) | 0, pal[0]);
   });
-  drawShards(); drawBlood();
+  drawToxics(); drawShards(); drawBlood();
   G.sparks.forEach(drawSpark);
   if (G.flashT > 0) {
     // éclat en étoile qui jaillit du point d'impact : grandit très vite en tournant puis s'efface
