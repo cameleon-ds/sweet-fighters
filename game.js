@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v88';
+const VERSION = 'v89';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1421,6 +1421,11 @@ function drawQRs() {
 }
 
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
+function confuse(held, f) {   // brume de Nyx : gauche/droite, haut/bas et boutons inversés
+  if (!f || !(f.confT > 0) || G.scene !== 'fight') return held;
+  const o = Object.assign({}, held), sw = (a, b) => { const t = o[a]; o[a] = o[b]; o[b] = t; };
+  sw('l', 'r'); sw('u', 'd'); sw('p', 'k'); sw('s', 'x'); return o;
+}
 function ctlUpdate(c, held) {
   c.prev = c.held; c.held = held;
   for (const b of [...BTNS, 'start', 'back', 'l', 'r', 'u', 'd']) {
@@ -2240,14 +2245,14 @@ function updNyx() {
   if (G.puddles) G.puddles = G.puddles.filter(p => p.t < 300);
   for (const c of G.smokes || []) {   // nuage toxique : aveugle l'adversaire et arrête ses projectiles
     c.t++; if (c.t < 90) c.x += c.dir * .5; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);
-    if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.blindT > 0)) addPopup(o.x, o.y - 100, 'BLINDED!', '#c8a0ff'); o.blindT = 100; }
+    if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.confT > 0)) { addPopup(o.x, o.y - 100, 'CONFUSED!', '#c8a0ff'); sfx('parry'); } o.confT = 180; }   // brume : inverse directions et boutons
     for (const fb of G.fbs || []) if (fb.alive && fb.owner !== c.owner && Math.abs(fb.x - c.x) < R) { fb.alive = false; addSpark(fb.x, fb.y, 'parry'); }
     for (const q of G.blades || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
     for (const q of G.holos || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
     for (const q of G.flasks || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
   }
   if (G.smokes) G.smokes = G.smokes.filter(c => c.t < 260);
-  for (const f of G.f) if (f.blindT > 0) f.blindT--;
+  for (const f of G.f) if (f.confT > 0) f.confT--;
   for (const g of G.geysers || []) {   // gerbe de flammes en diagonale : piège ceux qui sautent
     g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 8) * 130;
     if (!g.done && o && hurtbox(o) && g.t < 26) {
@@ -2276,15 +2281,25 @@ function drawNyxFx() {
     R(x - 1 + (sp ? 1 : 0), y - 5, 2, 3, '#a8c8c0');
     ctx.save(); ctx.globalAlpha = .5; R(x - Math.sign(q.vx) * 6, y + 1, 2, 2, '#c83aff'); R(x - Math.sign(q.vx) * 10, y + 3, 2, 2, '#6a2a8a'); ctx.restore();
   }
-  for (const c of G.smokes || []) {   // nuage de gaz opaque
-    const a = Math.min(1, c.t / 6, (260 - c.t) / 50), R2 = 38 + Math.min(18, c.t * .7);
-    ctx.save(); ctx.globalAlpha = .85 * a;
-    for (let i = 0; i < 16; i++) {   // volutes de fumée qui tournent lentement
-      const ang = i * 1.7 + c.t * .03 * (i % 2 ? 1 : -1), rr = R2 * (.22 + (i % 4) * .07), px = c.x + Math.cos(ang) * R2 * .62, py = GROUND - 34 + Math.sin(ang * 1.3) * 26 - (i % 3) * 6;
-      ctx.fillStyle = ['#2e3a2e', '#3e3050', '#4e5e3e', '#5a4a6a'][i % 4]; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(160,220,120,.25)'; ctx.beginPath(); ctx.arc(px - 2, py - rr * .4, rr * .45, 0, Math.PI * 2); ctx.fill();
+  for (const c of G.smokes || []) {   // brume toxique animée : volutes douces qui ondulent et se déroulent
+    const a = Math.min(1, c.t / 10, (260 - c.t) / 60), R2 = 38 + Math.min(18, c.t * .7);
+    ctx.save();
+    for (let i = 0; i < 28; i++) {
+      const ph = i * 2.39, sp = .015 + (i % 5) * .004, t = c.t * sp + ph;
+      const px = c.x + Math.sin(t) * R2 * .75 + Math.sin(t * 2.3 + i) * 6, py = GROUND - 8 - ((i * 13 + c.t * (.25 + (i % 3) * .1)) % 95);
+      const rr = R2 * (.3 + .18 * Math.sin(t * 1.7 + i) + (i % 4) * .05), al = a * (.34 + .12 * Math.sin(t * 2 + i)) * Math.min(1, (95 - (GROUND - 8 - py)) / 30 + .2);
+      const col = i % 3 === 0 ? '170,140,220' : i % 3 === 1 ? '130,190,120' : '190,170,230';
+      const g = ctx.createRadialGradient(px, py, 1, px, py, rr); g.addColorStop(0, `rgba(${col},${Math.max(0, al)})`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = .35 * a; ctx.fillStyle = '#9adf6a'; ctx.beginPath(); ctx.arc(c.x, GROUND - 34, R2 * .5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = .5 * a; ctx.strokeStyle = 'rgba(220,200,255,.7)'; ctx.lineWidth = 1;
+    for (let k = 0; k < 5; k++) {   // fines volutes
+      ctx.beginPath(); const y0 = GROUND - 20 - k * 16, ph = c.t * .05 + k;
+      for (let s2 = 0; s2 <= 12; s2++) { const xx = c.x - R2 * .8 + s2 * R2 * .13, yy = y0 + Math.sin(ph + s2 * .6) * 4; s2 ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+      ctx.stroke();
+    }
+    const fg = ctx.createRadialGradient(c.x, GROUND - 4, 2, c.x, GROUND - 4, R2 * 1.1); fg.addColorStop(0, `rgba(160,200,140,${.35 * a})`); fg.addColorStop(1, 'rgba(160,200,140,0)');
+    ctx.globalAlpha = 1; ctx.fillStyle = fg; ctx.beginPath(); ctx.ellipse(c.x, GROUND - 4, R2 * 1.1, 12, 0, 0, Math.PI * 2); ctx.fill();   // nappe au sol
     ctx.restore();
   }
   for (const g of G.geysers || []) {   // gerbe de flammes violettes
@@ -2299,8 +2314,15 @@ function drawNyxFx() {
   }
 }
 function drawBlind() {   // joueur humain aveuglé : l'écran s'assombrit
-  const b = G.f.find(f => f.blindT > 0 && !f.cpu); if (!b) return;
-  ctx.save(); ctx.globalAlpha = Math.min(.6, b.blindT / 60); ctx.fillStyle = '#10180e'; ctx.fillRect(-1000, -1000, SW + 2000, 3000); ctx.restore();
+  for (const f of G.f) {   // confusion : spirale violette et points d'interrogation qui tournent au-dessus de la tête
+    if (!(f.confT > 0)) continue;
+    const cy = f.y - (f.state === 'crouch' ? 66 : 96), a = Math.min(1, f.confT / 30);
+    ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = 'rgba(200,160,255,.8)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let k = 0; k <= 30; k++) { const t = k / 30 * Math.PI * 4 + G.frame * .15, rr = 2 + k * .35; ctx.lineTo(f.x + Math.cos(t) * rr * 1.6, cy + Math.sin(t) * rr * .5); }
+    ctx.stroke();
+    for (let k = 0; k < 3; k++) { const t = G.frame * .08 + k * 2.1; text('?', f.x + Math.cos(t) * 14, cy - 4 + Math.sin(t) * 4, 8, k % 2 ? '#e0c0ff' : '#9adf6a', 'center'); }
+    ctx.restore();
+  }
 }
 /* ---------- Zephyr : lames d'air et bourrasques ---------- */
 const BLADE_HIT = { dmg: 9, stun: 18, bstun: 12, push: 2.4, chip: 1, sfx: 'hit' };
@@ -2618,7 +2640,7 @@ function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
 function press(a, b, up) { a.press = b; a.pressU = !!up; a.pressFrames = 2; }
 function lowAttack(a, b) { a.hold = { d: true }; a.holdT = 10; press(a, b); }
 function aiInput(f, o) {
-  if (OPT.diff === 3 || f.blindT > 0) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
+  if (OPT.diff === 3) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
   const dk = [.45, 1, 1.7][OPT.diff], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l', back = dx > 0 ? 'l' : 'r';
@@ -2710,7 +2732,7 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, blindT: 0, sinkK: 0 });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
@@ -2834,8 +2856,8 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.p
 function step() {
   updateMusic();
   G.frame++;
-  ctlUpdate(pctl, readPlayer());
-  ctlUpdate(p2ctl, readRemote(2));
+  ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
+  ctlUpdate(p2ctl, confuse(readRemote(2), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
 
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
@@ -2928,8 +2950,8 @@ function stepFight() {
   }
 
   // Entrées
-  if (a.cpu && !G.noAI) ctlUpdate(a.ctl, aiInput(a, b));
-  if (b.cpu && !G.noAI) ctlUpdate(b.ctl, aiInput(b, a));
+  if (a.cpu && !G.noAI) ctlUpdate(a.ctl, confuse(aiInput(a, b), a));
+  if (b.cpu && !G.noAI) ctlUpdate(b.ctl, confuse(aiInput(b, a), b));
 
   if (G.shake > 0) G.shake *= .8;
   if (G.shake < .3) G.shake = 0;
@@ -3324,7 +3346,7 @@ const MOVES = [
     ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'NYX SPECIALS', lines: [
-    ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC SMOKE'], ['', 'BACKS OFF, BLINDS, STOPS SHOTS'],
+    ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC MIST'], ['', 'REVERSES FOE CONTROLS, STOPS SHOTS'],
     ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
