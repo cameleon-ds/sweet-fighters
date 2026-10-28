@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v126';
+const VERSION = 'v127';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3684,13 +3684,13 @@ function stepOptions() {
   }
 }
 function stepPause() {
-  if (edge(pctl, 'start') && !G.showOpts) { G.paused = false; G.showMoves = false; G.showOpts = false; sfx('beep'); return; }   // START = reprendre
+  if (edge(pctl, 'start') && !G.showOpts && !G.showMoves && padOn() && !keys.has('start')) { G.paused = false; sfx('beep'); return; }   // bouton MENU de la manette = reprendre
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
   const pc = Math.max(0, Math.min(n - 1, G.pcur + m)); if (pc !== G.pcur) { G.pcur = pc; sfx('beep'); }
-  if (backPress(pctl)) { G.paused = false; return; }
-  if (edge(pctl, 's')) {
+  if (backPress(pctl)) { G.paused = false; sfx('beep'); return; }   // ÉCHAP = reprendre
+  if (okPress(pctl)) {   // ENTRÉE (ou A) = valider
     sfx('select');
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
