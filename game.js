@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v130';
+const VERSION = 'v131';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2119,7 +2119,7 @@ function updFighter(f, o) {
           else {
             const c = Math.min(1, q.ch / 90); q.charging = false; q.c = c; q.vx = f.dir * (3.2 - 2 * c);   // plus elle est grosse, plus elle est lente
             q.hit = Object.assign({}, VOID_HIT, { dmg: Math.round(8 + 24 * c), push: .6 + c * 3, chip: 1 + Math.round(c * 5), knock: c > .75 });
-            G.shake = Math.max(G.shake, 2 + c * 6); vaneChargeStop(f); if (!(AC && playSample('vlaunch', .8 + c * .5, 1.1 - c * .2, true))) sfx('fb');   // son de lancer, plus grave et plus fort quand la sphère est grosse
+            G.shake = Math.max(G.shake, 2 + c * 6); vaneChargeStop(f); if (!(AC && playSample('vlaunch', .55 + c * .3, 1.1 - c * .2, true))) sfx('fb');   // son de lancer, plus grave et plus fort quand la sphère est grosse
           }
         }
       }
@@ -2127,7 +2127,7 @@ function updFighter(f, o) {
       break;
     case 'airvoid':
       f.vy = Math.min(f.vy, 0) - GRAV * .6;
-      if (f.t === 6) { G.voids.push({ owner: f, x: f.x + f.dir * 20, y: f.y - 46, vx: f.dir * 4.2, vy: 4.2, dir: f.dir, t: 0, r: 13, big: true }); if (!(AC && playSample('vlaunch', 1, 1, true))) sfx('fb'); sfx('heavy'); }
+      if (f.t === 6) { G.voids.push({ owner: f, x: f.x + f.dir * 20, y: f.y - 46, vx: f.dir * 4.2, vy: 4.2, dir: f.dir, t: 0, r: 13, big: true }); if (!(AC && playSample('vlaunch', .65, 1, true))) sfx('fb'); sfx('heavy'); }
       if (f.t >= 18) setState(f, 'jump');
       break;
     case 'pteleport':   // recule d'un mètre en se désintégrant, puis se réintègre dans le dos de l'adversaire
