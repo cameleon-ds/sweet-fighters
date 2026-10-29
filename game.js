@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v148';
+const VERSION = 'v149';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -475,7 +475,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', twinFb: true, style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
+  { name: 'HIRO', twinFb: true, style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -484,7 +484,7 @@ const DEFS = [
     belt:  ['#040406', '#121216', '#26262e', '#44444e'],
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],
     fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
-  { name: 'JOHN', fireUpper: true, style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
+  { name: 'AXEL', fireUpper: true, style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
     skin:  ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],
     hair:  { a: '#8a5a14', h: '#c08a24', H: '#ecc048', L: '#fff08a' },   // blond
     top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],                 // t-shirt rouge
@@ -3815,9 +3815,10 @@ const loadProgress = () => {
 const loadDone = () => loadProgress() >= 1;
 G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
 // Écran de démarrage : choix du plein écran, conseil volume, bouton START (l'appui autorise aussi le son)
-G.boot = true; G.bcur = 1;
+G.boot = true;
 const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 const fsAvail = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled || (document.documentElement.webkitRequestFullscreen && !IPHONE));
+G.bcur = fsAvail() ? 0 : 1;   // sélecteur d'abord sur FULL SCREEN
 /* ---------- Installer l'application (raccourci écran d'accueil / bureau) ---------- */
 let installEvt = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
@@ -3869,7 +3870,7 @@ function drawInstHelp() {   // mode d'emploi quand le navigateur n'a pas de fen�
   }
   text(isTouch ? 'TAP TO CLOSE' : 'ENTER / ESC: CLOSE', CX, 162, 8, 'rgba(255,255,255,.35)', 'center');
 }
-const bootItems = () => { const o = []; if (fsAvail()) o.push(0); if (installAvail()) o.push(2); o.push(1); return o; };
+const bootItems = () => { const o = []; if (fsAvail()) o.push(0); o.push(1); if (installAvail()) o.push(2); return o; };   // FULL SCREEN, START, puis (plus bas) INSTALL
 function bootMove(m) { const L = bootItems(); let i = L.indexOf(G.bcur); if (i < 0) i = L.length - 1; i = Math.max(0, Math.min(L.length - 1, i + m)); if (L[i] !== G.bcur) { G.bcur = L[i]; sfx('beep'); } }
 function bootOk() { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else if (G.bcur === 2 && installAvail()) { sfx('select'); doInstall(); } else bootStart(); }
 function bootStart() {
@@ -3879,7 +3880,7 @@ function bootStart() {
   unlockAudio(); sfx('select');
 }
 function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
-const bootRowY = i => 98 + i * 22;   // lignes du menu de démarrage
+const bootRowY = i => { const it = bootItems()[i]; return it === 2 ? 158 : 96 + i * 22; };   // INSTALL bien plus bas
 addEventListener('keydown', e => {
   if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && ['Enter', 'Escape', 'Space', 'Backspace'].includes(e.code)) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); e.preventDefault(); e.stopPropagation(); } return; }
   if (!G.boot || !loadDone()) return;
@@ -4492,21 +4493,21 @@ function drawOptions() {
   const OB = OPT_BACK(), pc = optPC(), PW = 236, RH = pc ? (OB > 9 ? 13 : 15) : (OB > 7 ? 17 : 19);
   panel(8, 200, 'OPTIONS', true, PW);
   const c = G.ocur, x0 = CX - PW / 2 + 22, vx = CX + PW / 2 - 40, bx = vx - 6;
-  const pos = i => optOrder().indexOf(i), col = i => c === pos(i) ? '#ffffff' : 'rgba(255,255,255,.55)';
+  const pos = i => optOrder().indexOf(i), col = i => c === pos(i) ? '#ffd23a' : 'rgba(255,255,255,.55)';
   const Y = i => 40 + pos(i) * RH;   // lignes bien espacées
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#0e0816'); if (on) R(bx + 3, y + 1, 6, 6, '#ffffff'); };
   const bars = (y, v) => {
     if (v === 0) { text('OFF', vx, y, 8, '#ffffff', 'center'); return; }
     for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#ffffff' : 'rgba(255,255,255,.18)');
   };
-  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * RH - 4, PW - 20, Math.min(15, RH), 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * RH, 8, '#ffffff', 'right'); }   // ligne sélectionnée surlignée
+  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * RH - 4, PW - 20, Math.min(15, RH), 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * RH, 8, '#ffd23a', 'right'); }   // ligne sélectionnée surlignée
   text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
   for (let i = 0; i < 3; i++) drawStar(vx - 12 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
   text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
   const dsel = c === pos(2);
-  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, ['#ffffff', '#ffffff', '#ffffff', '#ffffff'][OPT.diff], 'center');
+  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, dsel ? '#ffd23a' : '#ffffff', 'center');
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
@@ -4516,7 +4517,7 @@ function drawOptions() {
   }
   if (pos(9) >= 0) { text(INSTALL_LBL(), x0, Y(9), 8, col(9), 'left'); drawDlIcon(vx, Y(9) + 3, col(9)); }
   R(CX - PW / 2 + 14, 172, PW - 28, 1, 'rgba(255,255,255,.15)');
-  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
@@ -4525,14 +4526,14 @@ function drawKeys() {   // écran de configuration des touches / boutons
   const x0 = CX - 84, step = pad ? 14 : 12, y0 = pad ? 48 : 42;
   rows.forEach(([a, nm], i) => {
     const y = y0 + i * step, sel = c === i, waiting = bindWait && bindWait.act === a;
-    if (sel) text('>', x0 - 4, y, 8, '#ffffff', 'right');
-    text(nm, x0, y, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'left');
+    if (sel) text('>', x0 - 4, y, 8, '#ffd23a', 'right');
+    text(nm, x0, y, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'left');
     const v = waiting ? ((G.frame >> 4) % 2 ? 'PRESS...' : '') : pad ? padName(PADB[a]) : keyName(KEYS[a]);
     text(v, CX + 62, y, 8, waiting ? '#ffffff' : '#ffffff', 'center');
   });
   const yR = y0 + rows.length * step + 6;
-  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
-  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
+  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawPause() {
@@ -4542,7 +4543,7 @@ function drawPause() {
   panel(40, 136, 'PAUSE');
   PAUSE_ITEMS.forEach((t, i) => {
     const sel = G.pcur === i;
-    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   });
 }
 
@@ -4574,7 +4575,7 @@ function drawBoot() {   // écran de démarrage : même style que le menu du tit
   const lbl = it => it === 0 ? 'FULL SCREEN: ' + (OPT.full ? 'ON' : 'OFF') : it === 2 ? INSTALL_LBL() : 'START';
   items.forEach((it, i) => {
     const sel = c === it, y = bootRowY(i);
-    text((sel ? '> ' : '') + lbl(it) + (sel ? ' <' : ''), CX, y, 8, sel ? '#ffffff' : 'rgba(255,255,255,.6)', 'center');
+    text((sel ? '> ' : '') + lbl(it) + (sel ? ' <' : ''), CX, y, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
   });
 }
 const VOL_N = 130;   // message « monte le son » après START : fondu entrant, pause, fondu sortant
@@ -4629,7 +4630,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffffff' : 'rgba(255,255,255,.6)', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
     });
   }
   if (L > 30) {
@@ -4712,7 +4713,7 @@ function drawOver() {
   if (G.perfect && G.t > 100) { const k = Math.min(1, (G.t - 100) / 8), sc = 1 + (1 - k) * 2; ctx.save(); ctx.globalAlpha = k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('PERFECT!', 0, -8, 16, (G.frame >> 3) % 2 ? '#ffd23a' : '#ffffff', 'center'); ctx.restore(); }
   if (G.t > 30) ['RETRY', 'SELECT CHARACTER'].forEach((m, i) => {
     const sel = (G.ocurOver || 0) === i;
-    text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+    text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
   });
 }
 
