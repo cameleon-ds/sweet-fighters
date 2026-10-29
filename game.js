@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v147';
+const VERSION = 'v148';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3874,12 +3874,12 @@ function bootMove(m) { const L = bootItems(); let i = L.indexOf(G.bcur); if (i <
 function bootOk() { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else if (G.bcur === 2 && installAvail()) { sfx('select'); doInstall(); } else bootStart(); }
 function bootStart() {
   if (!G.boot) return;
-  G.boot = false; G.t = 0;
+  G.boot = false; G.t = 0; G.volT = 0;   // puis message « monte le son », puis logo
   if (OPT.full && fsAvail()) enterFS(); else if (!OPT.full) exitFS();
   unlockAudio(); sfx('select');
 }
 function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
-const BOOT_FS_Y = 62, BOOT_START_Y = 168, BOOT_INST_Y = 142;
+const bootRowY = i => 98 + i * 22;   // lignes du menu de démarrage
 addEventListener('keydown', e => {
   if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && ['Enter', 'Escape', 'Space', 'Backspace'].includes(e.code)) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); e.preventDefault(); e.stopPropagation(); } return; }
   if (!G.boot || !loadDone()) return;
@@ -3893,9 +3893,8 @@ addEventListener('pointerup', e => {
   if (G.boot && loadDone()) {
     const r = cv.getBoundingClientRect();
     const p = ROT ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H } : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
-    if (fsAvail() && Math.abs(p.y - (BOOT_FS_Y + 3)) < 12 && Math.abs(p.x - CX) < 90) { G.bcur = 0; bootToggleFS(); }
-    else if (installAvail() && Math.abs(p.y - (BOOT_INST_Y + 4)) < 11 && Math.abs(p.x - CX) < 100) { G.bcur = 2; sfx('select'); doInstall(); }
-    else if (Math.abs(p.y - (BOOT_START_Y + 4)) < 12 && Math.abs(p.x - CX) < 60) bootStart();
+    const items = bootItems(), i = items.findIndex((it, k) => Math.abs(p.y - (bootRowY(k) + 4)) < 11);
+    if (i >= 0 && Math.abs(p.x - CX) < 110) { G.bcur = items[i]; bootOk(); }
     return;
   }
   syncFS();
@@ -3922,6 +3921,11 @@ function step() {
       // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
       if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
       if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone()) { const m = navStep(); if (m) bootMove(m); if ((edge(pctl, 's') || edge(pctl, 'start')) && G.bootKey !== G.frame && G.frame - (G.bootKey || -9) > 2) bootOk(); } break; }   // chargement puis écran de démarrage
+      if (G.volT != null && G.volT < VOL_N) {   // message « monte le son » avant le logo (passable)
+        G.volT++; G.t = 0;
+        if (G.volT > 15 && (BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap)) G.volT = VOL_N;
+        tap = null; break;
+      }
       if (G.musicHold && (G.t >= 60 || G.tstate === 1)) { G.musicHold = false; BGM.currentTime = 0; }   // 1 s après l'apparition du logo
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
@@ -4562,39 +4566,31 @@ function drawImg(img, cx, cy, w, al) {
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
   ctx.restore(); return true;
 }
-function drawBoot() {   // écran de démarrage : titre jaune, tout le reste en blanc
-  const fa = fsAvail(), c = bootItems().includes(G.bcur) ? G.bcur : 1, PW = 240, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
-  R(CX - PW / 2, 14, PW, 190, 'rgba(14,8,22,.92)');
-  text('SWEET FIGHTERS', CX, 26, 16, '#ffd23a', 'center');
-  R(CX - PW / 2 + 16, 50, PW - 32, 1, 'rgba(255,255,255,.15)');
-  if (fa) {   // choix du plein écran
-    if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,255,255,.08)');
-    text((c === 0 ? '> ' : '  ') + 'FULL SCREEN', CX - 80, BOOT_FS_Y, 8, c === 0 ? WH : DIM, 'left');
-    const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? WH : DIM); R(bx + 2, BOOT_FS_Y, 8, 8, '#0e0816'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, WH);
-    text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, WH, 'left');
-    if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, DIM, 'center');
-  } else if (IOS && installAvail()) {
-    text('FOR FULL SCREEN ON IPHONE,', CX, BOOT_FS_Y - 4, 8, DIM, 'center');
-    text('ADD THE GAME TO YOUR HOME SCREEN', CX, BOOT_FS_Y + 8, 8, DIM, 'center');
-  }
-  // haut-parleur + conseil volume
-  const sx = CX - 8, sy = 88;
-  R(sx - 8, sy + 3, 4, 6, WH); ctx.fillStyle = WH; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
-  ctx.strokeStyle = WH; ctx.lineWidth = 1.5;
-  for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
-  text('TURN THE VOLUME ON', CX, sy + 22, 8, WH, 'center');
-  text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, DIM, 'center');
-  if (installAvail()) {   // bouton : ajouter à l'écran d'accueil / installer sur le bureau
-    const io = c === 2, lb = INSTALL_LBL(), tw = lb.length * 5, bw = tw + 40;
-    if (io) R(CX - bw / 2, BOOT_INST_Y - 5, bw, 17, 'rgba(255,255,255,.08)');
-    drawDlIcon(CX - tw / 2 - 4, BOOT_INST_Y + 3, io ? WH : DIM);
-    text(lb, CX + 7, BOOT_INST_Y, 8, io ? WH : DIM, 'center');
-  }
-  // bouton START
-  const on = c === 1, pulse = on ? (G.frame >> 4) % 2 : 0;
-  R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? WH : 'rgba(255,255,255,.7)') : DIM); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#0e0816');
-  text('START', CX, BOOT_START_Y, 8, on ? WH : DIM, 'center');
-  text(isTouch ? 'TAP TO CHOOSE' : 'UP / DOWN + ENTER', CX, 189, 8, 'rgba(255,255,255,.35)', 'center');
+function drawBoot() {   // écran de démarrage : même style que le menu du titre (> CHOIX <)
+  const PW = 240, items = bootItems(), c = items.includes(G.bcur) ? G.bcur : 1;
+  R(CX - PW / 2, 34, PW, 150, 'rgba(14,8,22,.92)');
+  text('SWEET FIGHTERS', CX, 48, 16, '#ffd23a', 'center');
+  R(CX - PW / 2 + 16, 72, PW - 32, 1, 'rgba(255,255,255,.15)');
+  const lbl = it => it === 0 ? 'FULL SCREEN: ' + (OPT.full ? 'ON' : 'OFF') : it === 2 ? INSTALL_LBL() : 'START';
+  items.forEach((it, i) => {
+    const sel = c === it, y = bootRowY(i);
+    text((sel ? '> ' : '') + lbl(it) + (sel ? ' <' : ''), CX, y, 8, sel ? '#ffffff' : 'rgba(255,255,255,.6)', 'center');
+  });
+}
+const VOL_N = 130;   // message « monte le son » après START : fondu entrant, pause, fondu sortant
+function drawVolumeMsg() {
+  const t = G.volT, a = t < 25 ? t / 25 : t > VOL_N - 25 ? Math.max(0, (VOL_N - t) / 25) : 1, e = 1 - Math.pow(1 - Math.min(1, t / 25), 3);
+  const WH = `rgba(255,255,255,${a})`, sy = 82 + (1 - e) * 8;
+  ctx.save(); ctx.globalAlpha = a;
+  const sx = CX - 8, pul = 1 + Math.sin(t / 6) * .5;   // haut-parleur et ondes qui pulsent
+  R(sx - 8, sy + 3, 4, 6, '#ffffff'); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+  for (const r of [5, 9, 13]) { ctx.globalAlpha = a * Math.max(0, Math.min(1, pul - (r - 5) / 10)); ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
+  ctx.restore();
+  // texte qui se révèle lettre par lettre
+  const T1 = 'TURN THE VOLUME ON', T2 = 'FOR THE BEST EXPERIENCE', n = Math.floor(t * 1.2);
+  text(T1.slice(0, n), CX, sy + 30, 8, WH, 'center');
+  text(T2.slice(0, Math.max(0, n - 8)), CX, sy + 44, 8, `rgba(255,255,255,${a * .6})`, 'center');
 }
 function drawTitle() {
   const t = G.t;
@@ -4612,6 +4608,7 @@ function drawTitle() {
     }
     drawBoot(); return;
   }
+  if (G.volT != null && G.volT < VOL_N) { drawVolumeMsg(); return; }
   if (t < SPLASH) {
     const al = t < 20 ? t / 20 : t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 20);
     drawImg(SRG, CX, H / 2, Math.min(300, W - 40), al);
