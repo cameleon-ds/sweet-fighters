@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v136';
+const VERSION = 'v137';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1432,7 +1432,7 @@ addEventListener('keydown', e => {
   }
   const m = keyAction(e.code);
   if (m) { keys.add(m); latched.add(m); e.preventDefault(); }
-  if ((m === 's' || m === 'start') && G.showOpts && !G.showKeys && G.ocur === 6) { OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame; if (OPT.full) enterFS(); else exitFS(); }   // option PLEIN ÉCRAN (validée pendant l'appui : autorisé par le navigateur)
+  if ((m === 's' || m === 'start') && G.showOpts && !G.showKeys && G.ocur === 0) { OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame; if (OPT.full) enterFS(); else exitFS(); }   // option PLEIN ÉCRAN (validée pendant l'appui : autorisé par le navigateur)
 });
 addEventListener('keyup', e => { const m = keyAction(e.code); if (m) keys.delete(m); });
 function bindKey(dev, act, val) {   // associe et échange si la touche était déjà utilisée
@@ -3646,6 +3646,8 @@ function stepMoves() {
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
+const OPT_ORDER = [6, 0, 1, 2, 3, 4, 5, 7, 8];   // ordre d'affichage : FULL SCREEN en premier
+const optL = () => OPT_ORDER[G.ocur] != null ? OPT_ORDER[G.ocur] : -1;
 const OPT_BACK = () => isTouch && !padOn() ? 7 : 9;   // ligne FULL SCREEN, puis sur PC : KEYBOARD et GAMEPAD
 const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
 const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
@@ -3668,26 +3670,27 @@ function stepOptions() {
   const m = navStep(), oc = Math.max(0, Math.min(OB, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's') || edge(pctl, 'start');
   if (backPress(pctl) || (ok && G.ocur === OB)) { G.showOpts = false; sfx('beep'); return; }
-  if (G.ocur === 6 && ok && G.fsDone !== G.frame && G.frame - (G.fsDone || -99) > 2) {   // plein écran (tactile / manette)
+  const L = G.ocur === OB ? -1 : optL();
+  if (L === 6 && ok && G.fsDone !== G.frame && G.frame - (G.fsDone || -99) > 2) {   // plein écran (tactile / manette)
     OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame;
     if (OPT.full) enterFS(); else exitFS();   // sur mobile, l'entrée se fait au prochain toucher si le navigateur la refuse ici
   }
-  if (OB === 9 && ok && (G.ocur === 7 || G.ocur === 8)) { G.showKeys = G.ocur === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
-  if (G.ocur === 5 && (l || r || ok)) {
+  if (OB === 9 && ok && (L === 7 || L === 8)) { G.showKeys = L === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
+  if (L === 5 && (l || r || ok)) {
     OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
     saveOpt(); sfx('select');
   }
-  if (G.ocur === 4 && (l || r || ok)) {
+  if (L === 4 && (l || r || ok)) {
     OPT.music = l ? Math.max(0, OPT.music - 1) : r ? Math.min(4, OPT.music + 1) : (OPT.music + 1) % 5;
     saveOpt(); sfx('select');
   }
-  if (G.ocur === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
-  if (G.ocur === 2 && (l || r || ok)) {
+  if (L === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
+  if (L === 2 && (l || r || ok)) {
     OPT.diff = l ? (OPT.diff + 3) % 4 : (OPT.diff + 1) % 4;   // en boucle : TRAINING avant EASY et après HARD
     saveOpt(); sfx('select');
   }
-  if (G.ocur === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
-  if (G.ocur === 1 && (l || r || ok)) {
+  if (L === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
+  if (L === 1 && (l || r || ok)) {
     OPT.energy = l ? Math.max(1, OPT.energy - 1) : r ? Math.min(3, OPT.energy + 1) : OPT.energy % 3 + 1;
     saveOpt(); sfx('select');
   }
@@ -4318,38 +4321,42 @@ function drawStar(x, y, r, on) {
   ctx.closePath();
   ctx.fillStyle = on ? '#ffd23a' : '#3a2e44'; ctx.fill();
 }
-function panel(y0, h, title) {
-  R(CX - 100, y0, 200, h, 'rgba(20,10,30,.92)');
-  R(CX - 100, y0, 200, 2, '#ffd23a'); R(CX - 100, y0 + h - 2, 200, 2, '#ffd23a');
-  text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
+function panel(y0, h, title, small, w = 200) {
+  R(CX - w / 2, y0, w, h, 'rgba(20,10,30,.92)');
+  R(CX - w / 2, y0, w, 2, '#ffd23a'); R(CX - w / 2, y0 + h - 2, w, 2, '#ffd23a');
+  if (small) { text(title, CX, y0 + 9, 8, '#ffd23a', 'center'); R(CX - w / 2 + 14, y0 + 22, w - 28, 1, '#4a3a2a'); }   // petit titre + filet
+  else text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
   if (G.showKeys) { drawKeys(); return; }
-  panel(20, 180, 'OPTIONS');
-  const c = G.ocur, col = i => c === i ? '#ffffff' : '#9a8aa0', x0 = CX - 84, bx = CX + 64;
+  const OB = OPT_BACK(), pc = OB === 9, PW = 236;
+  panel(8, 200, 'OPTIONS', true, PW);
+  const c = G.ocur, x0 = CX - PW / 2 + 22, vx = CX + PW / 2 - 40, bx = vx - 6;
+  const pos = i => OPT_ORDER.indexOf(i), col = i => c === pos(i) ? '#ffffff' : '#9a8aa0';
+  const Y = i => 40 + pos(i) * (pc ? 15 : 19);   // lignes bien espacées
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
   const bars = (y, v) => {
-    if (v === 0) { text('OFF', CX + 62, y, 8, '#ff5a4a', 'center'); return; }
-    for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
+    if (v === 0) { text('OFF', vx, y, 8, '#ff5a4a', 'center'); return; }
+    for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
   };
-  if (G.showKeys) { drawKeys(); return; }
-  const OB = OPT_BACK(), Y = i => OB === 9 ? 44 + i * 12.5 : 44 + i * 15;
-  if (c < OB) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
+  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * (pc ? 15 : 19) - 4, PW - 20, 15, 'rgba(255,210,58,.08)'); text('>', x0 - 4, 40 + c * (pc ? 15 : 19), 8, '#ffd23a', 'right'); }   // ligne sélectionnée surlignée
+  text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
-  for (let i = 0; i < 3; i++) drawStar(CX + 50 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
+  for (let i = 0; i < 3; i++) drawStar(vx - 12 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
   text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
-  text((c === 2 ? '< ' : '') + DIFFS[OPT.diff] + (c === 2 ? ' >' : ''), CX + 62, Y(2), 8, ['#5ae06a', '#ffd23a', '#ff5a4a', '#7ad8ff'][OPT.diff], 'center');
+  const dsel = c === pos(2);
+  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, ['#5ae06a', '#ffd23a', '#ff5a4a', '#7ad8ff'][OPT.diff], 'center');
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
-  text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
-  if (OB === 9) {
-    text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', CX + 62, Y(7), 8, col(7), 'center');
-    text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', CX + 62, Y(8), 8, padOn() ? col(8) : '#5a4a60', 'center');
+  if (pc) {
+    text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', vx, Y(7), 8, col(7), 'center');
+    text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', vx, Y(8), 8, padOn() ? col(8) : '#5a4a60', 'center');
   }
-  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 166, 8, col(OB), 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 180, 8, '#7a6a80', 'center');
+  R(CX - PW / 2 + 14, 172, PW - 28, 1, '#4a3a2a');
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : '#9a8aa0', 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, '#7a6a80', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
   const pad = G.showKeys === 'pad', rows = bindRows(), N = rows.length + 2, c = G.kcur || 0;
