@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v137';
+const VERSION = 'v139';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1655,9 +1655,9 @@ function drawQRs() {
   if (isTouch) return;
   for (const p of [1, 2]) {
     const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', on = remoteOn(p);
-    const sz = q ? q.width : 74, x = p === 1 ? 6 : W - 6 - sz, y = 36;
+    const sz = Math.round((q ? q.width : 74) * .72), x = p === 1 ? 8 : W - 8 - sz, y = 36;   // QR codes plus petits
     text('PLAYER ' + p, x + sz / 2, y - 12, 8, col, 'center');
-    if (q) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = on ? .35 : 1; ctx.drawImage(q, x, y); ctx.restore(); }
+    if (q) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.globalAlpha = on ? .35 : 1; ctx.drawImage(q, x, y, sz, sz); ctx.restore(); }
     else { R(x, y, sz, sz, '#111'); text(NET.status === 'error' ? 'OFFLINE' : '...', x + sz / 2, y + sz / 2 - 4, 8, '#9a8aa0', 'center'); }
     text(on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
     if (!on) text('TO PLAY', x + sz / 2, y + sz + 14, 8, '#d8c8a8', 'center');
@@ -3731,24 +3731,42 @@ function musicWanted() {
 function updateMusic() {
   const want = musicWanted();
   if (want !== bgmKey) {   // fondu sortant de l'ancienne musique, puis fondu entrant de la nouvelle
-    if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0) BGM.play().catch(() => {}); }
+    if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0 && !G.musicHold) BGM.play().catch(() => {}); }
     else bgmMul = Math.max(0, bgmMul - 1 / 36);
   } else bgmMul = Math.min(1, bgmMul + 1 / 60);
   const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1) * bgmMul));
   if (bgmGain) bgmGain.gain.value = vol; else BGM.volume = vol;   // réglage appliqué en temps réel
   if (bgmGain && AC && AC.state !== 'running' && bgmUnlocked && !document.hidden) AC.resume().catch(() => {});
   if (OPT.music === 0 && !BGM.paused) BGM.pause();
-  else if (OPT.music > 0 && bgmUnlocked && BGM.paused && BGM.src) BGM.play().catch(() => {});
+  else if (OPT.music > 0 && bgmUnlocked && BGM.paused && BGM.src && !G.musicHold) BGM.play().catch(() => {});
 }
 // Les navigateurs n'autorisent le son qu'après une action de l'utilisateur
 const unlockAudio = () => {
-  if (bgmUnlocked) return;
-  bgmUnlocked = true;
+  if (bgmUnlocked) { if (!bgmGain) bgmRoute(); if (G.gate) G.gate = false; return; }
+  bgmUnlocked = true; G.gate = false;
   bgmRoute();
   if (!BGM.src) { bgmKey = musicWanted(); BGM.src = MUSIC[bgmKey] + '?v=55'; }
-  if (OPT.music > 0) BGM.play().catch(() => { bgmUnlocked = false; });
+  if (OPT.music > 0 && !G.musicHold) BGM.play().catch(() => { bgmUnlocked = false; });
 };
 ['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+// La musique démarre avec le logo Super Rocket Games : lecture automatique tentée dès l'ouverture.
+// Si le navigateur la bloque (il exige une action du joueur), un écran « PRESS ANY KEY / TAP TO START » précède le logo.
+G.gate = null;   // null = en attente de la réponse du navigateur
+// Chargement : images (portraits, décors, titre, logos) avant de lancer le jeu ; affiché au moins 1,2 s
+const LOAD_T0 = performance.now();
+function loadList() { return [...PORTRAITS, ...PORTRAITS_HURT, ...Object.values(STAGE_PIC), TITLE_IMG, SRG, LOGO]; }
+const loadProgress = () => { const L = loadList(), n = L.filter(im => im.complete).length, tk = Math.min(1, (performance.now() - LOAD_T0) / 1200); return Math.min(n / L.length, tk); };
+const loadDone = () => loadProgress() >= 1;
+G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
+setTimeout(() => {
+  if (bgmUnlocked) return;
+  if (OPT.music === 0) { G.gate = false; return; }
+  bgmKey = 'title'; BGM.src = MUSIC.title + '?v=55'; BGM.volume = Math.min(1, OPT.music / 4 * MUSIC_MAX);
+  const p = BGM.play();
+  if (p && p.then) p.then(() => { bgmUnlocked = true; G.gate = false; if (G.musicHold) BGM.pause(); }).catch(() => { G.gate = true; });   // test : lecture autorisée ?
+  else G.gate = false;
+  setTimeout(() => { if (G.gate === null) G.gate = true; }, 1200);
+}, 50);
 document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.pause(); });
 
 function step() {
@@ -3767,6 +3785,8 @@ function step() {
     case 'title': {
       // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
       if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
+      if (G.tstate !== 1 && G.t < 2 && (G.gate !== false || !loadDone())) { G.t = 0; break; }   // attend que la musique puisse démarrer avec le logo
+      if (G.musicHold && (G.t >= 60 || G.tstate === 1)) { G.musicHold = false; BGM.currentTime = 0; }   // 1 s après l'apparition du logo
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
       if (G.showOpts) { stepOptions(); break; }
@@ -4409,6 +4429,17 @@ function drawTitle() {
   const t = G.t;
   R(0, 0, W, H, '#000');
   // 1) logo Super Rocket Games : fondu entrant, 1 seconde, fondu sortant
+  if ((G.gate !== false || !loadDone()) && t < 2 && G.tstate !== 1) {   // chargement, puis écran de démarrage si le navigateur exige une action pour le son
+    const k = loadProgress(), bw = 140, bx = CX - bw / 2, by = H / 2 + 6;
+    if (!loadDone()) {
+      text('LOADING', CX, by - 18, 8, '#ffd23a', 'center');
+      R(bx - 2, by - 2, bw + 4, 10, '#3a2e44'); R(bx, by, bw, 6, '#140a1e');
+      const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, '#ff6a1a'); g.addColorStop(1, '#ffd23a');
+      ctx.fillStyle = g; ctx.fillRect(bx, by, Math.round(bw * k), 6);
+      text(Math.round(k * 100) + '%', CX, by + 14, 8, '#9a8aa0', 'center');
+    } else if (G.gate && (G.frame >> 5) % 2 === 0) text(isTouch ? 'TAP TO START' : 'PRESS ANY KEY', CX, H / 2 - 4, 8, '#ffffff', 'center');
+    return;
+  }
   if (t < SPLASH) {
     const al = t < 20 ? t / 20 : t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 20);
     drawImg(SRG, CX, H / 2, Math.min(300, W - 40), al);
