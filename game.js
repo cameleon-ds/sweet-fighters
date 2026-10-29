@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v139';
+const VERSION = 'v140';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3751,22 +3751,44 @@ const unlockAudio = () => {
 ['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
 // La musique démarre avec le logo Super Rocket Games : lecture automatique tentée dès l'ouverture.
 // Si le navigateur la bloque (il exige une action du joueur), un écran « PRESS ANY KEY / TAP TO START » précède le logo.
-G.gate = null;   // null = en attente de la réponse du navigateur
+G.gate = false;
 // Chargement : images (portraits, décors, titre, logos) avant de lancer le jeu ; affiché au moins 1,2 s
 const LOAD_T0 = performance.now();
 function loadList() { return [...PORTRAITS, ...PORTRAITS_HURT, ...Object.values(STAGE_PIC), TITLE_IMG, SRG, LOGO]; }
 const loadProgress = () => { const L = loadList(), n = L.filter(im => im.complete).length, tk = Math.min(1, (performance.now() - LOAD_T0) / 1200); return Math.min(n / L.length, tk); };
 const loadDone = () => loadProgress() >= 1;
 G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
-setTimeout(() => {
-  if (bgmUnlocked) return;
-  if (OPT.music === 0) { G.gate = false; return; }
-  bgmKey = 'title'; BGM.src = MUSIC.title + '?v=55'; BGM.volume = Math.min(1, OPT.music / 4 * MUSIC_MAX);
-  const p = BGM.play();
-  if (p && p.then) p.then(() => { bgmUnlocked = true; G.gate = false; if (G.musicHold) BGM.pause(); }).catch(() => { G.gate = true; });   // test : lecture autorisée ?
-  else G.gate = false;
-  setTimeout(() => { if (G.gate === null) G.gate = true; }, 1200);
-}, 50);
+// Écran de démarrage : choix du plein écran, conseil volume, bouton START (l'appui autorise aussi le son)
+G.boot = true; G.bcur = 1;
+const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
+const fsAvail = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled || (document.documentElement.webkitRequestFullscreen && !IPHONE));
+function bootStart() {
+  if (!G.boot) return;
+  G.boot = false; G.t = 0;
+  if (OPT.full && fsAvail()) enterFS(); else if (!OPT.full) exitFS();
+  unlockAudio(); sfx('select');
+}
+function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
+const BOOT_FS_Y = 70, BOOT_START_Y = 164;
+addEventListener('keydown', e => {
+  if (!G.boot || !loadDone()) return;
+  const k = e.code;
+  if (k === 'ArrowUp' || k === 'ArrowDown') { G.bcur = fsAvail() ? 1 - G.bcur : 1; sfx('beep'); }
+  else if ((k === 'ArrowLeft' || k === 'ArrowRight') && G.bcur === 0) bootToggleFS();
+  else if (k === 'Enter' || k === 'Space' || k === KEYS.s || k === KEYS.p) { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else bootStart(); }
+}, true);
+// Sur mobile, le navigateur n'autorise le plein écran qu'au RELÂCHEMENT du doigt (pointerup / touchend), pas à l'appui
+addEventListener('pointerup', e => {
+  if (G.boot && loadDone()) {
+    const r = cv.getBoundingClientRect();
+    const p = ROT ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H } : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+    if (fsAvail() && Math.abs(p.y - (BOOT_FS_Y + 3)) < 12 && Math.abs(p.x - CX) < 90) { G.bcur = 0; bootToggleFS(); }
+    else if (Math.abs(p.y - (BOOT_START_Y + 4)) < 14 && Math.abs(p.x - CX) < 60) bootStart();
+    return;
+  }
+  syncFS();
+}, true);
+addEventListener('touchend', () => { if (!G.boot) syncFS(); }, { capture: true, passive: true });
 document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.pause(); });
 
 function step() {
@@ -3785,7 +3807,7 @@ function step() {
     case 'title': {
       // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
       if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
-      if (G.tstate !== 1 && G.t < 2 && (G.gate !== false || !loadDone())) { G.t = 0; break; }   // attend que la musique puisse démarrer avec le logo
+      if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone() && edge(pctl, 's')) bootStart(); break; }   // chargement puis écran de démarrage
       if (G.musicHold && (G.t >= 60 || G.tstate === 1)) { G.musicHold = false; BGM.currentTime = 0; }   // 1 s après l'apparition du logo
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
@@ -4425,11 +4447,39 @@ function drawImg(img, cx, cy, w, al) {
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
   ctx.restore(); return true;
 }
+function drawBoot() {   // écran de démarrage
+  const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240;
+  R(CX - PW / 2, 14, PW, 190, 'rgba(20,10,30,.92)'); R(CX - PW / 2, 14, PW, 2, '#ffd23a'); R(CX - PW / 2, 202, PW, 2, '#ffd23a');
+  text('SWEET FIGHTERS 2', CX, 26, 16, '#ffd23a', 'center');
+  R(CX - PW / 2 + 16, 50, PW - 32, 1, '#4a3a2a');
+  if (fa) {   // choix du plein écran
+    if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,210,58,.1)');
+    text((c === 0 ? '> ' : '  ') + 'FULL SCREEN', CX - 80, BOOT_FS_Y, 8, c === 0 ? '#ffffff' : '#9a8aa0', 'left');
+    const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? '#ffffff' : '#9a8aa0'); R(bx + 2, BOOT_FS_Y, 8, 8, '#140a1e'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, '#5ae06a');
+    text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, OPT.full ? '#5ae06a' : '#ff5a4a', 'left');
+    if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, '#7a6a80', 'center');
+  } else if (IPHONE) {
+    text('FULL SCREEN ON IPHONE:', CX, BOOT_FS_Y - 4, 8, '#9a8aa0', 'center');
+    text('SHARE > ADD TO HOME SCREEN', CX, BOOT_FS_Y + 8, 8, '#7ad8ff', 'center');
+  }
+  // haut-parleur + conseil volume
+  const sx = CX - 8, sy = 104;
+  R(sx - 8, sy + 3, 4, 6, '#ffd23a'); ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
+  ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 1.5;
+  for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
+  text('TURN THE VOLUME ON', CX, sy + 22, 8, '#ffffff', 'center');
+  text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, '#9a8aa0', 'center');
+  // bouton START
+  const on = c === 1, pulse = on ? (G.frame >> 4) % 2 : 0;
+  R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? '#ffd23a' : '#ff6a1a') : '#5a4a60'); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#140a1e');
+  text('START', CX, BOOT_START_Y, 8, on ? '#ffffff' : '#9a8aa0', 'center');
+  text(isTouch ? 'TAP TO CHOOSE' : 'UP / DOWN + ENTER', CX, 189, 8, '#5a4a60', 'center');
+}
 function drawTitle() {
   const t = G.t;
   R(0, 0, W, H, '#000');
   // 1) logo Super Rocket Games : fondu entrant, 1 seconde, fondu sortant
-  if ((G.gate !== false || !loadDone()) && t < 2 && G.tstate !== 1) {   // chargement, puis écran de démarrage si le navigateur exige une action pour le son
+  if ((G.boot || !loadDone()) && t < 2 && G.tstate !== 1) {   // chargement, puis écran de démarrage
     const k = loadProgress(), bw = 140, bx = CX - bw / 2, by = H / 2 + 6;
     if (!loadDone()) {
       text('LOADING', CX, by - 18, 8, '#ffd23a', 'center');
@@ -4437,8 +4487,9 @@ function drawTitle() {
       const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, '#ff6a1a'); g.addColorStop(1, '#ffd23a');
       ctx.fillStyle = g; ctx.fillRect(bx, by, Math.round(bw * k), 6);
       text(Math.round(k * 100) + '%', CX, by + 14, 8, '#9a8aa0', 'center');
-    } else if (G.gate && (G.frame >> 5) % 2 === 0) text(isTouch ? 'TAP TO START' : 'PRESS ANY KEY', CX, H / 2 - 4, 8, '#ffffff', 'center');
-    return;
+      return;
+    }
+    drawBoot(); return;
   }
   if (t < SPLASH) {
     const al = t < 20 ? t / 20 : t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 20);
