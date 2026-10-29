@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v141';
+const VERSION = 'v142';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4447,33 +4447,33 @@ function drawImg(img, cx, cy, w, al) {
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
   ctx.restore(); return true;
 }
-function drawBoot() {   // écran de démarrage
-  const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240;
-  R(CX - PW / 2, 14, PW, 190, 'rgba(20,10,30,.92)'); R(CX - PW / 2, 14, PW, 2, '#ffd23a'); R(CX - PW / 2, 202, PW, 2, '#ffd23a');
+function drawBoot() {   // écran de démarrage : titre jaune, tout le reste en blanc
+  const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
+  R(CX - PW / 2, 14, PW, 190, 'rgba(14,8,22,.92)');
   text('SWEET FIGHTERS', CX, 26, 16, '#ffd23a', 'center');
-  R(CX - PW / 2 + 16, 50, PW - 32, 1, '#4a3a2a');
+  R(CX - PW / 2 + 16, 50, PW - 32, 1, 'rgba(255,255,255,.15)');
   if (fa) {   // choix du plein écran
-    if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,210,58,.1)');
-    text((c === 0 ? '> ' : '  ') + 'FULL SCREEN', CX - 80, BOOT_FS_Y, 8, c === 0 ? '#ffffff' : '#9a8aa0', 'left');
-    const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? '#ffffff' : '#9a8aa0'); R(bx + 2, BOOT_FS_Y, 8, 8, '#140a1e'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, '#5ae06a');
-    text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, OPT.full ? '#5ae06a' : '#ff5a4a', 'left');
-    if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, '#7a6a80', 'center');
+    if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,255,255,.08)');
+    text((c === 0 ? '> ' : '  ') + 'FULL SCREEN', CX - 80, BOOT_FS_Y, 8, c === 0 ? WH : DIM, 'left');
+    const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? WH : DIM); R(bx + 2, BOOT_FS_Y, 8, 8, '#0e0816'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, WH);
+    text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, WH, 'left');
+    if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, DIM, 'center');
   } else if (IPHONE) {
-    text('FULL SCREEN ON IPHONE:', CX, BOOT_FS_Y - 4, 8, '#9a8aa0', 'center');
-    text('SHARE > ADD TO HOME SCREEN', CX, BOOT_FS_Y + 8, 8, '#7ad8ff', 'center');
+    text('FULL SCREEN ON IPHONE:', CX, BOOT_FS_Y - 4, 8, DIM, 'center');
+    text('SHARE > ADD TO HOME SCREEN', CX, BOOT_FS_Y + 8, 8, WH, 'center');
   }
   // haut-parleur + conseil volume
   const sx = CX - 8, sy = 104;
-  R(sx - 8, sy + 3, 4, 6, '#ffd23a'); ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
-  ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 1.5;
+  R(sx - 8, sy + 3, 4, 6, WH); ctx.fillStyle = WH; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
+  ctx.strokeStyle = WH; ctx.lineWidth = 1.5;
   for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
-  text('TURN THE VOLUME ON', CX, sy + 22, 8, '#ffffff', 'center');
-  text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, '#9a8aa0', 'center');
+  text('TURN THE VOLUME ON', CX, sy + 22, 8, WH, 'center');
+  text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, DIM, 'center');
   // bouton START
   const on = c === 1, pulse = on ? (G.frame >> 4) % 2 : 0;
-  R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? '#ffd23a' : '#ff6a1a') : '#5a4a60'); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#140a1e');
-  text('START', CX, BOOT_START_Y, 8, on ? '#ffffff' : '#9a8aa0', 'center');
-  text(isTouch ? 'TAP TO CHOOSE' : 'UP / DOWN + ENTER', CX, 189, 8, '#5a4a60', 'center');
+  R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? WH : 'rgba(255,255,255,.7)') : DIM); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#0e0816');
+  text('START', CX, BOOT_START_Y, 8, on ? WH : DIM, 'center');
+  text(isTouch ? 'TAP TO CHOOSE' : 'UP / DOWN + ENTER', CX, 189, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawTitle() {
   const t = G.t;
