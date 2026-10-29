@@ -1,4 +1,4 @@
-# Sweet Fighters 2
+# Sweet Fighters
 
 Pixel-art fighting game playable in the browser (PC and mobile in landscape).
 

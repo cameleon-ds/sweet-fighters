@@ -1,10 +1,10 @@
 /* =========================================================
-   SWEET FIGHTERS 2 — moteur de combat pixel art
+   SWEET FIGHTERS — moteur de combat pixel art
    Résolution native 384x216, mise à l'échelle "pixelated"
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v140';
+const VERSION = 'v141';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4450,7 +4450,7 @@ function drawImg(img, cx, cy, w, al) {
 function drawBoot() {   // écran de démarrage
   const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240;
   R(CX - PW / 2, 14, PW, 190, 'rgba(20,10,30,.92)'); R(CX - PW / 2, 14, PW, 2, '#ffd23a'); R(CX - PW / 2, 202, PW, 2, '#ffd23a');
-  text('SWEET FIGHTERS 2', CX, 26, 16, '#ffd23a', 'center');
+  text('SWEET FIGHTERS', CX, 26, 16, '#ffd23a', 'center');
   R(CX - PW / 2 + 16, 50, PW - 32, 1, '#4a3a2a');
   if (fa) {   // choix du plein écran
     if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,210,58,.1)');
