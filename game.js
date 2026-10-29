@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v146';
+const VERSION = 'v147';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -220,10 +220,15 @@ const BGS = {};
 const STAGE_IMG = { dojo: ['stage_dojo.jpg', 650], city: ['stage_city.jpg', 652], temple: ['stage_temple.jpg', 668], hall: ['stage_hall.jpg', 668], terrace: ['stage_terrace.jpg', 660], alley: ['stage_alley.jpg', 630], ring: ['stage_ring.jpg', 722], lab: ['stage_lab.jpg', 676] };
 const URBAN = ['city', 'terrace', 'alley', 'ring', 'lab'];   // décors urbains : poubelles, cônes, bouteilles
 const STAGE_PIC = {};
+// Chargement différé : seuls les logos, l'image titre et la musique du titre bloquent le démarrage ;
+// portraits et décors se téléchargent ensuite en arrière-plan (prêts bien avant l'écran de sélection)
+const LAZY = []; let lazyGo = false;
+const lazySrc = (im, src) => { if (lazyGo) im.src = src; else LAZY.push([im, src]); };
+function lazyStart() { if (lazyGo) return; lazyGo = true; LAZY.forEach(([im, src]) => { im.src = src; }); LAZY.length = 0; }
 for (const k in STAGE_IMG) {
   const im = new Image();
   im.onload = () => { BGS[k] = buildStageBG(k); if (typeof G !== 'undefined' && G.stage === k) BG = BGS[k]; };
-  im.src = STAGE_IMG[k][0] + '?v=104';
+  lazySrc(im, STAGE_IMG[k][0] + '?v=104');
   STAGE_PIC[k] = im;
 }
 function buildStageBG(k) {
@@ -3796,8 +3801,17 @@ const unlockAudio = () => {
 G.gate = false;
 // Chargement : images (portraits, décors, titre, logos) avant de lancer le jeu ; affiché au moins 1,2 s
 const LOAD_T0 = performance.now();
-function loadList() { return [...PORTRAITS, ...PORTRAITS_HURT, ...Object.values(STAGE_PIC), TITLE_IMG, SRG, LOGO]; }
-const loadProgress = () => { const L = loadList(), n = L.filter(im => im.complete).length, tk = Math.min(1, (performance.now() - LOAD_T0) / 1200); return Math.min(n / L.length, tk); };
+function loadList() { return [SRG, TITLE_IMG, LOGO]; }   // uniquement l'essentiel au démarrage
+// musique du titre : on attend qu'elle soit prête (au plus 3 s : certains navigateurs mobiles ne la chargent qu'à la lecture)
+const musicReady = () => BGM.readyState >= 3 || /iPhone|iPad|iPod/.test(navigator.userAgent) || performance.now() - LOAD_T0 > 3000;
+let loadOk = false;
+const loadProgress = () => {
+  if (loadOk) return 1;
+  const L = loadList(), n = L.filter(im => im.complete).length + (musicReady() ? 1 : 0), tk = Math.min(1, (performance.now() - LOAD_T0) / 400);
+  const p = Math.min(n / (L.length + 1), tk);
+  if (p >= 1) { loadOk = true; lazyStart(); }   // le reste se charge en arrière-plan
+  return p;
+};
 const loadDone = () => loadProgress() >= 1;
 G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
 // Écran de démarrage : choix du plein écran, conseil volume, bouton START (l'appui autorise aussi le son)
@@ -3934,6 +3948,7 @@ function step() {
     case 'select': {
       G.t++;
       netStart();   // prépare les QR codes des manettes smartphone
+      if (NET.id && !QR[1] && typeof qrcode !== 'undefined') makeQRs();   // bibliothèque QR chargée après coup
       const sc = G.selPhase && p2On() ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
       {
         let sl = G.sel || 0;
@@ -4155,8 +4170,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
