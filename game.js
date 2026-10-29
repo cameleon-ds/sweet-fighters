@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v135';
+const VERSION = 'v136';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1432,6 +1432,7 @@ addEventListener('keydown', e => {
   }
   const m = keyAction(e.code);
   if (m) { keys.add(m); latched.add(m); e.preventDefault(); }
+  if ((m === 's' || m === 'start') && G.showOpts && !G.showKeys && G.ocur === 6) { OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame; if (OPT.full) enterFS(); else exitFS(); }   // option PLEIN ÉCRAN (validée pendant l'appui : autorisé par le navigateur)
 });
 addEventListener('keyup', e => { const m = keyAction(e.code); if (m) keys.delete(m); });
 function bindKey(dev, act, val) {   // associe et échange si la touche était déjà utilisée
@@ -1535,18 +1536,20 @@ addEventListener('pointerdown', e => {
   tap = e.target !== cv ? null : ROT
     ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H }
     : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
-  if (isTouch && !fsTried) {
-    fsTried = true;
-    const el = document.documentElement;
-    const rq = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (rq) {
-      try {
-        const pr = rq.call(el);
-        if (pr && pr.then) pr.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
-      } catch (err) {}
-    }
-  }
+  syncFS();   // plein écran (demandé au premier toucher, si l'option est activée)
 }, { passive: true });
+// Plein écran : activé par défaut sur mobile, réglable dans OPTIONS. Le navigateur n'accepte l'entrée en plein écran qu'après une action du joueur.
+const isFS = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function enterFS() {
+  const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!rq || isFS()) return;
+  try { const pr = rq.call(el); if (pr && pr.then) pr.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {}); } catch (err) {}
+}
+function exitFS() { const ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex && isFS()) { try { const p = ex.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} } }
+function syncFS() { if (typeof OPT === 'undefined') return; if (OPT.full) enterFS(); }
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => {
+  if (!isFS() && !isTouch && typeof OPT !== 'undefined' && OPT.full) { OPT.full = false; saveOpt(); }   // PC : ÉCHAP quitte le plein écran et désactive l'option
+}));
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
@@ -3618,7 +3621,8 @@ function endRound(winner) {
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
 const OPT = { zoom: true, energy: 1, diff: 1, blood: true, music: 3, sfx: 4 };   // musique 75 %, bruitages 100 %
-try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}   // nouvelle clé : zoom et sang activés par défaut
+try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}
+if (OPT.full == null) OPT.full = isTouch;   // plein écran par défaut sur mobile   // nouvelle clé : zoom et sang activés par défaut
 const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
 const DIFFS = ['EASY', 'NORMAL', 'HARD', 'TRAINING'];
@@ -3642,7 +3646,7 @@ function stepMoves() {
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
-const OPT_BACK = () => isTouch && !padOn() ? 6 : 8;   // sur PC : lignes KEYBOARD et GAMEPAD en plus
+const OPT_BACK = () => isTouch && !padOn() ? 7 : 9;   // ligne FULL SCREEN, puis sur PC : KEYBOARD et GAMEPAD
 const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
 const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
 function stepKeys() {
@@ -3664,7 +3668,11 @@ function stepOptions() {
   const m = navStep(), oc = Math.max(0, Math.min(OB, G.ocur + m)); if (oc !== G.ocur) { G.ocur = oc; sfx('beep'); }
   const l = edge(pctl, 'l'), r = edge(pctl, 'r'), ok = edge(pctl, 's') || edge(pctl, 'start');
   if (backPress(pctl) || (ok && G.ocur === OB)) { G.showOpts = false; sfx('beep'); return; }
-  if (OB === 8 && ok && (G.ocur === 6 || G.ocur === 7)) { G.showKeys = G.ocur === 6 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
+  if (G.ocur === 6 && ok && G.fsDone !== G.frame && G.frame - (G.fsDone || -99) > 2) {   // plein écran (tactile / manette)
+    OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame;
+    if (OPT.full) enterFS(); else exitFS();   // sur mobile, l'entrée se fait au prochain toucher si le navigateur la refuse ici
+  }
+  if (OB === 9 && ok && (G.ocur === 7 || G.ocur === 8)) { G.showKeys = G.ocur === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
   if (G.ocur === 5 && (l || r || ok)) {
     OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
     saveOpt(); sfx('select');
@@ -4325,7 +4333,7 @@ function drawOptions() {
     for (let i = 0; i < 4; i++) R(CX + 46 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
   };
   if (G.showKeys) { drawKeys(); return; }
-  const OB = OPT_BACK(), Y = i => OB === 8 ? 48 + i * 13 : 46 + i * 17;
+  const OB = OPT_BACK(), Y = i => OB === 9 ? 44 + i * 12.5 : 44 + i * 15;
   if (c < OB) text('>', x0 - 4, Y(c), 8, '#ffd23a', 'right');
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
@@ -4335,11 +4343,12 @@ function drawOptions() {
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
-  if (OB === 8) {
-    text('KEYBOARD', x0, Y(6), 8, col(6), 'left'); text('SET >', CX + 62, Y(6), 8, col(6), 'center');
-    text('GAMEPAD', x0, Y(7), 8, col(7), 'left'); text(padOn() ? 'SET >' : 'NONE', CX + 62, Y(7), 8, padOn() ? col(7) : '#5a4a60', 'center');
+  text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
+  if (OB === 9) {
+    text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', CX + 62, Y(7), 8, col(7), 'center');
+    text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', CX + 62, Y(8), 8, padOn() ? col(8) : '#5a4a60', 'center');
   }
-  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, OB === 8 ? 164 : 154, 8, col(OB), 'center');
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 166, 8, col(OB), 'center');
   text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 180, 8, '#7a6a80', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
