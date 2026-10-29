@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v144';
+const VERSION = 'v145';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1586,7 +1586,7 @@ function readPlayer() {
     back: K('back'),
   };
   latched.clear();
-  const gp = readPad(0); for (const b in gp) if (gp[b]) r[b] = true;   // manette branchée sur le PC
+  const ps = padSlots(); if (ps.p1 != null) { const gp = readPad(ps.p1); for (const b in gp) if (gp[b]) r[b] = true; }   // manette branchée sur le PC
   const rm = readRemote(1);   // manette smartphone du joueur 1
   for (const b in rm) if (rm[b]) r[b] = true;
   return r;
@@ -1617,6 +1617,20 @@ function readRemote(p) {
   return o;
 }
 const remoteOn = p => !!(NET.rem[p] && NET.rem[p].open);
+// Répartition des manettes du PC (Xbox, etc.) entre les joueurs :
+// smartphone en joueur 1 → la 1re manette va au joueur 2 ; sinon 1re manette = joueur 1, 2e manette = joueur 2
+function padSlots() {
+  const n = padList().length, o = { p1: null, p2: null };
+  if (remoteOn(1)) { if (!remoteOn(2) && n >= 1) o.p2 = 0; else if (n >= 1) o.p1 = 0; }
+  else { if (n >= 1) o.p1 = 0; if (!remoteOn(2) && n >= 2) o.p2 = 1; }
+  return o;
+}
+const p2On = () => remoteOn(2) || padSlots().p2 != null;   // joueur 2 humain (smartphone ou manette)
+function readP2() {
+  const o = readRemote(2), ps = padSlots();
+  if (ps.p2 != null) { const gp = readPad(ps.p2); for (const b in gp) if (gp[b]) o[b] = true; }
+  return o;
+}
 // Serveurs STUN/TURN publics : aident les téléphones à se connecter même derrière une box ou en 4G
 const ICE = { iceServers: [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
@@ -1679,12 +1693,12 @@ function makeQRs() {
 function drawQRs() {
   if (isTouch) return;
   for (const p of [1, 2]) {
-    const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', on = remoteOn(p);
+    const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', ps = padSlots(), padP = ps['p' + p] != null && !remoteOn(p), on = remoteOn(p) || (p === 2 && padP);
     const sz = Math.round((q ? q.width : 74) * .72), x = p === 1 ? 8 : W - 8 - sz, y = 36;   // QR codes plus petits
     text('PLAYER ' + p, x + sz / 2, y - 12, 8, col, 'center');
     if (q) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.globalAlpha = on ? .35 : 1; ctx.drawImage(q, x, y, sz, sz); ctx.restore(); }
     else { R(x, y, sz, sz, '#111'); text(NET.status === 'error' ? 'OFFLINE' : '...', x + sz / 2, y + sz / 2 - 4, 8, '#9a8aa0', 'center'); }
-    text(on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
+    text(padP && p === 2 ? 'GAMEPAD' : on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
     if (!on) text('TO PLAY', x + sz / 2, y + sz + 14, 8, '#d8c8a8', 'center');
   }
 }
@@ -3616,7 +3630,7 @@ function startMatch(p1, p2, stage) {
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  const vs2 = remoteOn(2);   // 2e manette connectée : joueur 2 humain au lieu du CPU
+  const vs2 = p2On();   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
   G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, !vs2)];
   if (vs2) G.f[1].ctl = p2ctl;
   G.f[0].ctl = pctl;
@@ -3820,7 +3834,7 @@ function step() {
   updateMusic();
   G.frame++; G.st = (G.st || 0) + 1;
   ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
-  ctlUpdate(p2ctl, confuse(readRemote(2), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
+  ctlUpdate(p2ctl, confuse(readP2(), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
 
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
@@ -3859,7 +3873,7 @@ function step() {
     case 'select': {
       G.t++;
       netStart();   // prépare les QR codes des manettes smartphone
-      const sc = G.selPhase && remoteOn(2) ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
+      const sc = G.selPhase && p2On() ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
       {
         let sl = G.sel || 0;
         if (edge(sc, 'l') && sl % 4 > 0) sl--;
@@ -4549,7 +4563,7 @@ function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
-  const two = remoteOn(2), L2 = two ? '2P' : 'CPU';
+  const two = p2On(), L2 = two ? '2P' : 'CPU';
   text(ph === 0 ? (two ? 'PLAYER 1: SELECT FIGHTER' : 'SELECT YOUR FIGHTER') : (two ? 'PLAYER 2: SELECT FIGHTER' : 'SELECT CPU FIGHTER'), CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
   drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
