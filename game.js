@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v142';
+const VERSION = 'v143';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4361,12 +4361,11 @@ function drawStar(x, y, r, on) {
     ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
   }
   ctx.closePath();
-  ctx.fillStyle = on ? '#ffd23a' : '#3a2e44'; ctx.fill();
+  ctx.fillStyle = on ? '#ffffff' : 'rgba(255,255,255,.18)'; ctx.fill();
 }
 function panel(y0, h, title, small, w = 200) {
-  R(CX - w / 2, y0, w, h, 'rgba(20,10,30,.92)');
-  R(CX - w / 2, y0, w, 2, '#ffd23a'); R(CX - w / 2, y0 + h - 2, w, 2, '#ffd23a');
-  if (small) { text(title, CX, y0 + 9, 8, '#ffd23a', 'center'); R(CX - w / 2 + 14, y0 + 22, w - 28, 1, '#4a3a2a'); }   // petit titre + filet
+  R(CX - w / 2, y0, w, h, 'rgba(14,8,22,.92)');   // panneau sobre : titre jaune, texte blanc, pas de traits jaunes
+  if (small) { text(title, CX, y0 + 9, 8, '#ffd23a', 'center'); R(CX - w / 2 + 14, y0 + 22, w - 28, 1, 'rgba(255,255,255,.15)'); }   // petit titre + filet
   else text(title, CX, y0 + 10, 16, '#ffd23a', 'center');
 }
 function drawOptions() {
@@ -4374,31 +4373,31 @@ function drawOptions() {
   const OB = OPT_BACK(), pc = OB === 9, PW = 236;
   panel(8, 200, 'OPTIONS', true, PW);
   const c = G.ocur, x0 = CX - PW / 2 + 22, vx = CX + PW / 2 - 40, bx = vx - 6;
-  const pos = i => OPT_ORDER.indexOf(i), col = i => c === pos(i) ? '#ffffff' : '#9a8aa0';
+  const pos = i => OPT_ORDER.indexOf(i), col = i => c === pos(i) ? '#ffffff' : 'rgba(255,255,255,.55)';
   const Y = i => 40 + pos(i) * (pc ? 15 : 19);   // lignes bien espacées
-  const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#140a1e'); if (on) R(bx + 3, y + 1, 6, 6, '#5ae06a'); };
+  const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#0e0816'); if (on) R(bx + 3, y + 1, 6, 6, '#ffffff'); };
   const bars = (y, v) => {
-    if (v === 0) { text('OFF', vx, y, 8, '#ff5a4a', 'center'); return; }
-    for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#5ae06a' : '#3a2e44');
+    if (v === 0) { text('OFF', vx, y, 8, '#ffffff', 'center'); return; }
+    for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#ffffff' : 'rgba(255,255,255,.18)');
   };
-  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * (pc ? 15 : 19) - 4, PW - 20, 15, 'rgba(255,210,58,.08)'); text('>', x0 - 4, 40 + c * (pc ? 15 : 19), 8, '#ffd23a', 'right'); }   // ligne sélectionnée surlignée
+  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * (pc ? 15 : 19) - 4, PW - 20, 15, 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * (pc ? 15 : 19), 8, '#ffffff', 'right'); }   // ligne sélectionnée surlignée
   text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
   for (let i = 0; i < 3; i++) drawStar(vx - 12 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
   text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
   const dsel = c === pos(2);
-  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, ['#5ae06a', '#ffd23a', '#ff5a4a', '#7ad8ff'][OPT.diff], 'center');
+  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, ['#ffffff', '#ffffff', '#ffffff', '#ffffff'][OPT.diff], 'center');
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
   if (pc) {
     text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', vx, Y(7), 8, col(7), 'center');
-    text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', vx, Y(8), 8, padOn() ? col(8) : '#5a4a60', 'center');
+    text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', vx, Y(8), 8, padOn() ? col(8) : 'rgba(255,255,255,.3)', 'center');
   }
-  R(CX - PW / 2 + 14, 172, PW - 28, 1, '#4a3a2a');
-  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : '#9a8aa0', 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, '#7a6a80', 'center');
+  R(CX - PW / 2 + 14, 172, PW - 28, 1, 'rgba(255,255,255,.15)');
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
   const pad = G.showKeys === 'pad', rows = bindRows(), N = rows.length + 2, c = G.kcur || 0;
@@ -4406,15 +4405,15 @@ function drawKeys() {   // écran de configuration des touches / boutons
   const x0 = CX - 84, step = pad ? 14 : 12, y0 = pad ? 48 : 42;
   rows.forEach(([a, nm], i) => {
     const y = y0 + i * step, sel = c === i, waiting = bindWait && bindWait.act === a;
-    if (sel) text('>', x0 - 4, y, 8, '#ffd23a', 'right');
-    text(nm, x0, y, 8, sel ? '#ffffff' : '#9a8aa0', 'left');
+    if (sel) text('>', x0 - 4, y, 8, '#ffffff', 'right');
+    text(nm, x0, y, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'left');
     const v = waiting ? ((G.frame >> 4) % 2 ? 'PRESS...' : '') : pad ? padName(PADB[a]) : keyName(KEYS[a]);
-    text(v, CX + 62, y, 8, waiting ? '#ffd23a' : '#7af0ff', 'center');
+    text(v, CX + 62, y, 8, waiting ? '#ffffff' : '#ffffff', 'center');
   });
   const yR = y0 + rows.length * step + 6;
-  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ff7a6a' : '#9a8aa0', 'center');
-  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffffff' : '#9a8aa0', 'center');
-  text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, '#7a6a80', 'center');
+  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+  text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
@@ -4423,7 +4422,7 @@ function drawPause() {
   panel(40, 136, 'PAUSE');
   PAUSE_ITEMS.forEach((t, i) => {
     const sel = G.pcur === i;
-    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffffff' : '#9a8aa0', 'center');
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
   });
 }
 
@@ -4511,7 +4510,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffffff' : 'rgba(255,255,255,.6)', 'center');
     });
   }
   if (L > 30) {
