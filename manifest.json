@@ -1,6 +1,7 @@
 {
   "name": "Sweet Fighters",
   "short_name": "Sweet Fighters",
+  "id": "./",
   "start_url": "./",
   "display": "fullscreen",
   "orientation": "landscape",

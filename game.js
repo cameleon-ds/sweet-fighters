@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v145';
+const VERSION = 'v146';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3685,9 +3685,11 @@ function stepMoves() {
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
-const OPT_ORDER = [6, 0, 1, 2, 3, 4, 5, 7, 8];   // ordre d'affichage : FULL SCREEN en premier
-const optL = () => OPT_ORDER[G.ocur] != null ? OPT_ORDER[G.ocur] : -1;
-const OPT_BACK = () => isTouch && !padOn() ? 7 : 9;   // ligne FULL SCREEN, puis sur PC : KEYBOARD et GAMEPAD
+// ordre d'affichage : FULL SCREEN en premier ; sur PC : KEYBOARD et GAMEPAD ; en bas : installer l'application (9)
+const optOrder = () => { const o = isTouch && !padOn() ? [6, 0, 1, 2, 3, 4, 5] : [6, 0, 1, 2, 3, 4, 5, 7, 8]; if (installAvail()) o.push(9); return o; };
+const optL = () => optOrder()[G.ocur] != null ? optOrder()[G.ocur] : -1;
+const OPT_BACK = () => optOrder().length;
+const optPC = () => !(isTouch && !padOn());
 const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
 const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
 function stepKeys() {
@@ -3714,7 +3716,8 @@ function stepOptions() {
     OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame;
     if (OPT.full) enterFS(); else exitFS();   // sur mobile, l'entrée se fait au prochain toucher si le navigateur la refuse ici
   }
-  if (OB === 9 && ok && (L === 7 || L === 8)) { G.showKeys = L === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
+  if (L === 9 && ok) { sfx('select'); doInstall(); return; }
+  if (optPC() && ok && (L === 7 || L === 8)) { G.showKeys = L === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
   if (L === 5 && (l || r || ok)) {
     OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
     saveOpt(); sfx('select');
@@ -3801,6 +3804,60 @@ G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
 G.boot = true; G.bcur = 1;
 const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 const fsAvail = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled || (document.documentElement.webkitRequestFullscreen && !IPHONE));
+/* ---------- Installer l'application (raccourci écran d'accueil / bureau) ---------- */
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+addEventListener('appinstalled', () => { installEvt = null; G.installed = true; G.instHelp = false; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+const IOS = IPHONE || /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const ANDROID = /Android/i.test(navigator.userAgent);
+const isStandalone = () => !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches ||
+  (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement && !document.webkitFullscreenElement));
+const installAvail = () => !G.installed && !isStandalone();
+const INSTALL_LBL = () => isTouch ? 'ADD TO HOME SCREEN' : 'INSTALL ON DESKTOP';
+function doInstall() {
+  if (installEvt) {   // Chrome / Edge / Android : vraie fenêtre d'installation
+    const e = installEvt; installEvt = null;
+    try { e.prompt(); e.userChoice.then(r => { if (r && r.outcome === 'accepted') G.installed = true; }).catch(() => {}); }
+    catch (err) { G.instHelp = true; G.instOpen = G.frame; }
+  } else { G.instHelp = true; G.instOpen = G.frame; }   // iPhone / Safari / Firefox : mode d'emploi
+}
+function drawDlIcon(x, y, col) {   // icône « télécharger » (flèche vers le bas + plateau)
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 2); ctx.moveTo(x - 3.5, y - 1.5); ctx.lineTo(x, y + 2); ctx.lineTo(x + 3.5, y - 1.5);
+  ctx.moveTo(x - 6, y + 2); ctx.lineTo(x - 6, y + 5); ctx.lineTo(x + 6, y + 5); ctx.lineTo(x + 6, y + 2); ctx.stroke(); ctx.restore();
+}
+function drawShareIcon(x, y, col) {   // icône « partager » d'iOS (carré ouvert + flèche vers le haut)
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 3, y - 2); ctx.lineTo(x - 6, y - 2); ctx.lineTo(x - 6, y + 7); ctx.lineTo(x + 6, y + 7); ctx.lineTo(x + 6, y - 2); ctx.lineTo(x + 3, y - 2);
+  ctx.moveTo(x, y + 3); ctx.lineTo(x, y - 7); ctx.moveTo(x - 3, y - 4); ctx.lineTo(x, y - 7); ctx.lineTo(x + 3, y - 4); ctx.stroke(); ctx.restore();
+}
+function drawInstHelp() {   // mode d'emploi quand le navigateur n'a pas de fenêtre d'installation
+  R(0, 0, W, H, 'rgba(0,0,0,.7)');
+  const PW = 260, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
+  R(CX - PW / 2, 36, PW, 144, '#0e0816');
+  panel(36, 144, INSTALL_LBL(), true, PW);
+  const x0 = CX - PW / 2 + 22;
+  if (IOS) {
+    text('1. TAP THE SHARE BUTTON', x0, 74, 8, WH, 'left'); drawShareIcon(CX + PW / 2 - 30, 77, WH);
+    text('2. ADD TO HOME SCREEN', x0, 98, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 101, WH);
+    text('THEN OPEN THE GAME FROM', CX, 126, 8, DIM, 'center'); text('ITS ICON: FULL SCREEN', CX, 138, 8, DIM, 'center');
+  } else if (ANDROID || isTouch) {
+    text('1. OPEN THE BROWSER MENU', x0, 74, 8, WH, 'left');
+    ctx.fillStyle = WH; for (let i = 0; i < 3; i++) ctx.fillRect(CX + PW / 2 - 31, 73 + i * 4, 2, 2);
+    text('2. ADD TO HOME SCREEN', x0, 98, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 101, WH);
+    text('THEN OPEN THE GAME FROM', CX, 126, 8, DIM, 'center'); text('ITS ICON: FULL SCREEN', CX, 138, 8, DIM, 'center');
+  } else {
+    text('1. OPEN THE BROWSER MENU', x0, 74, 8, WH, 'left');
+    text('2. INSTALL SWEET FIGHTERS', x0, 92, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 95, WH);
+    text('   (SAFARI: FILE > ADD TO DOCK)', x0, 106, 8, DIM, 'left');
+    text('WORKS WITH CHROME, EDGE', CX, 126, 8, DIM, 'center'); text('AND SAFARI', CX, 138, 8, DIM, 'center');
+  }
+  text(isTouch ? 'TAP TO CLOSE' : 'ENTER / ESC: CLOSE', CX, 162, 8, 'rgba(255,255,255,.35)', 'center');
+}
+const bootItems = () => { const o = []; if (fsAvail()) o.push(0); if (installAvail()) o.push(2); o.push(1); return o; };
+function bootMove(m) { const L = bootItems(); let i = L.indexOf(G.bcur); if (i < 0) i = L.length - 1; i = Math.max(0, Math.min(L.length - 1, i + m)); if (L[i] !== G.bcur) { G.bcur = L[i]; sfx('beep'); } }
+function bootOk() { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else if (G.bcur === 2 && installAvail()) { sfx('select'); doInstall(); } else bootStart(); }
 function bootStart() {
   if (!G.boot) return;
   G.boot = false; G.t = 0;
@@ -3808,21 +3865,23 @@ function bootStart() {
   unlockAudio(); sfx('select');
 }
 function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
-const BOOT_FS_Y = 70, BOOT_START_Y = 164;
+const BOOT_FS_Y = 62, BOOT_START_Y = 168, BOOT_INST_Y = 142;
 addEventListener('keydown', e => {
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && ['Enter', 'Escape', 'Space', 'Backspace'].includes(e.code)) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); e.preventDefault(); e.stopPropagation(); } return; }
   if (!G.boot || !loadDone()) return;
   const k = e.code;
-  if (k === 'ArrowUp' || k === 'ArrowDown') { G.bcur = fsAvail() ? 1 - G.bcur : 1; sfx('beep'); }
-  else if ((k === 'ArrowLeft' || k === 'ArrowRight') && G.bcur === 0) bootToggleFS();
-  else if (k === 'Enter' || k === 'Space' || k === KEYS.s || k === KEYS.p) { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else bootStart(); }
+  if ((k === 'ArrowLeft' || k === 'ArrowRight') && G.bcur === 0) bootToggleFS();
+  else if (k === 'Enter' || k === 'Space' || k === KEYS.s || k === KEYS.p) { bootOk(); G.bootKey = G.frame; }
 }, true);
 // Sur mobile, le navigateur n'autorise le plein écran qu'au RELÂCHEMENT du doigt (pointerup / touchend), pas à l'appui
 addEventListener('pointerup', e => {
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 20) { G.instHelp = false; G.instClosed = G.frame; } return; }
   if (G.boot && loadDone()) {
     const r = cv.getBoundingClientRect();
     const p = ROT ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H } : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
     if (fsAvail() && Math.abs(p.y - (BOOT_FS_Y + 3)) < 12 && Math.abs(p.x - CX) < 90) { G.bcur = 0; bootToggleFS(); }
-    else if (Math.abs(p.y - (BOOT_START_Y + 4)) < 14 && Math.abs(p.x - CX) < 60) bootStart();
+    else if (installAvail() && Math.abs(p.y - (BOOT_INST_Y + 4)) < 11 && Math.abs(p.x - CX) < 100) { G.bcur = 2; sfx('select'); doInstall(); }
+    else if (Math.abs(p.y - (BOOT_START_Y + 4)) < 12 && Math.abs(p.x - CX) < 60) bootStart();
     return;
   }
   syncFS();
@@ -3835,6 +3894,8 @@ function step() {
   G.frame++; G.st = (G.st || 0) + 1;
   ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
   ctlUpdate(p2ctl, confuse(readP2(), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && (edge(pctl, 's') || edge(pctl, 'back') || edge(pctl, 'start') || edge(pctl, 'p') || edge(pctl, 'k'))) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); } tap = null; return; }
+  if (G.instClosed != null && G.frame - G.instClosed < 3) { tap = null; return; }
 
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
@@ -3846,7 +3907,7 @@ function step() {
     case 'title': {
       // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
       if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
-      if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone() && edge(pctl, 's')) bootStart(); break; }   // chargement puis écran de démarrage
+      if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone()) { const m = navStep(); if (m) bootMove(m); if ((edge(pctl, 's') || edge(pctl, 'start')) && G.bootKey !== G.frame && G.frame - (G.bootKey || -9) > 2) bootOk(); } break; }   // chargement puis écran de démarrage
       if (G.musicHold && (G.t >= 60 || G.tstate === 1)) { G.musicHold = false; BGM.currentTime = 0; }   // 1 s après l'apparition du logo
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
@@ -4409,17 +4470,17 @@ function panel(y0, h, title, small, w = 200) {
 }
 function drawOptions() {
   if (G.showKeys) { drawKeys(); return; }
-  const OB = OPT_BACK(), pc = OB === 9, PW = 236;
+  const OB = OPT_BACK(), pc = optPC(), PW = 236, RH = pc ? (OB > 9 ? 13 : 15) : (OB > 7 ? 17 : 19);
   panel(8, 200, 'OPTIONS', true, PW);
   const c = G.ocur, x0 = CX - PW / 2 + 22, vx = CX + PW / 2 - 40, bx = vx - 6;
-  const pos = i => OPT_ORDER.indexOf(i), col = i => c === pos(i) ? '#ffffff' : 'rgba(255,255,255,.55)';
-  const Y = i => 40 + pos(i) * (pc ? 15 : 19);   // lignes bien espacées
+  const pos = i => optOrder().indexOf(i), col = i => c === pos(i) ? '#ffffff' : 'rgba(255,255,255,.55)';
+  const Y = i => 40 + pos(i) * RH;   // lignes bien espacées
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#0e0816'); if (on) R(bx + 3, y + 1, 6, 6, '#ffffff'); };
   const bars = (y, v) => {
     if (v === 0) { text('OFF', vx, y, 8, '#ffffff', 'center'); return; }
     for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#ffffff' : 'rgba(255,255,255,.18)');
   };
-  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * (pc ? 15 : 19) - 4, PW - 20, 15, 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * (pc ? 15 : 19), 8, '#ffffff', 'right'); }   // ligne sélectionnée surlignée
+  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * RH - 4, PW - 20, Math.min(15, RH), 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * RH, 8, '#ffffff', 'right'); }   // ligne sélectionnée surlignée
   text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
@@ -4434,6 +4495,7 @@ function drawOptions() {
     text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', vx, Y(7), 8, col(7), 'center');
     text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', vx, Y(8), 8, padOn() ? col(8) : 'rgba(255,255,255,.3)', 'center');
   }
+  if (pos(9) >= 0) { text(INSTALL_LBL(), x0, Y(9), 8, col(9), 'left'); drawDlIcon(vx, Y(9) + 3, col(9)); }
   R(CX - PW / 2 + 14, 172, PW - 28, 1, 'rgba(255,255,255,.15)');
   text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
   text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
@@ -4486,7 +4548,7 @@ function drawImg(img, cx, cy, w, al) {
   ctx.restore(); return true;
 }
 function drawBoot() {   // écran de démarrage : titre jaune, tout le reste en blanc
-  const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
+  const fa = fsAvail(), c = bootItems().includes(G.bcur) ? G.bcur : 1, PW = 240, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
   R(CX - PW / 2, 14, PW, 190, 'rgba(14,8,22,.92)');
   text('SWEET FIGHTERS', CX, 26, 16, '#ffd23a', 'center');
   R(CX - PW / 2 + 16, 50, PW - 32, 1, 'rgba(255,255,255,.15)');
@@ -4496,17 +4558,23 @@ function drawBoot() {   // écran de démarrage : titre jaune, tout le reste en 
     const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? WH : DIM); R(bx + 2, BOOT_FS_Y, 8, 8, '#0e0816'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, WH);
     text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, WH, 'left');
     if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, DIM, 'center');
-  } else if (IPHONE) {
-    text('FULL SCREEN ON IPHONE:', CX, BOOT_FS_Y - 4, 8, DIM, 'center');
-    text('SHARE > ADD TO HOME SCREEN', CX, BOOT_FS_Y + 8, 8, WH, 'center');
+  } else if (IOS && installAvail()) {
+    text('FOR FULL SCREEN ON IPHONE,', CX, BOOT_FS_Y - 4, 8, DIM, 'center');
+    text('ADD THE GAME TO YOUR HOME SCREEN', CX, BOOT_FS_Y + 8, 8, DIM, 'center');
   }
   // haut-parleur + conseil volume
-  const sx = CX - 8, sy = 104;
+  const sx = CX - 8, sy = 88;
   R(sx - 8, sy + 3, 4, 6, WH); ctx.fillStyle = WH; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
   ctx.strokeStyle = WH; ctx.lineWidth = 1.5;
   for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
   text('TURN THE VOLUME ON', CX, sy + 22, 8, WH, 'center');
   text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, DIM, 'center');
+  if (installAvail()) {   // bouton : ajouter à l'écran d'accueil / installer sur le bureau
+    const io = c === 2, lb = INSTALL_LBL(), tw = lb.length * 5, bw = tw + 40;
+    if (io) R(CX - bw / 2, BOOT_INST_Y - 5, bw, 17, 'rgba(255,255,255,.08)');
+    drawDlIcon(CX - tw / 2 - 4, BOOT_INST_Y + 3, io ? WH : DIM);
+    text(lb, CX + 7, BOOT_INST_Y, 8, io ? WH : DIM, 'center');
+  }
   // bouton START
   const on = c === 1, pulse = on ? (G.frame >> 4) % 2 : 0;
   R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? WH : 'rgba(255,255,255,.7)') : DIM); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#0e0816');
@@ -4653,6 +4721,7 @@ function render() {
   }
   ctx.restore();
   if (G.paused && grp === 'fight') drawPause();   // menu pause jamais secoué
+  if (G.instHelp) drawInstHelp();
   if (transT < TRANS_N) { drawTransition(transT / TRANS_N); transT++; }
 }
 // Transition entre écrans : un volet diagonal noir bordé d'une lame de lumière balaie l'ancien écran
