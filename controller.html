@@ -51,6 +51,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   const q = new URLSearchParams(location.search), host = q.get('h'), P = q.get('p') === '2' ? 2 : 1;
   const who = document.getElementById('who'), st = document.getElementById('st');
   who.textContent = 'PLAYER ' + P; who.className = 'p' + P;
+  function wake() { try { if (navigator.wakeLock && !wake.lock) navigator.wakeLock.request('screen').then(l => { wake.lock = l; l.addEventListener('release', () => { wake.lock = null; }); }).catch(() => {}); } catch (e) {} }
   const state = { x: 0, y: 0 };                                   // stick (-1..1)
   const btn = { p: false, k: false, s: false, x: false, start: false };
   let conn = null, peer = null, ok = false, dirty = true;
@@ -66,18 +67,48 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   if (!host) { setSt('NO GAME ID - SCAN AGAIN', 'bad'); }
   else if (typeof Peer === 'undefined') { setSt('NETWORK LIBRARY MISSING', 'bad'); }
   else {
-    peer = new Peer();
-    const connect = () => {
-      setSt('CONNECTING...');
-      conn = peer.connect(host, { metadata: { p: P }, reliable: true });
-      conn.on('open', () => { ok = true; setSt('CONNECTED', 'ok'); emit(); });
-      conn.on('close', () => { ok = false; setSt('DISCONNECTED - RETRYING', 'bad'); setTimeout(connect, 2000); });
-      conn.on('error', () => { ok = false; });
+    // Connexion robuste : réessaie sans fin, détecte les coupures (battement de cœur du PC) et se reconnecte seule
+    const ICE = { iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+    ] };
+    let lastMsg = 0, retryT = null, tries = 0;
+    const newPeer = () => {
+      try { if (peer) peer.destroy(); } catch (_) {}
+      peer = new Peer({ config: ICE });
+      peer.on('open', connect);
+      peer.on('error', e => {
+        ok = false;
+        setSt(e && e.type === 'peer-unavailable' ? 'WAITING FOR THE GAME...' : 'RECONNECTING...', 'bad');
+        schedule();
+      });
+      peer.on('disconnected', () => { setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch (_) {} }, 1000); });
     };
-    peer.on('open', connect);
-    peer.on('error', e => { ok = false; setSt(e && e.type === 'peer-unavailable' ? 'GAME NOT FOUND - SCAN AGAIN' : 'CONNECTION ERROR', 'bad');
-      if (e && e.type !== 'peer-unavailable') setTimeout(() => { try { peer.reconnect(); } catch (_) {} }, 2000); });
-    peer.on('disconnected', () => { try { peer.reconnect(); } catch (_) {} });
+    const schedule = (ms) => {   // nouvelle tentative (de plus en plus espacée, max 5 s)
+      if (retryT) return;
+      retryT = setTimeout(() => { retryT = null; if (ok) return; if (!peer || peer.destroyed || peer.disconnected) newPeer(); else connect(); }, ms || Math.min(5000, 1000 + tries * 700));
+    };
+    const connect = () => {
+      if (ok) return;
+      tries++;
+      setSt('CONNECTING...');
+      try { if (conn) conn.close(); } catch (_) {}
+      const c = conn = peer.connect(host, { metadata: { p: P }, reliable: true });
+      const t0 = setTimeout(() => { if (conn === c && !ok) schedule(10); }, 8000);   // pas de réponse : on réessaie
+      c.on('open', () => { clearTimeout(t0); if (conn !== c) return; ok = true; tries = 0; lastMsg = Date.now(); setSt('CONNECTED', 'ok'); emit(); });
+      c.on('data', () => { lastMsg = Date.now(); });
+      c.on('close', () => { if (conn !== c) return; ok = false; setSt('RECONNECTING...', 'bad'); schedule(); });
+      c.on('error', () => { if (conn !== c) return; ok = false; schedule(); });
+    };
+    newPeer();
+    // le PC envoie un signal chaque seconde : sans nouvelles depuis 5 s, la manette se reconnecte
+    setInterval(() => { if (ok && Date.now() - lastMsg > 5000) { ok = false; setSt('RECONNECTING...', 'bad'); try { conn.close(); } catch (_) {} schedule(10); } }, 1000);
+    // retour sur la page (écran rallumé, appli rouverte) : reconnexion immédiate
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      wake();
+      if (!ok) { clearTimeout(retryT); retryT = null; schedule(10); }
+    });
   }
 
   // Stick
@@ -117,8 +148,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   sb.addEventListener('pointerup', send0); sb.addEventListener('pointercancel', send0); sb.addEventListener('pointerleave', send0);
 
   // garder l'écran allumé
-  const wake = () => { try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {} };
-  document.addEventListener('pointerdown', wake, { once: true });
+  document.addEventListener('pointerdown', wake);   // l'écran reste allumé (redemandé à chaque retour sur la page)
   document.addEventListener('gesturestart', e => e.preventDefault());
 })();
 </script>

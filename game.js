@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v143';
+const VERSION = 'v144';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1617,29 +1617,54 @@ function readRemote(p) {
   return o;
 }
 const remoteOn = p => !!(NET.rem[p] && NET.rem[p].open);
+// Serveurs STUN/TURN publics : aident les téléphones à se connecter même derrière une box ou en 4G
+const ICE = { iceServers: [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+] };
 function netStart() {
   if (NET.peer || typeof Peer === 'undefined') return;
-  const id = 'sf2-' + Math.random().toString(36).slice(2, 10);
+  // identifiant gardé d'une session à l'autre : les téléphones déjà connectés se reconnectent seuls si la page est rechargée
+  let id = null; try { id = localStorage.getItem('sf2host'); } catch (e) {}
+  if (!id) { id = 'sf2-' + Math.random().toString(36).slice(2, 10); try { localStorage.setItem('sf2host', id); } catch (e) {} }
   NET.status = 'connecting';
-  try { NET.peer = new Peer(id); } catch (e) { NET.status = 'error'; return; }
+  try { NET.peer = new Peer(id, { config: ICE }); } catch (e) { NET.status = 'error'; return; }
   NET.peer.on('open', pid => { NET.id = pid; NET.status = 'ready'; makeQRs(); });
-  NET.peer.on('error', () => { NET.status = 'error'; });
-  NET.peer.on('disconnected', () => { try { NET.peer.reconnect(); } catch (e) {} });
+  NET.peer.on('error', e => {
+    if (e && e.type === 'unavailable-id') {   // identifiant déjà pris (autre onglet) : on en prend un nouveau
+      try { localStorage.removeItem('sf2host'); NET.peer.destroy(); } catch (_) {}
+      NET.peer = null; setTimeout(netStart, 300); return;
+    }
+    if (!NET.id) NET.status = 'error';
+  });
+  NET.peer.on('disconnected', () => { setTimeout(() => { try { if (NET.peer && !NET.peer.destroyed) NET.peer.reconnect(); } catch (e) {} }, 1000); });   // reconnexion au serveur de signalisation
   NET.peer.on('connection', conn => {
     const p = (conn.metadata && conn.metadata.p) === 2 ? 2 : 1;
     if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { try { NET.rem[p].conn.close(); } catch (e) {} }
-    const r = NET.rem[p] = { conn, open: false, held: {}, tap: {}, x: 0, y: 0 };
-    conn.on('open', () => { r.open = true; sfx('select'); try { conn.send({ t: 'hi', p }); } catch (e) {} });
+    const r = NET.rem[p] = { conn, open: false, held: {}, tap: {}, x: 0, y: 0, last: performance.now() };
+    const opened = () => { if (r.open) return; r.open = true; r.last = performance.now(); sfx('select'); try { conn.send({ t: 'hi', p }); } catch (e) {} };
+    conn.on('open', opened); if (conn.open) opened();
     conn.on('data', m => {
+      r.last = performance.now(); if (!r.open) opened();
       if (!m || m.t !== 'in') return;
       for (const b of ['p', 'k', 's', 'x', 'start']) { const v = !!(b === 'x' ? m.bx : m[b]); if (v && !r.held[b]) r.tap[b] = true; r.held[b] = v; }
       r.x = +m.x || 0; r.y = +m.y || 0;
     });
-    conn.on('close', () => { r.open = false; });
+    conn.on('close', () => { if (NET.rem[p] === r) { r.open = false; r.held = {}; r.x = r.y = 0; } });
+    conn.on('error', () => {});
   });
+  // battement de cœur : le PC répond régulièrement ; une manette muette depuis 6 s est considérée déconnectée (elle se reconnecte seule)
+  if (NET.hb) return; NET.hb = setInterval(() => {
+    const now = performance.now();
+    for (const p of [1, 2]) {
+      const r = NET.rem[p]; if (!r || !r.conn) continue;
+      if (r.open) { try { r.conn.send({ t: 'hb' }); } catch (e) {} }
+      if (r.open && now - r.last > 6000) { r.open = false; r.held = {}; r.x = r.y = 0; }
+    }
+  }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p, location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=144', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {
