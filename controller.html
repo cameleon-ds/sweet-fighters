@@ -56,6 +56,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 #connect{position:absolute;left:50%;top:calc(var(--h)*.42);transform:translate(-50%,-50%);z-index:5;display:none;padding:16px 26px;border-radius:16px;border:3px solid #ffd23a;background:rgba(14,8,22,.85);color:#ffd23a;font-size:14px;box-shadow:0 0 22px rgba(255,210,58,.45);animation:glow 1.6s ease-in-out infinite}
 #connect.on{transform:translate(-50%,-50%) scale(.94);background:rgba(255,210,58,.25)}
 @keyframes glow{50%{box-shadow:0 0 6px rgba(255,210,58,.2)}}
+#cnote{position:absolute;left:50%;top:calc(var(--h)*.42 + 40px);transform:translateX(-50%);z-index:5;display:none;font-size:8px;color:#fff;white-space:nowrap;text-shadow:0 1px 0 #000,0 0 6px rgba(0,0,0,.8);pointer-events:none}
 #inst{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:4;display:none;align-items:center;gap:6px;padding:7px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:7px;color:rgba(255,255,255,.9)}
 #inst svg{width:14px;height:14px}
 #help{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
@@ -70,6 +71,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 <div id="top"><div id="who">PLAYER 1</div><div id="st">CONNECTING...</div></div>
 <div id="fig"><div class="pic"><img alt=""></div><div class="nm"></div><div class="hp"><i></i></div><div class="res"></div></div>
 <div id="connect">CONNECT</div>
+<div id="cnote">USE SAME WI-FI</div>
 <div id="stickZone"><div id="stick"><div id="knob"></div></div></div>
 <div id="btnZone"><div id="btns">
   <div class="b by" data-b="p">Y<small>PUNCH</small></div>
@@ -134,14 +136,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     let lastMsg = 0, retryT = null, tries = 0, parked = null, hidT = null;
     // Mise en veille : manette remplacée par une autre page (même joueur) ou page cachée depuis plus d'1 minute
     // Bouton CONNECT au milieu : seule la page où l'on appuie se connecte, les autres pages sont déconnectées
-    const cbtn = document.getElementById('connect');
+    const cbtn = document.getElementById('connect'), cnote = document.getElementById('cnote');
     const park = why => {
       parked = why; ok = false; clearTimeout(retryT); retryT = null;
       try { if (conn) conn.close(); } catch (_) {} try { if (peer) peer.destroy(); } catch (_) {} peer = null; conn = null;
       setSt(why === 'replaced' ? 'CONNECTED ON ANOTHER SCREEN' : why === 'idle' ? 'PAUSED' : 'PRESS CONNECT', why === 'start' ? '' : 'bad');
-      cbtn.style.display = 'block'; fig.style.display = 'none';
+      cbtn.style.display = 'block'; cnote.style.display = 'block'; fig.style.display = 'none';
     };
-    const unpark = () => { if (!parked) return; parked = null; tries = 0; cbtn.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
+    const unpark = () => { if (!parked) return; parked = null; tries = 0; cbtn.style.display = 'none'; cnote.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
     cbtn.addEventListener('pointerdown', e => { cbtn.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
     cbtn.addEventListener('pointerup', e => { cbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); unpark(); });
     cbtn.addEventListener('pointercancel', () => cbtn.classList.remove('on'));
