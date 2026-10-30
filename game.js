@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v165';
+const VERSION = 'v166';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3828,7 +3828,7 @@ function drawEnding() {
     drawFighter(E.f, CX, 142); if (E.f.def.float && typeof drawVaneGhost === 'function') drawVaneGhost(Object.assign(E.f, { x: CX, y: 142 }));
   }
   drawConf(true);   // quelques confettis devant
-  if (t > 110) { const k = Math.min(1, (t - 110) / 12), sc = 1 + (1 - k) * 1.5; ctx.save(); ctx.globalAlpha = a * k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('CONGRATULATIONS !', 0, -8, 16, (G.frame >> 4) % 2 ? '#ffd23a' : '#ffe98a', 'center'); ctx.restore(); }
+  if (t > 110) { const k = Math.min(1, (t - 110) / 24), e = 1 - Math.pow(1 - k, 3), sc = 1 + (1 - e) * 7; ctx.save(); ctx.globalAlpha = a * k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('CONGRATULATIONS !', 0, -8, 16, (G.frame >> 4) % 2 ? '#ffd23a' : '#ffe98a', 'center'); ctx.restore(); }
   if (t > 300 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 196, 8, '#ffffff', 'center');
   ctx.restore();
   if (E.out) R(0, 0, W, H, `rgba(0,0,0,${Math.min(1, E.out / 40)})`);   // fondu de sortie
