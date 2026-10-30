@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v178';
+const VERSION = 'v179';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1845,7 +1845,7 @@ const ATK = {
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
   kbarrage: { act: [1, 30], box: [12, -80, 50, -54], dmg: 4, stun: 16, bstun: 8, push: .35, sfx: 'hit' },             // Kael : rafale de 5 poings électriques
   kspin:    { act: [2, 16], box: [-44, -74, 46, -36], dmg: 11, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Kael : coup de pied rotatif 360° aérien
-  flipk:    { act: [6, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 36, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
+  flipk:    { act: [5, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 18, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
   nyxspin:  { act: [2, 18], box: [-40, -78, 42, -30], dmg: 10, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Nyx : coup de pied 360° arrière en plein vol
   nslide:   { dur: 32, act: [3, 22], box: [8, -18, 46, 0], dmg: 8, knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },   // Nyx : glissade au sol
 };
@@ -2079,7 +2079,7 @@ function updFighter(f, o) {
           break;
         }
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
-        if (back) { setState(f, 'flipk'); f.vx = 0; f.flipN = 1; f.flipHits = 0; f.flipQ = false; f.flipFin = false; break; }   // arrière + A : salto avant coup de pied (x3, puis 4e en feu)
+        if (back) { setState(f, 'flipk'); f.vx = 0; f.flipN = 1; f.flipHits = 0; f.flipQ = false; f.flipFin = false; f.flipS = FLIP_S; break; }   // arrière + A : salto avant coup de pied (x3, puis 4e en feu)
         if (shotOK(f)) { shotUse(f); setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
       }
       if (f.def.kit === 'kael' && f.kcharge > 0 && !h.d && take(c, 'p')) { setState(f, 'kbarrage'); f.vx = 0; f.kcharge = Math.max(f.kcharge, 40); f.barN = 0; break; }   // poing encore électrique : rafale de 5 coups
@@ -2355,9 +2355,12 @@ function updFighter(f, o) {
       break;
     case 'flipk': {   // petit saut avant + coup de pied tournoyant (salto avant complet) ; le 4e tourne en arrière, en feu
       if (f.t < 4) { f.vx = 0; break; }
-      if (f.t === 4) { f.air = true; f.vy = f.flipFin ? -6 : -5.2; f.vx = (f.flipFin ? 2.6 : 2.4) * f.dir; f.y -= 1; sfx(f.flipFin ? 'fb' : 'upper'); }
-      if (f.hasHit && !f.flipFin) f.vx = 1.1 * f.dir;
-      const k = Math.min(1, (f.t - 4) / (f.flipFin ? 30 : 26));
+      // vitesse : S = 1.35 par défaut, 2x plus vite pour les saltos enchaînés après un premier coup reçu (même saut, plus rapide)
+      const S = f.flipS || FLIP_S;
+      if (f.t === 4) { f.air = true; f.vy = (f.flipFin ? -6 : -5.2) * S; f.vx = (f.flipFin ? 2.6 : 2.4) * S * f.dir; f.y -= 1; sfx(f.flipFin ? 'fb' : 'upper'); }
+      if (f.t > 4 && f.air) f.vy += GRAV * (S * S - 1);
+      if (f.hasHit && !f.flipFin) f.vx = 1.1 * S * f.dir;
+      const k = Math.min(1, (f.t - 4) / ((f.flipFin ? 30 : 26) / S));
       f.rotAng = (f.flipFin ? -1 : 1) * f.dir * k * Math.PI * 2;
       if (back && take(c, 's') && f.flipN < 3 && !f.flipFin) f.flipQ = true;   // arrière + A à nouveau : enchaîne le salto suivant
       if (f.flipFin && f.rotAng != null) { const dx = f.dir * 28 * K * UP, dy = 10 * K * UP, cy = f.y - 30 * K * UP, a2 = f.rotAng, cs = Math.cos(a2), sn = Math.sin(a2); (f.ftrail2 = f.ftrail2 || []).push({ x: f.x + dx * cs - dy * sn, y: cy + dx * sn + dy * cs }); if (f.ftrail2.length > 14) f.ftrail2.shift(); }   // pied en feu
@@ -2439,8 +2442,8 @@ function updFighter(f, o) {
       else if (f.state === 'tatsu' || f.state === 'kspin') { setState(f, 'land'); f.landT = 10; }
       else if (f.state === 'flipk') {   // retombe sur ses pieds : salto suivant, 4e coup en feu, ou fin
         const n = f.flipN, q2 = f.flipQ, hits = f.flipHits, fin = f.flipFin; f.rotAng = null; f.ftrail2 = null;
-        if (!fin && n >= 3 && hits >= 3) { setState(f, 'flipk'); f.t = 3; f.flipN = 4; f.flipFin = true; f.flipQ = false; f.flipHits = hits; addPopup(f.x, f.y - 110, 'FIRE FLIP!', f.def.fb[2]); }
-        else if (!fin && q2 && n < 3) { setState(f, 'flipk'); f.t = 3; f.flipN = n + 1; f.flipQ = false; f.flipFin = false; f.flipHits = hits; }
+        if (!fin && n >= 3 && hits >= 3) { setState(f, 'flipk'); f.t = 3; f.flipN = 4; f.flipFin = true; f.flipQ = false; f.flipHits = hits; f.flipS = 1.6; addPopup(f.x, f.y - 110, 'FIRE FLIP!', f.def.fb[2]); }
+        else if (!fin && q2 && n < 3) { setState(f, 'flipk'); f.t = 3; f.flipN = n + 1; f.flipQ = false; f.flipFin = false; f.flipHits = hits; f.flipS = hits >= 1 ? FLIP_S * 2 : FLIP_S; }
         else { setState(f, 'land'); f.landT = fin ? 12 : 6; }
       }
       else if (f.state === 'dive') { f.trail = null; f.bounced = false; setState(f, 'land'); f.landT = 8; G.shake = Math.max(G.shake, 1); }
@@ -3250,6 +3253,7 @@ const PUDDLE_HIT = { dmg: 3, stun: 10, bstun: 6, push: .6, chip: 0, sfx: 'hit', 
 const GEYSER_HIT = { dmg: 12, knock: true, lift: 7, bstun: 14, push: 2, chip: 2, sfx: 'heavy' };
 const NYX_FIRE = ['#ffffff', '#ffb0e0', '#e0306a', '#6a0a8a'];
 const SMOKE_T = 120;
+const FLIP_S = 1.35;   // vitesse du salto coup de pied d'Hiro / Axel (arrière + A)
 const GEYSER_L = 205;   // longueur de la gerbe de flammes (haut + A) : atteint un adversaire au sommet de son saut   // la fumée de confusion ne dure que 2 secondes
 function addPuddle(owner, x, done) {
   const mine = G.puddles.filter(p => p.owner === owner); if (mine.length >= 2) mine[0].t = 9999;
