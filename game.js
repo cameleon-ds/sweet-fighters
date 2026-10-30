@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v157';
+const VERSION = 'v158';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2813,9 +2813,9 @@ function updVesper() {
     if (!o.air && Math.abs(o.x - m.x) < 14 && hurtbox(o)) { m.dead = true; shock(m.owner, o, MINE_HIT, m.x, GROUND - 10); G.shake = 5; }
   }
   if (G.mines) G.mines = G.mines.filter(m => !m.dead);
-  for (const f of G.f) {   // échos derrière Vesper pendant le coup de pied plongeant
+  for (const f of G.f) {   // échos derrière Vesper : coup de pied plongeant et Pas de l'Ombre (arrière + A)
     if (f.def.kit !== 'vesper') continue;
-    if (f.state === 'dive') { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
+    if (f.state === 'dive' || (f.state === 'shadow' && f.t < 16)) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
     else if (f.echo && f.echo.length) f.echo.shift();
   }
 }
