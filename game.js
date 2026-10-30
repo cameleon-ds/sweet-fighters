@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v155';
+const VERSION = 'v156';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1438,6 +1438,10 @@ addEventListener('keydown', e => {
     if (e.code !== 'Escape') bindKey('kb', bindWait.act, e.code);
     bindWait = null; keys.clear(); return;
   }
+  if (bindWait && bindWait.dev === 'pad') {   // réglage manette en attente : ÉCHAP annule, HAUT / BAS change de ligne sans rien modifier
+    if (e.code === 'Escape' || e.code === 'Backspace') { e.preventDefault(); bindWait = null; keys.clear(); sfx('beep'); return; }
+    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { e.preventDefault(); bindMove(e.code === 'ArrowUp' ? -1 : 1); return; }
+  }
   const m = keyAction(e.code);
   if (m) { keys.add(m); latched.add(m); e.preventDefault(); }
   if ((m === 's' || m === 'start') && G.showOpts && !G.showKeys && G.ocur === 0) { OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame; if (OPT.full) enterFS(); else exitFS(); }   // option PLEIN ÉCRAN (validée pendant l'appui : autorisé par le navigateur)
@@ -1459,13 +1463,19 @@ function readPad(i) {
   if (i === 0 && bindWait && bindWait.dev === 'pad') {   // capture du nouveau bouton
     const now = gp.buttons.map(b => b.pressed);
     const n = now.findIndex((p, k) => p && !padPrev[k] && k !== 12 && k !== 13 && k !== 14 && k !== 15);
+    const mv = now[12] && !padPrev[12] ? -1 : now[13] && !padPrev[13] ? 1 : 0;   // croix haut / bas : ligne suivante / précédente sans changement
     padPrev = now;
+    if (mv) { bindMove(mv); return {}; }
     if (n >= 0) { bindKey('pad', bindWait.act, n); bindWait = null; G.padLock = 12; }
     return {};
   }
   if (i === 0) padPrev = gp.buttons.map(b => b.pressed);
   if (G.padLock > 0) { G.padLock--; return {}; }
   return o;
+}
+function bindMove(m) {   // annule l'attente et passe à la ligne précédente / suivante
+  bindWait = null; keys.clear(); G.padLock = 8;
+  const N = bindRows().length + 2; G.kcur = Math.max(0, Math.min(N - 1, (G.kcur || 0) + m)); sfx('beep');
 }
 const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'XBOX'];
 const padName = n => PAD_NAMES[n] || 'B' + n;
@@ -3739,7 +3749,7 @@ const optL = () => optOrder()[G.ocur] != null ? optOrder()[G.ocur] : -1;
 const OPT_BACK = () => optOrder().length;
 const optPC = () => !(isTouch && !padOn());
 const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
-const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
+const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4, 9) : BIND_ROWS;
 function stepKeys() {
   if (bindWait) return;   // en attente d'une touche
   const rows = bindRows(), N = rows.length + 2, m = navStep();
@@ -4562,7 +4572,7 @@ function drawOptions() {
   if (pos(9) >= 0) { text(INSTALL_LBL(), x0, Y(9), 8, col(9), 'left'); drawDlIcon(vx, Y(9) + 3, col(9)); }
   R(CX - PW / 2 + 14, 172, PW - 28, 1, 'rgba(255,255,255,.15)');
   text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
   const pad = G.showKeys === 'pad', rows = bindRows(), N = rows.length + 2, c = G.kcur || 0;
@@ -4578,7 +4588,7 @@ function drawKeys() {   // écran de configuration des touches / boutons
   const yR = y0 + rows.length * step + 6;
   text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
-  text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
+  text(bindWait ? (pad ? 'PRESS A BUTTON  (ESC: CANCEL)' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
