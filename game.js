@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v160';
+const VERSION = 'v161';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4690,7 +4690,6 @@ function drawTitle() {
   if (G.tstate !== 1) {
     if (L > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 176, 8, '#ffffff', 'center');
   } else {
-    drawQRs();   // les manettes smartphone peuvent se connecter dès l'écran titre
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
       text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
