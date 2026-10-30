@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v177';
+const VERSION = 'v178';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -755,8 +755,8 @@ function footP(q, dir, skin) {
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   let swE = null, swH = null;
-  const spinning = (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54) || (f.state === 'tornado' && f.t >= 3 && f.vy < 0);
-  const dir = spinning && ((f.t >> 2) & 1) ? -f.dir : f.dir;
+  const spinning = (f.state === 'kspin' && f.t >= 2 && f.t < 16) || (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54) || (f.state === 'tornado' && f.t >= 3 && f.vy < 0);
+  const dir = spinning && (f.state === 'kspin' ? ((f.t / 2 | 0) & 1) : ((f.t >> 2) & 1)) ? -f.dir : f.dir;   // Kael : rotation très rapide
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
   const upRise = f.state === 'uppercut' && (f.apexT == null || f.t - f.apexT < 4);
   const backView = f.state === 'rupper' || (upRise && f.t >= 3);
@@ -1361,13 +1361,13 @@ function noise(dur, vol, freq, type = 'bandpass', f1, q = 1, at = 0) {
 // impact : claquement aigu + coup sourd qui descend (style arcade 16 bits)
 const smack = (snapF, snapV, f0, f1, dur, vol) => { noise(.05, snapV, snapF, 'highpass', 0, .7); noise(dur * .8, vol * .7, 900, 'lowpass', 160); tone('sine', f0, f1, dur, vol); tone('square', f0 * 1.5, f1, dur * .45, vol * .35); };
 // Vrais bruitages d'impact (extraits de « Punch & Impact Sound Effects ») : légers, lourds, chute, KO
-const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], perfect: ['perfect'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'], wh4: ['wh4'], tele: ['tele1', 'tele2', 'tele3', 'tele4'], counter: ['ctr1', 'ctr2', 'ctr3', 'ctr4'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
+const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hit6'], ko: ['hit5'], r1: ['round-1'], r2: ['round-2'], r3: ['round-3'], fight: ['fight'], kov: ['ko'], win: ['you-win'], lose: ['you-lose'], perfect: ['perfect'], swing: ['wh1', 'wh2', 'wh4', 'wh5'], jump: ['wh3', 'wh6', 'wh7'], fb: ['fireball'], vcharge: ['vane-charge'], vlaunch: ['vane-launch'], wh4: ['wh4'], tele: ['tele1', 'tele2', 'tele3', 'tele4'], counter: ['ctr1', 'ctr2', 'ctr3', 'ctr4'], clash: ['tele4'], obj: ['obj1', 'obj2', 'obj3'], congrats: ['congratulations'] };   // whoosh.mp3 découpé   // + voix de l'annonceur
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
   // ouvert en local (fichier sur l'ordinateur) : le navigateur interdit fetch() -> on charge les sons intégrés dans sfx-data.js
   const local = location.protocol === 'file:';
-  const get = nm => local ? Promise.resolve(Uint8Array.from(atob(window.SFX_DATA[nm]), ch => ch.charCodeAt(0)).buffer) : fetch('sfx/' + nm + '.mp3?v=135').then(r => r.arrayBuffer());
+  const get = nm => local ? Promise.resolve(Uint8Array.from(atob(window.SFX_DATA[nm]), ch => ch.charCodeAt(0)).buffer) : fetch('sfx/' + nm + '.mp3?v=178').then(r => r.arrayBuffer());
   const go = () => { for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => get(nm).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {})); };
   if (local && !window.SFX_DATA) { const sc = document.createElement('script'); sc.src = 'sfx-data.js'; sc.onload = go; document.head.appendChild(sc); } else go();
 }
@@ -1405,7 +1405,7 @@ function sfx(n) {
       case 'upper': if (!playSample('jump', .7, 1)) { noise(.22, .45, 400, 'bandpass', 3000, 1.2); tone('square', 200, 820, .22, .16); } break;   // shoryuken et envols : même whoosh que le saut
       case 'ko': playSample('ko', 1.2, .85); tone('sine', 140, 28, 1.2, .6); tone('sawtooth', 220, 40, 1, .3); noise(1.2, .7, 600, 'lowpass', 60); noise(.08, .9, 2000, 'highpass'); break;
       case 'thud': if (!playSample('thud', 1)) { tone('sine', 110, 32, .3, .9); noise(.25, .6, 400, 'lowpass', 70); } break;   // chute au sol
-      case 'crash': noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
+      case 'crash': if (playSample('obj', 1)) break; noise(.25, .55, 2600); noise(.12, .45, 900); tone('triangle', 1400, 500, .12, .12); break;
       case 'beep': {   // déplacement du curseur : note aiguë 8 bits (une noire) avec delay et réverbe
         sfxBus(); const g = tone('square', 1760, 1760, .5, .14, 0, SFXBUS); g.connect(ECHO); g.connect(VERB);
         break;
@@ -1421,7 +1421,7 @@ function sfx(n) {
         const g2 = tone('triangle', 1568, 1568, .6, .18, 2 * .075, SFXBUS); g2.connect(VERB);
         break;
       }
-      case 'parry': tone('square', 1800, 1800, .09, .22); tone('triangle', 2700, 2600, .35, .25); noise(.08, .5, 5000, 'highpass'); break;   // « ting » métallique
+      case 'parry': playSample('clash', 1); break;   // deux projectiles qui se touchent / parade : tele4
     }
   } catch (e) {}
 }
@@ -1843,10 +1843,15 @@ const ATK = {
   crushD:   { act: [0, 99], box: [-10, -46, 28, 4], high: true, dmg: 16, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   zenith:   { dur: 60, act: [4, 26], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
+  kbarrage: { act: [1, 30], box: [12, -80, 50, -54], dmg: 4, stun: 16, bstun: 8, push: .35, sfx: 'hit' },             // Kael : rafale de 5 poings électriques
+  kspin:    { act: [2, 16], box: [-44, -74, 46, -36], dmg: 11, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Kael : coup de pied rotatif 360° aérien
+  flipk:    { act: [6, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 36, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
+  nyxspin:  { act: [2, 18], box: [-40, -78, 42, -30], dmg: 10, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Nyx : coup de pied 360° arrière en plein vol
+  nslide:   { dur: 32, act: [3, 22], box: [8, -18, 46, 0], dmg: 8, knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },   // Nyx : glissade au sol
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['nyxspin', 'kbarrage', 'kspin', 'flipk', 'nslide', 'gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1898,6 +1903,11 @@ function poseOf(f) {
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'airflask': return f.t < 4 ? 'jump' : 'jpunch';
     case 'nyxglide': return 'jump';
+    case 'kbarrage': return f.t >= 30 ? 'punch0' : (f.t % 6) < 3 ? 'punch1' : 'fpunch1';
+    case 'kspin': return f.t < 2 ? 'jump' : 'tatsu';
+    case 'nyxspin': return f.t < 2 ? 'jump' : 'jkick';
+    case 'flipk': return f.t < 4 ? 'crouch' : 'jkick';
+    case 'nslide': return f.t < 3 || f.t >= 26 ? 'crouch' : 'ckick';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
     case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
@@ -1966,6 +1976,35 @@ function threatened(f, o) {
   return false;
 }
 
+// Projectiles (boules d'énergie, clones, fioles...) : 3 tirs d'affilée maximum, puis 1 seconde d'attente
+function shotOK(f) { if (G.frame - (f.shotLast || -999) > 90) f.shotN = 0; return G.frame >= (f.shotCd || 0) && (f.shotN || 0) < 3; }
+function shotUse(f) { f.shotN = (f.shotN || 0) + 1; f.shotLast = G.frame; if (f.shotN >= 3) { f.shotCd = G.frame + 24 + 60; f.shotN = 0; } }
+// Nyx en glissade : les projectiles passent au-dessus
+const underShot = o => o.state === 'nslide' && o.t >= 2 && o.t < 26;
+// Kael (coup de pied rotatif) : renvoie boules de feu, clones, fioles et objets du décor lancés sur lui
+function reflectNear(g, R, yc, yr) {
+  const mir = (q, vk, qy) => {
+    if (q.owner === g || q.dead || q.alive === false) return;
+    if (Math.abs(q.x - g.x) > R || Math.abs(qy - yc) > yr) return;
+    const v = vk ? q[vk] : q.dir; if (Math.sign(v) !== Math.sign(g.x - q.x) && Math.abs(q.x - g.x) > 10) return;
+    if (q.owner && q.owner.fb === q) q.owner.fb = null;
+    q.owner = g; q.dir = -(q.dir || Math.sign(v)); if (vk) q[vk] = -q[vk]; if ('x0' in q) q.x0 = q.x; q.x = g.x + q.dir * (R - 6); q.t = 0;
+    if (q.vy != null && !q.straight) q.vy = Math.min(q.vy, -2.5);
+    addSpark(q.x, qy, 'parry'); sfx('parry'); G.flashT = Math.max(G.flashT, 4); G.freeze = Math.max(G.freeze || 0, 4); addPopup(g.x, g.y - 120, 'REFLECT!', '#7af0ff');
+  };
+  for (const q of G.fbs || []) mir(q, 'vx', q.y);
+  for (const q of G.blades || []) mir(q, null, q.y);
+  for (const q of G.sonics || []) mir(q, null, q.y);
+  for (const q of G.voids || []) if (!q.charging) mir(q, 'vx', q.y);
+  for (const q of G.flasks || []) mir(q, 'vx', q.y);
+  for (const q of G.holos || []) mir(q, null, q.y - 50);
+  for (const p of G.props || []) {
+    const F = p.fly; if (!p.alive || !F || F.owner === g || F.lastBy === g) continue;
+    if (Math.abs(p.x - g.x) > R + 6 || Math.abs(p.y - yc) > yr + 10) continue;
+    aimProp(p, g, F.owner); p.fly.deflected = false; p.fly.lastBy = g;
+    addSpark(p.x, p.y, 'parry'); sfx('counter'); G.flashT = Math.max(G.flashT, 4); addPopup(g.x, g.y - 120, 'REFLECT!', '#7af0ff');
+  }
+}
 function spawnFireball(f, big) {
   f.fb = { owner: f, x: f.x + f.dir * (big ? 52 : 40), y: f.y - 56, vx: 3.8 * f.dir, dir: f.dir, t: 0, alive: true, big: !!big, sc: big ? 2 : 1 };
   G.fbs.push(f.fb);
@@ -2002,47 +2041,48 @@ function updFighter(f, o) {
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
           if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }
           // Clone énergétique : 3 tirs d'affilée, puis 1 seconde d'attente
-          if (G.frame - (f.holoLast || -999) > 90) f.holoN = 0;   // pause assez longue : compteur remis à zéro
-          if (G.frame >= (f.holoCd || 0) && (f.holoN || 0) < 3) { setState(f, 'holo'); f.vx = 0; f.holoN = (f.holoN || 0) + 1; f.holoLast = G.frame; if (f.holoN >= 3) { f.holoCd = G.frame + 24 + 60; f.holoN = 0; } }
+          if (shotOK(f)) { shotUse(f); setState(f, 'holo'); f.vx = 0; }
           break;
         }
         if (f.def.kit === 'vane') {   // Vane : Impact Météore / Téléportation Fantôme / Éclair du Vide
           f.vx = 0;
           if (h.u) { setState(f, 'meteor'); f.invuln = 8; break; }
           if (back) { setState(f, 'pteleport'); f.invuln = 20; break; }
-          if (!G.voids.some(q => q.owner === f)) { setState(f, 'voidcast'); break; }
+          if (shotOK(f)) { shotUse(f); setState(f, 'voidcast'); break; }
           break;
         }
         if (f.def.kit === 'kael') {   // Kael : Uppercut Plasma / Esquive Éclair / Onde Sonique
           if (h.u) { setState(f, 'plasmawall'); f.vx = 0; break; }
           if (back) { setState(f, 'flashstep'); f.invuln = 12; sfx('tele'); break; }
-          if (!G.sonics.some(q => q.owner === f)) { setState(f, 'sonic'); f.vx = 0; break; }
+          if (shotOK(f)) { shotUse(f); setState(f, 'sonic'); f.vx = 0; break; }
           break;
         }
         if (f.def.kit === 'nyx') {   // Nyx : Geyser Alchimique / Écran de Fumée Toxique / Fiole Magma
           f.vx = 0;
+          if (h.d) { setState(f, 'nslide'); sfx('whoosh'); break; }   // bas + A : glissade au sol, passe sous les projectiles
           if (h.u) { setState(f, 'geyser'); break; }
           if (back) { setState(f, 'smokeback'); break; }
-          if (!G.flasks.some(q => q.owner === f)) { setState(f, 'flask'); break; }
+          if (shotOK(f)) { shotUse(f); setState(f, 'flask'); break; }
           break;
         }
         if (f.def.kit === 'zephyr') {   // Zephyr : Tornade Ascendante / Cyclone Rétrograde / Lame de Fond
           if (h.u) { setState(f, 'tornado'); f.vx = 0; f.invuln = 10; break; }
           if (back) { setState(f, 'sink'); f.vx = 0; f.invuln = 50; sfx('tele'); break; }   // passe sous terre et ressort derrière l'adversaire
-          if (!G.blades.some(q => q.owner === f)) { setState(f, 'gust'); f.vx = 0; break; }
+          if (shotOK(f)) { shotUse(f); setState(f, 'gust'); f.vx = 0; break; }
           break;
         }
         if (f.def.kit === 'grog') {   // Grog : Écrasement Céleste / Rempart de Fer / Impact Sismique
           f.vx = 0;
           if (h.u) { setState(f, 'crush'); break; }
           if (back) { setState(f, 'rampart'); f.rampT = 180; sfx('block'); sfx('parry'); break; }   // bras électrisés pendant 3 s
-          if (!G.waves.some(w => w.owner === f && !w.small)) { setState(f, 'quake'); break; }
+          if (shotOK(f)) { shotUse(f); setState(f, 'quake'); break; }
           break;
         }
         if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
-        if (back) { setState(f, 'gtatsu'); f.vx = 0; f.spinN = 0; sfx('upper'); break; }   // arrière + A : tornade au sol x4
-        if (!f.fb) { setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
+        if (back) { setState(f, 'flipk'); f.vx = 0; f.flipN = 1; f.flipHits = 0; f.flipQ = false; f.flipFin = false; break; }   // arrière + A : salto avant coup de pied (x3, puis 4e en feu)
+        if (shotOK(f)) { shotUse(f); setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
       }
+      if (f.def.kit === 'kael' && f.kcharge > 0 && !h.d && take(c, 'p')) { setState(f, 'kbarrage'); f.vx = 0; f.kcharge = Math.max(f.kcharge, 40); f.barN = 0; break; }   // poing encore électrique : rafale de 5 coups
       // Prise après un contre réussi : Y renverse, B projette de l'autre côté
       if (f.counterT > 0 && o.slowT > 0 && Math.abs(o.x - f.x) < 80) {
         if (take(c, 'p')) { doThrow(f, o, 'slam'); break; }
@@ -2121,10 +2161,11 @@ function updFighter(f, o) {
       if (f.t === 5) { f.air = true; sfx('upper'); }
       if (f.def.fireUpper) {   // John : part loin en avant puis monte en courbe, poing enflammé
         if (f.t === 3) f.fireState = 'uppercut';
-        if (f.t >= 5 && f.t <= 14) { f.vx = 6 * f.dir; f.vy = [-1.3, -1.5, -1.8, -2.1, -2.5, -3, -3.6, -4.4, -5.4, -6.6][f.t - 5]; if (f.t === 5) f.y -= 2; }
-        else if (f.t === 15) { f.vy = -7.4; f.vx = 2.8 * f.dir; }
-        else if (f.t > 15 && f.vy < 0) f.vx *= .88;
-        if (f.t > 15 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
+        // Axel : corps incliné à 45° dès le départ, monte en ligne droite en diagonale
+        if (f.t >= 1 && f.t < 5) f.rotAng = f.dir * Math.PI / 4 * (f.t / 4);
+        if (f.t >= 5 && f.t <= 20) { f.rotAng = f.dir * Math.PI / 4; f.vx = 5.4 * f.dir; f.vy = -5.4 - GRAV; if (f.t === 5) f.y -= 2; }
+        else if (f.t > 20) { f.vx = 1.2 * f.dir; f.rotAng = f.dir * Math.PI / 4 * Math.max(0, 1 - (f.t - 20) / 10); if (f.rotAng === 0) f.rotAng = null; }
+        if (f.t > 20 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
         if (f.t >= 4) { const [hp] = grogArm(f, 4, 4); (f.ftrail = f.ftrail || []).push({ x: hp[0], y: hp[1], bx: f.x, by: f.y, t: f.t, rotAng: f.rotAng }); if (f.ftrail.length > 12) f.ftrail.shift(); }   // traînée de feu du poing
         break;
       }
@@ -2148,6 +2189,9 @@ function updFighter(f, o) {
         }
         else if (f.def.kit === 'nyx' && take(c, 's')) {   // Nyx : plane (1 s, jusqu'à 2 s si A reste appuyé)
           setState(f, 'nyxglide'); f.airAtk = true; f.glideHold = true; sfx('whoosh');
+        }
+        else if (f.def.kit === 'kael' && take(c, 's')) {   // Kael : coup de pied rotatif 360° électrique sur place (2 tours), renvoie les projectiles
+          setState(f, 'kspin'); f.airAtk = true; f.vx = 0; sfx('upper'); sfx('parry');
         }
         else if (f.def.kit === 'vesper' && take(c, 's')) {
           // Vesper : coup de pied plongeant en diagonale avec traînée néon
@@ -2299,6 +2343,36 @@ function updFighter(f, o) {
       if (f.t === 8) { G.pwalls.push({ owner: f, x: f.x + f.dir * 26, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; G.shake = Math.max(G.shake, 4); G.flashT = Math.max(G.flashT, 4); sfx('parry'); sfx('heavy'); }
       if (f.t >= 40) setState(f, 'idle');
       break;
+    case 'kbarrage':   // 5 coups de poing électriques très rapides ; si les 5 touchent, le 5e fait tomber
+      f.vx = f.t < 30 ? .9 * f.dir : 0;
+      if (f.t < 30 && f.t % 6 === 0) { f.hasHit = false; sfx('whoosh'); }
+      if (f.t >= 40) { f.kcharge = 0; setState(f, 'idle'); }
+      break;
+    case 'kspin':   // tourne sur place en l'air, très vite
+      f.vx = 0; f.vy = f.t < 18 ? -GRAV : f.vy;
+      if (f.t >= 2 && f.t < 16) { reflectNear(f, 48, f.y - 54, 44); if (f.t % 4 === 2) sfx('whoosh'); }
+      if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; }
+      break;
+    case 'flipk': {   // petit saut avant + coup de pied tournoyant (salto avant complet) ; le 4e tourne en arrière, en feu
+      if (f.t < 4) { f.vx = 0; break; }
+      if (f.t === 4) { f.air = true; f.vy = f.flipFin ? -6 : -5.2; f.vx = (f.flipFin ? 2.6 : 2.4) * f.dir; f.y -= 1; sfx(f.flipFin ? 'fb' : 'upper'); }
+      if (f.hasHit && !f.flipFin) f.vx = 1.1 * f.dir;
+      const k = Math.min(1, (f.t - 4) / (f.flipFin ? 30 : 26));
+      f.rotAng = (f.flipFin ? -1 : 1) * f.dir * k * Math.PI * 2;
+      if (back && take(c, 's') && f.flipN < 3 && !f.flipFin) f.flipQ = true;   // arrière + A à nouveau : enchaîne le salto suivant
+      if (f.flipFin && f.rotAng != null) { const dx = f.dir * 28 * K * UP, dy = 10 * K * UP, cy = f.y - 30 * K * UP, a2 = f.rotAng, cs = Math.cos(a2), sn = Math.sin(a2); (f.ftrail2 = f.ftrail2 || []).push({ x: f.x + dx * cs - dy * sn, y: cy + dx * sn + dy * cs }); if (f.ftrail2.length > 14) f.ftrail2.shift(); }   // pied en feu
+      break;
+    }
+    case 'nyxspin':   // rotation sur elle-même vers l'arrière (coup de pied), puis redescend en sautant vers l'arrière
+      f.vx = 0; f.vy = -GRAV;
+      f.rotAng = -f.dir * Math.min(1, f.t / 16) * Math.PI * 2;
+      if (f.t === 8) sfx('whoosh');
+      if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; f.roll = -1; f.t = 3; f.vx = -2.4 * f.dir; f.vy = -3.2; sfx('jump'); }
+      break;
+    case 'nslide':   // Nyx : glisse vers l'avant au ras du sol
+      f.vx = f.t < 3 ? 0 : f.t < 22 ? 5.2 * f.dir : f.vx * .7;
+      if (f.t >= 32) { f.vx = 0; setState(f, 'idle'); }
+      break;
     case 'flashstep':   // pas de côté éclair vers l'arrière, les gants se chargent
       f.vx = f.t < 10 ? -f.dir * 6.5 : f.vx * .5;
       if (f.t === 8) { f.kcharge = 240; sfx('parry'); addPopup(f.x, f.y - 100, 'CHARGED!', '#5af0ff'); }
@@ -2310,6 +2384,7 @@ function updFighter(f, o) {
       if (f.t >= 24) setState(f, 'idle');
       break;
     case 'nyxglide': {   // Nyx plane : flotte, se déplace dans les 4 directions (même hors de l'écran en haut), lâche une fiole à la fin
+      if (take(c, 'p') || take(c, 'k')) { setState(f, 'nyxspin'); f.vx = 0; sfx('whoosh'); break; }   // Y ou B en planant : coup de pied tournoyant 360° vers l'arrière
       if (!h.s) f.glideHold = false;
       const lim = f.glideHold ? 120 : 60;   // A maintenu : jusqu'à 2 s ; simple appui : 1 s
       const lift = f.y > GROUND - 112 ? -Math.min(2.2, (f.y - (GROUND - 112)) * .12) : 0;   // monte assez haut pour passer au-dessus d'un adversaire ou d'une boule de feu
@@ -2361,7 +2436,13 @@ function updFighter(f, o) {
       f.y = GROUND; f.vy = 0; f.air = false;
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
-      else if (f.state === 'tatsu') { setState(f, 'land'); f.landT = 10; }
+      else if (f.state === 'tatsu' || f.state === 'kspin') { setState(f, 'land'); f.landT = 10; }
+      else if (f.state === 'flipk') {   // retombe sur ses pieds : salto suivant, 4e coup en feu, ou fin
+        const n = f.flipN, q2 = f.flipQ, hits = f.flipHits, fin = f.flipFin; f.rotAng = null; f.ftrail2 = null;
+        if (!fin && n >= 3 && hits >= 3) { setState(f, 'flipk'); f.t = 3; f.flipN = 4; f.flipFin = true; f.flipQ = false; f.flipHits = hits; addPopup(f.x, f.y - 110, 'FIRE FLIP!', f.def.fb[2]); }
+        else if (!fin && q2 && n < 3) { setState(f, 'flipk'); f.t = 3; f.flipN = n + 1; f.flipQ = false; f.flipFin = false; f.flipHits = hits; }
+        else { setState(f, 'land'); f.landT = fin ? 12 : 6; }
+      }
       else if (f.state === 'dive') { f.trail = null; f.bounced = false; setState(f, 'land'); f.landT = 8; G.shake = Math.max(G.shake, 1); }
       else if (f.state === 'zenith') { f.rotAng = null; setState(f, 'land'); f.landT = 10; }
       else if (f.state === 'tornado') { setState(f, 'land'); f.landT = 12; }
@@ -2378,7 +2459,7 @@ function updFighter(f, o) {
         const hit = f.hasHit; f.rotAng = null; setState(f, 'crushLand'); G.shake = Math.max(G.shake, 8); sfx('thud'); sfx('heavy');
         for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 12, small: true, done: hit });
       }
-      else if (['jump', 'jpunch', 'jkick', 'airflask', 'nyxglide'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
+      else if (['jump', 'jpunch', 'jkick', 'airflask', 'nyxglide', 'nyxspin'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
   } else {
@@ -2393,6 +2474,7 @@ function updFighter(f, o) {
 function hurtbox(f) {
   if (f.invuln > 0 || ['fall', 'down', 'getup', 'held'].includes(f.state)) return null;
   if (f.air) return [f.x - 13, f.y - 81, f.x + 13, f.y - 17];
+  if (f.state === 'nslide' && f.t >= 2 && f.t < 26) return [f.x - 18, f.y - 28, f.x + 18, f.y];   // glissade : passe sous les boules de feu
   if (f.state === 'land' || f.state === 'uppercut') return [f.x - 14, f.y - 67, f.x + 14, f.y];
   if (['crouch', 'cblock', 'cpunch', 'ckick'].includes(f.state)) return [f.x - 15, f.y - 56, f.x + 15, f.y];
   return [f.x - 14, f.y - 84, f.x + 14, f.y];
@@ -2401,7 +2483,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
+  if (['nyxspin', 'kspin', 'flipk', 'jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
   let [x0, y0, x1, y1] = a.box;
   if (f.def.float && VANE_NORMALS.includes(f.state)) { x0 += 26; x1 += 26; y0 -= floatOff(f); y1 -= floatOff(f); }   // c'est le double, plus loin devant, qui frappe
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
@@ -2868,7 +2950,7 @@ function updVesper() {
     if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30 || q.t > 90) q.dead = true;
     if (q.dead || !o) continue;
     const hb = hurtbox(o), ab = rawAtkBox(o);
-    const touch = hb && Math.abs(o.x - q.x) < 16 && o.y > q.y - 70;
+    const touch = hb && !underShot(o) && Math.abs(o.x - q.x) < 16 && o.y > q.y - 70;
     const struck = ab && ab[0] < q.x + 12 && ab[2] > q.x - 12;   // l'adversaire frappe l'hologramme
     if (touch || struck) {
       q.dead = true;
@@ -2941,7 +3023,7 @@ function updVane() {
     if (q.vy > 0 && q.y >= GROUND - q.r - 2) { q.y = GROUND - q.r - 2; q.vy = 0; q.vx = q.dir * 6; }   // touche le sol puis glisse
     if (q.x < (G.camL || 0) - 60 || q.x > (G.camL || 0) + W + 60) q.dead = true;
     if (q.dead || !o) continue;
-    if (hurtbox(o) && Math.abs(o.x - q.x) < q.r + 6 && q.y + q.r * .8 > o.y - 94 && q.y - q.r * .8 < o.y + 4) {
+    if (hurtbox(o) && !underShot(o) && Math.abs(o.x - q.x) < q.r + 6 && q.y + q.r * .8 > o.y - 94 && q.y - q.r * .8 < o.y + 4) {
       q.dead = true; applyHit(q.owner, o, q.big ? VOID_BIG : (q.hit || VOID_HIT), q.x, q.y, q.x - q.dir * 10, true);
       if (q.c > .5) G.shake = Math.max(G.shake, 4 + q.c * 6);
       if (o.state === 'hit' || o.state === 'fall') { o.paraT = 54 + Math.round((q.c || 0) * 30); addPopup(o.x, o.y - 100, 'PARALYZED!', '#c88aff'); }
@@ -3071,7 +3153,7 @@ function updKael() {
     q.t++; q.x += q.dir * 8;
     if (q.x < (G.camL || 0) - 40 || q.x > (G.camL || 0) + W + 40 || q.t > 60) q.dead = true;
     if (q.dead || !o) continue;
-    if (hurtbox(o) && Math.abs(o.x - q.x) < 16 && o.y - 80 < q.y + 18 && o.y > q.y - 18) { q.dead = true; applyHit(q.owner, o, q.big ? SONIC_BIG : SONIC_HIT, q.x, q.y, q.x - q.dir * 10, true); }
+    if (hurtbox(o) && !underShot(o) && Math.abs(o.x - q.x) < 16 && o.y - 80 < q.y + 18 && o.y > q.y - 18) { q.dead = true; applyHit(q.owner, o, q.big ? SONIC_BIG : SONIC_HIT, q.x, q.y, q.x - q.dir * 10, true); }
     for (const fb of G.fbs || []) if (fb.alive && fb.owner !== q.owner && Math.abs(fb.x - q.x) < 22) { fb.alive = false; q.dead = true; addSpark(q.x, q.y, 'parry'); }
     for (const b of G.blades || []) if (!b.dead && b.owner !== q.owner && Math.abs(b.x - q.x) < 22) { b.dead = true; q.dead = true; addSpark(q.x, q.y, 'parry'); }
     for (const b of G.sonics) if (b !== q && !b.dead && b.owner !== q.owner && Math.abs(b.x - q.x) < 20) { b.dead = true; q.dead = true; addSpark(q.x, q.y, 'parry'); }
@@ -3086,6 +3168,16 @@ function updKael() {
   }
   if (G.pwalls) G.pwalls = G.pwalls.filter(w => w.t < 40);
   for (const f of G.f) { if (f.kcharge > 0) f.kcharge--; if (f.def.kit === 'kael' && f.state === 'flashstep' && G.frame % 2 === 0) (f.ghosts = f.ghosts || []).push({ x: f.x, t: 0 }); if (f.ghosts) { f.ghosts.forEach(g => g.t++); f.ghosts = f.ghosts.filter(g => g.t < 12); } }
+}
+function drawFlipFire() {   // 4e salto de Hiro (feu bleu) / Axel (feu orange) : roue de flammes
+  for (const f of G.f) {
+    if (f.state !== 'flipk' || !f.flipFin || !f.ftrail2) continue;
+    const pal = f.def.fb; ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    f.ftrail2.forEach((p, i) => { const k = (i + 1) / f.ftrail2.length, r = 3 + k * 7;
+      for (let j = 0; j < 3; j++) { const gx = p.x + (Math.random() - .5) * 6, gy = p.y + (Math.random() - .5) * 6 - j * 2, gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+        gr.addColorStop(0, pal[0]); gr.addColorStop(.35, pal[1]); gr.addColorStop(.7, pal[2]); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = .55 * k; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.fill(); } });
+    ctx.restore();
+  }
 }
 function drawKaelFx() {
   for (const f of G.f) {   // images rémanentes bleues de l'Esquive Éclair
@@ -3129,6 +3221,15 @@ function drawKaelFx() {
       gl.addColorStop(0, 'rgba(200,250,255,.8)'); gl.addColorStop(1, 'rgba(26,120,208,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(hx2, hy2, 12, 0, Math.PI * 2); ctx.fill();
       for (let b = 0; b < 2; b++) { const a = Math.random() * 6.28; elecArc([[hx2, hy2], [hx2 + Math.cos(a) * 6, hy2 + Math.sin(a) * 6], [hx2 + Math.cos(a) * 12, hy2 + Math.sin(a) * 12]], 'rgba(90,240,255,.9)', 1); }
     }
+    if (f.state === 'kspin' && f.t >= 2 && f.t < 16) {   // coup de pied rotatif : anneau électrique autour du corps
+      const cx = f.x, cy = f.y - 54, ph = f.t * 1.6;
+      for (let b = 0; b < 4; b++) { const L = []; for (let s2 = 0; s2 <= 8; s2++) { const an = ph + b * 1.57 + s2 * .22; L.push([cx + Math.cos(an) * 40, cy + Math.sin(an) * 9 + (Math.random() - .5) * 4]); } elecArc(L, b % 2 ? 'rgba(200,250,255,.9)' : 'rgba(90,240,255,.85)', 1.3); }
+      const gl = ctx.createRadialGradient(cx, cy, 2, cx, cy, 44); gl.addColorStop(0, 'rgba(160,240,255,.25)'); gl.addColorStop(1, 'rgba(26,120,208,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(cx, cy, 44, 18, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    if (f.state === 'kbarrage' && f.t < 30 && f.handW) {   // rafale : éclairs devant le poing
+      const [hx2, hy2] = f.handW;
+      for (let b = 0; b < 3; b++) { const a = (Math.random() - .5) * 1.2; elecArc([[hx2, hy2], [hx2 + f.dir * 8, hy2 + Math.sin(a) * 6], [hx2 + f.dir * 18, hy2 + Math.sin(a) * 12]], 'rgba(160,245,255,.95)', 1.2); }
+    }
     if (f.def.kit === 'kael' && f.state === 'uppercut' && f.t >= 3 && f.t < 30 && f.handW) {   // colonne de plasma autour du poing
       const [hx2, hy2] = f.handW, a = Math.min(1, (30 - f.t) / 10);
       ctx.globalAlpha = a;
@@ -3148,7 +3249,8 @@ const FLASK_HIT = { dmg: 7, stun: 16, bstun: 10, push: 1.8, chip: 1, sfx: 'hit' 
 const PUDDLE_HIT = { dmg: 3, stun: 10, bstun: 6, push: .6, chip: 0, sfx: 'hit', unblock: true };
 const GEYSER_HIT = { dmg: 12, knock: true, lift: 7, bstun: 14, push: 2, chip: 2, sfx: 'heavy' };
 const NYX_FIRE = ['#ffffff', '#ffb0e0', '#e0306a', '#6a0a8a'];
-const SMOKE_T = 120;   // la fumée de confusion ne dure que 2 secondes
+const SMOKE_T = 120;
+const GEYSER_L = 205;   // longueur de la gerbe de flammes (haut + A) : atteint un adversaire au sommet de son saut   // la fumée de confusion ne dure que 2 secondes
 function addPuddle(owner, x, done) {
   const mine = G.puddles.filter(p => p.owner === owner); if (mine.length >= 2) mine[0].t = 9999;
   G.puddles.push({ owner, x, t: 0, last: -99, done: !!done }); sfx('fb');
@@ -3162,7 +3264,7 @@ function updNyx() {
       q.dead = true; breakProp(pr); (G.clashFx = G.clashFx || []).push({ x: (pr.x + q.x) / 2, y: (pr.y + q.y) / 2, t: 0 }); G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); sfx('parry'); sfx('heavy'); break;
     }
     if (q.dead) continue;
-    if (o && hurtbox(o) && Math.abs(o.x - q.x) < 14 && q.y > o.y - 80 && q.y < o.y) { q.dead = true; applyHit(q.owner, o, FLASK_HIT, q.x, q.y, q.x - q.vx * 4, true); addPuddle(q.owner, o.x, true); nyxIgnite(o); continue; }
+    if (o && hurtbox(o) && !underShot(o) && Math.abs(o.x - q.x) < 14 && q.y > o.y - 80 && q.y < o.y) { q.dead = true; applyHit(q.owner, o, FLASK_HIT, q.x, q.y, q.x - q.vx * 4, true); addPuddle(q.owner, o.x, true); nyxIgnite(o); continue; }
     if (q.y >= GROUND - 3) { q.dead = true; addPuddle(q.owner, q.x); addSpark(q.x, GROUND - 6, 'fb', NYX_FIRE); }
     if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30) q.dead = true;
   }
@@ -3176,7 +3278,8 @@ function updNyx() {
   if (G.puddles) G.puddles = G.puddles.filter(p => p.t < 300);
   for (const f of G.f) {   // échos roses derrière Nyx quand elle plane
     if (f.def.kit !== 'nyx') continue;
-    if (f.state === 'nyxglide') { if (G.frame % 2 === 0) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); } }
+    if (f.state === 'nslide' && f.t < 26) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
+    else if (f.state === 'nyxglide' || f.state === 'nyxspin') { if (G.frame % 2 === 0) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); } }
     else if (f.echo && f.echo.length) f.echo.shift();
   }
   for (const f of G.f) if (f.nyxBurnT > 0) {   // brûlure rose : petite perte d'énergie continue
@@ -3198,11 +3301,11 @@ function updNyx() {
   if (G.smokes) G.smokes = G.smokes.filter(c => c.t < SMOKE_T && !c.dead);
   for (const f of G.f) if (f.confT > 0) f.confT--;
   for (const g of G.geysers || []) {   // gerbe de flammes en diagonale : piège ceux qui sautent
-    g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 8) * 130;
+    g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 9) * GEYSER_L;   // monte assez haut pour toucher ceux qui sautent
     if (!g.done && o && hurtbox(o) && g.t < 26) {
       const ex = g.x + g.dir * L * .5, ey = GROUND - L * .87, px = o.x, py = o.y - 40;
       const vx = ex - g.x, vy = ey - GROUND, k = Math.max(0, Math.min(1, ((px - g.x) * vx + (py - GROUND) * vy) / (vx * vx + vy * vy || 1)));
-      if (Math.hypot(px - (g.x + vx * k), py - (GROUND + vy * k)) < 20) { g.done = true; applyHit(g.owner, o, GEYSER_HIT, px, py, g.x, true); o.burn = 60; o.burnPal = NYX_FIRE; }
+      if (Math.hypot(px - (g.x + vx * k), py - (GROUND + vy * k)) < 24) { g.done = true; applyHit(g.owner, o, GEYSER_HIT, px, py, g.x, true); o.burn = 60; o.burnPal = NYX_FIRE; }
     }
   }
   if (G.geysers) G.geysers = G.geysers.filter(g => g.t < 34);
@@ -3257,10 +3360,10 @@ function drawNyxFx() {
     ctx.restore();
   }
   for (const g of G.geysers || []) {   // gerbe de flammes violettes
-    const L = Math.min(1, g.t / 8) * 130, a = Math.min(1, (34 - g.t) / 10);
+    const L = Math.min(1, g.t / 9) * GEYSER_L, a = Math.min(1, (34 - g.t) / 10);
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a;
-    for (let i = 0; i < 22; i++) {
-      const k = i / 21, d2 = k * L, x = g.x + g.dir * d2 * .5 + Math.sin(G.frame * .5 + i) * 3, y = GROUND - d2 * .87, rr = 3 + (1 - k) * 7 + Math.sin(G.frame * .7 + i * 2) * 1.5;
+    for (let i = 0; i < 32; i++) {
+      const k = i / 31, d2 = k * L, x = g.x + g.dir * d2 * .5 + Math.sin(G.frame * .5 + i) * 3, y = GROUND - d2 * .87, rr = 3 + (1 - k) * 7 + Math.sin(G.frame * .7 + i * 2) * 1.5;
       const gr = ctx.createRadialGradient(x, y, 0, x, y, rr * 1.6); gr.addColorStop(0, 'rgba(255,220,255,.9)'); gr.addColorStop(.4, 'rgba(200,58,255,.7)'); gr.addColorStop(1, 'rgba(90,10,140,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, rr * 1.6, 0, Math.PI * 2); ctx.fill();
     }
@@ -3287,7 +3390,7 @@ function updZephyr() {
     if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30) q.dead = true;
     if (q.dead || !o) continue;
     const hb = hurtbox(o);
-    if (hb && Math.abs(o.x - q.x) < 18 && o.y - 80 < q.y + 20 && o.y > q.y - 20) { q.dead = true; applyHit(q.owner, o, BLADE_HIT, q.x, q.y, q.x - q.dir * 10, true); }
+    if (hb && !underShot(o) && Math.abs(o.x - q.x) < 18 && o.y - 80 < q.y + 20 && o.y > q.y - 20) { q.dead = true; applyHit(q.owner, o, BLADE_HIT, q.x, q.y, q.x - q.dir * 10, true); }
   }
   for (const q of G.blades || []) {   // deux croissants (ou un croissant et une boule de feu) qui se croisent s'annulent
     if (q.dead) continue;
@@ -3674,11 +3777,19 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     else if (att.combo.length >= 4) att.combo = att.combo.slice(-3);
   }
   // 3 coups d'affilée max, puis petit temps d'arrêt (sauf pour finir un enchaînement de la liste)
-  if (!projectile && att.state !== 'gtatsu' && att.state !== 'ckick') {
+  if (!projectile && !['gtatsu', 'ckick', 'kbarrage', 'kspin', 'flipk'].includes(att.state)) {
     att.run = def.state === 'hit' && G.frame - (att.runLast || -999) < 50 ? (att.run || 0) + 1 : 1;
     att.runLast = G.frame;
     if (finisher) { att.run = 0; att.restT = 0; }
     else if (att.run >= 3) { att.restT = 30; att.run = 0; }
+  }
+  if (att.state === 'kbarrage' && !projectile) {   // 5e poing de la rafale : fait tomber
+    att.barN = (att.barN || 0) + 1;
+    if (att.barN >= 5) { data = Object.assign({}, data, { knock: true, dmg: 9 }); G.flashT = Math.max(G.flashT, 6); G.boltX = sx; G.boltY = sy; addPopup(def.x, def.y - 100, 'THUNDER RUSH!', '#5af0ff'); }
+  }
+  if (att.state === 'flipk' && !projectile) {
+    if (att.flipFin) { data = Object.assign({}, data, { knock: true, dmg: 14 }); def.burn = Math.max(def.burn || 0, 100); def.burnPal = att.def.fb; G.flashT = Math.max(G.flashT, 8); G.shake = 6; }   // 4e salto en feu
+    else att.flipHits = (att.flipHits || 0) + 1;
   }
   if (att.state === 'gtatsu' && !projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
@@ -3736,7 +3847,7 @@ function aiInput(f, o) {
     const r = Math.random();
     if (r < .35) { a.hold = { u: true, [fwd]: true }; a.holdT = 6; }
     else if (r < .82) { a.hold = { [back]: true }; a.holdT = 55; }
-    else if (!f.fb) press(a, 's');
+    else if (shotOK(f)) press(a, 's');
   }
   if (!fb) a.reacted = false;
   if (neutral && o.air && dist < 90 && o.vy > -2 && rnd() < .05) lowAttack(a, 'p');
@@ -3754,11 +3865,11 @@ function aiInput(f, o) {
     a.cd = (10 + (Math.random() * 20 | 0)) * [1.6, 1, .6][Math.min(2, OPT.diff)];
     const r = Math.random();
     if (dist > 150) {
-      if (r < .35 && !f.fb) press(a, 's');
+      if (r < .35 && shotOK(f)) press(a, 's');
       else if (r < .85) { a.hold = { [fwd]: true }; a.holdT = 20 + (Math.random() * 20 | 0); }
       else { a.hold = { u: true, [fwd]: true }; a.holdT = 6; }
     } else if (dist > 72) {
-      if (r < .2 && !f.fb) press(a, 's');
+      if (r < .2 && shotOK(f)) press(a, 's');
       else if (r < .6) { a.hold = { [fwd]: true }; a.holdT = 15; }
       else if (r < .72) { a.hold = { u: true, [fwd]: true }; a.holdT = 6; }
       else if (r < .85) { a.hold = { [back]: true }; a.holdT = 12; }
@@ -3854,6 +3965,7 @@ function startEnding() {
 const END_ATK = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick'];
 function stepEnding() {
   const E = G.end; G.t++;
+  if (G.t === 112 && AC) playSample('congrats', 1.5, VOX, true);   // voix « CONGRATULATIONS » (delay + réverbe)
   for (const c of E.conf) { c.y += c.vy; c.x += -.28 + Math.sin(G.t * .03 + c.ph) * .35; if (c.y > H + 4) { c.y = -4; c.x = Math.random() * (W + 80); } if (c.x < -6) c.x += W + 12; }   // chute lente, vent vers la gauche
   const f = E.f, T = G.t - 80;   // le personnage apparaît vers 80
   if (T >= 0) {
@@ -4422,8 +4534,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=178'); return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=178'); return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
@@ -4601,7 +4713,7 @@ function drawFight() {
   G.f.forEach(f => { if (f.burn > 0) drawBurn(f); drawFlameHand(f); if (f.dizzy) drawDizzy(f); });
   if (G.clash) drawClash();
   G.fbs.forEach(drawFireball);
-  drawDiveTrail(); drawFireTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawVaneFx(); drawClashFx();
+  drawDiveTrail(); drawFireTrail(); drawVesperFx(); drawGrogFx(); drawZephyrFx(); drawNyxFx(); drawBlind(); drawKaelFx(); drawFlipFire(); drawVaneFx(); drawClashFx();
   // énergie qui grossit entre les mains pendant la charge
   G.f.forEach(f => {
     if (f.state !== 'special' || f.fired || !f.chargeT) return;
@@ -4672,7 +4784,7 @@ const MOVES = [
     ['DOWN + Y', 'RISING UPPERCUT'], ['DOWN + B x3', 'LOW KICKS (3RD KNOCKS DOWN)'] ] },
   { title: 'SPECIALS & COUNTER', lines: [
     ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'UPPERCUT'],
-    ['BACK + A', 'TORNADO KICK x4'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
+    ['BACK + A x3', 'FLIP KICKS (3 HITS = FIRE FLIP)'], ['AIR + A', 'SPIN KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'VESPER SPECIALS', lines: [
@@ -4682,11 +4794,11 @@ const MOVES = [
     ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
     ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'] ] },
   { title: 'KAEL SPECIALS', lines: [
-    ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
-    ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
+    ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, CHARGES THE FISTS'], ['CHARGED > Y', 'THUNDER RUSH'], ['', '5 FAST PUNCHES, 5TH KNOCKS DOWN'],
+    ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'], ['JUMP + A', 'VOLT SPIN'], ['', '360 SPIN KICK, REFLECTS SHOTS'] ] },
   { title: 'NYX SPECIALS', lines: [
     ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', '2 S MIST, REVERSES MOVES, STOPS SHOTS'],
-    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A: GLIDE 2 S, DROPS A FLASK'] ] },
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['DOWN + A', 'SHADOW SLIDE'], ['', 'SLIDES UNDER SHOTS, TRIPS THE FOE'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A: GLIDE 2 S, DROPS A FLASK'], ['GLIDE > Y / B', 'BACK SPIN KICK, BACKFLIP DOWN'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
