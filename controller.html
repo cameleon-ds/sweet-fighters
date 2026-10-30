@@ -63,6 +63,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 #scan .frame{position:absolute;inset:18%;border:2px dashed rgba(255,255,255,.7);border-radius:8px}
 #scanMsg{font-size:8px;color:#fff;text-align:center;padding:0 10px}
 #scanClose{font-size:9px;color:rgba(255,255,255,.85);padding:8px 14px;border:2px solid rgba(255,255,255,.35);border-radius:12px}
+#scanBtn{position:absolute;left:50%;top:calc(var(--h)*.42 + 60px);transform:translateX(-50%);z-index:5;display:none;font-size:8px;color:rgba(255,255,255,.85);padding:7px 12px;border:2px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(0,0,0,.4);white-space:nowrap}
 #inst{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:4;display:none;align-items:center;gap:6px;padding:7px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:7px;color:rgba(255,255,255,.9)}
 #inst svg{width:14px;height:14px}
 #help{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
@@ -79,6 +80,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 <div id="connect">CONNECT</div>
 <div id="scan"><div class="win"><video muted playsinline></video><i class="frame"></i></div><div id="scanMsg"></div><div id="scanClose">CANCEL</div></div>
 <div id="cnote">USE SAME WI-FI</div>
+<div id="scanBtn">SCAN QR CODE</div>
 <div id="stickZone"><div id="stick"><div id="knob"></div></div></div>
 <div id="btnZone"><div id="btns">
   <div class="b by" data-b="p">Y<small>PUNCH</small></div>
@@ -140,20 +142,22 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
       { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
       { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
     ] };
-    let lastMsg = 0, retryT = null, tries = 0, parked = null, hidT = null;
+    let lastMsg = 0, retryT = null, tries = 0, parked = null, hidT = null, lastAct = Date.now();
     // Mise en veille : manette remplacée par une autre page (même joueur) ou page cachée depuis plus d'1 minute
     // Bouton CONNECT au milieu : seule la page où l'on appuie se connecte, les autres pages sont déconnectées
-    const cbtn = document.getElementById('connect'), cnote = document.getElementById('cnote');
+    const cbtn = document.getElementById('connect'), cnote = document.getElementById('cnote'), sbtn = document.getElementById('scanBtn');
     const park = why => {
       parked = why; ok = false; clearTimeout(retryT); retryT = null;
       try { if (conn) conn.close(); } catch (_) {} try { if (peer) peer.destroy(); } catch (_) {} peer = null; conn = null;
       setSt(why === 'replaced' ? 'CONNECTED ON ANOTHER SCREEN' : why === 'idle' ? 'PAUSED' : 'PRESS CONNECT', why === 'start' ? '' : 'bad');
-      cbtn.style.display = 'block'; cnote.style.display = 'block'; fig.style.display = 'none';
+      cbtn.style.display = 'block'; cnote.style.display = 'block'; sbtn.style.display = 'block'; fig.style.display = 'none';
     };
-    const unpark = () => { if (!parked) return; parked = null; tries = 0; cbtn.style.display = 'none'; cnote.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
+    const unpark = () => { if (!parked) return; parked = null; tries = 0; lastAct = Date.now(); cbtn.style.display = 'none'; cnote.style.display = 'none'; sbtn.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
     cbtn.addEventListener('pointerdown', e => { cbtn.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
     // CONNECT : page ouverte par un scan -> connexion directe ; appli de l'écran d'accueil -> on scanne le QR code du jeu avec la caméra
-    cbtn.addEventListener('pointerup', e => { cbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); if (fromScan && host) unpark(); else openScan(); });
+    cbtn.addEventListener('pointerup', e => { cbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); if (host) unpark(); else openScan(); });   // CONNECT : se connecte au dernier jeu (scanné ou mémorisé) ; sinon ouvre le scanner
+    sbtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
+    sbtn.addEventListener('pointerup', e => { e.stopPropagation(); openScan(); });   // nouveau jeu / autre PC : scanner le QR code
     const scanBox = document.getElementById('scan'), video = scanBox.querySelector('video'), scanMsg = document.getElementById('scanMsg');
     let stream = null, scanning = false, detector = null;
     const closeScan = () => { scanning = false; scanBox.style.display = 'none'; try { stream && stream.getTracks().forEach(t => t.stop()); } catch (_) {} stream = null; };
@@ -226,9 +230,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     // le PC envoie un signal chaque seconde : sans nouvelles depuis 5 s, la manette se reconnecte
     setInterval(() => { if (!parked && ok && Date.now() - lastMsg > 5000) { ok = false; setSt('RECONNECTING...', 'bad'); try { conn.close(); } catch (_) {} schedule(10); } }, 1000);
     // retour sur la page (écran rallumé, appli rouverte) : reconnexion immédiate
+    // Plus d'1 minute sans activité (aucun toucher) ou page cachée plus d'1 minute : la manette se déconnecte complètement
+    // (au retour, elle ne se reconnecte pas seule : il faut appuyer sur CONNECT, pour ne pas voler la place d'une autre manette)
+    let hiddenAt = 0;
+    document.addEventListener('pointerdown', () => { lastAct = Date.now(); }, true);
+    setInterval(() => { if (!parked && Date.now() - lastAct > 60000) park('idle'); }, 2000);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') { clearTimeout(hidT); hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
+      if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); clearTimeout(hidT); hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
       clearTimeout(hidT); wake();
+      if (!parked && hiddenAt && Date.now() - hiddenAt > 60000) { park('idle'); return; }   // onglet resté en arrière-plan (téléphone : minuteries gelées)
+      if (!parked && Date.now() - lastAct > 60000) { park('idle'); return; }
       if (parked) return;   // en pause : on attend l'appui sur CONNECT
       if (!ok) { clearTimeout(retryT); retryT = null; schedule(10); }
     });
