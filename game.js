@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v156';
+const VERSION = 'v157';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3294,6 +3294,7 @@ function clashProjectiles() {
   for (const q of G.sonics || []) if (!q.dead) L.push([q, q.y, 16]);
   for (const q of G.voids || []) if (!q.dead && !q.charging) L.push([q, q.y, q.r || 14]);
   for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 10]);
+  for (const q of G.holos || []) if (!q.dead) L.push([q, q.y - 50, 16]);   // clone énergétique de Vesper = projectile
   for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14]);
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
     const [a, ay, ar] = L[i], [b, by, br] = L[j];
