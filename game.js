@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v161';
+const VERSION = 'v162';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1460,6 +1460,7 @@ function readPad(i) {
   const B = n => !!(gp.buttons[n] && gp.buttons[n].pressed), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, menu = inMenu(), dz = menu ? .6 : .38;
   o.l = B(14) || ax < -dz; o.r = B(15) || ax > dz; o.u = B(12) || ay < -dz; o.d = B(13) || ay > dz;
   for (const a in PADB) if (B(PADB[a])) o[a] = true;
+  if (o.l || o.r || o.u || o.d || gp.buttons.some(b => b.pressed)) initAudio();   // manette : active le son dès le premier appui (sons du menu de démarrage)
   if (i === 0 && bindWait && bindWait.dev === 'pad') {   // capture du nouveau bouton
     const now = gp.buttons.map(b => b.pressed);
     const n = now.findIndex((p, k) => p && !padPrev[k] && k !== 12 && k !== 13 && k !== 14 && k !== 15);
@@ -3850,6 +3851,7 @@ const unlockAudio = () => {
   if (OPT.music > 0 && !G.musicHold) BGM.play().catch(() => { bgmUnlocked = false; });
 };
 ['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+['touchend', 'click', 'keyup'].forEach(ev => addEventListener(ev, () => initAudio(), { capture: true, passive: true }));   // iPhone : le son ne se débloque qu'au relâchement du doigt
 // La musique démarre avec le logo Super Rocket Games : lecture automatique tentée dès l'ouverture.
 // Si le navigateur la bloque (il exige une action du joueur), un écran « PRESS ANY KEY / TAP TO START » précède le logo.
 G.gate = false;
