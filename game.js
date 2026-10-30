@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v167';
+const VERSION = 'v168';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3850,7 +3850,7 @@ function stepMoves() {
   if (pctl.held.u) G.mscroll = Math.max(0, (G.mscroll || 0) - 1.5);
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
-const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS', 'BACK TO TITLE'];
+const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'OPTIONS', 'CHARACTER SELECT', 'BACK TO TITLE'];
 // ordre d'affichage : FULL SCREEN en premier ; sur PC : KEYBOARD et GAMEPAD ; en bas : installer l'application (9)
 const optOrder = () => { const o = isTouch && !padOn() ? [6, 0, 1, 2, 3, 4, 5] : [6, 0, 1, 2, 3, 4, 5, 7, 8]; if (installAvail()) o.push(9); return o; };
 const optL = () => optOrder()[G.ocur] != null ? optOrder()[G.ocur] : -1;
@@ -3925,8 +3925,8 @@ function stepPause() {
     sfx('select');
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
-    else if (G.pcur === 2) { G.paused = false; G.scene = 'select'; G.t = 0; }
-    else if (G.pcur === 3) { G.showOpts = true; G.ocur = 0; }
+    else if (G.pcur === 2) { G.showOpts = true; G.ocur = 0; }
+    else if (G.pcur === 3) { G.paused = false; G.scene = 'select'; G.t = 0; }
     else G.pconf = 1;   // BACK TO TITLE : confirmation (NO par défaut)
   }
 }
