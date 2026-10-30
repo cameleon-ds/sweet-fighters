@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v170';
+const VERSION = 'v171';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1893,6 +1893,7 @@ function poseOf(f) {
     case 'rupper': return f.t < 4 ? 'rup0' : f.t < 9 ? 'rup1' : f.t < 17 ? 'rup2' : 'rup3';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
     case 'airflask': return f.t < 4 ? 'jump' : 'jpunch';
+    case 'nyxglide': return 'jump';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
     case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
@@ -2141,8 +2142,8 @@ function updFighter(f, o) {
         else if (f.def.kit === 'grog' && take(c, 's')) {   // Grog : chute verticale comme un poids énorme
           setState(f, 'gpound'); f.airAtk = true; f.vx = 0; f.vy = -1.2; sfx('whoosh');
         }
-        else if (f.def.kit === 'nyx' && take(c, 's')) {   // Nyx : jette une fiole en diagonale vers le bas
-          setState(f, 'airflask'); f.airAtk = true; sfx('whoosh');
+        else if (f.def.kit === 'nyx' && take(c, 's')) {   // Nyx : plane (1 s, jusqu'à 2 s si A reste appuyé)
+          setState(f, 'nyxglide'); f.airAtk = true; f.glideHold = true; sfx('whoosh');
         }
         else if (f.def.kit === 'vesper' && take(c, 's')) {
           // Vesper : coup de pied plongeant en diagonale avec traînée néon
@@ -2304,6 +2305,14 @@ function updFighter(f, o) {
       if (f.t === 8) { G.flasks.push({ owner: f, x: f.x + f.dir * 18, y: f.y - 62, vx: f.dir * 3.4, vy: -3.6, t: 0 }); sfx('whoosh'); }
       if (f.t >= 24) setState(f, 'idle');
       break;
+    case 'nyxglide': {   // Nyx plane : flotte doucement, se déplace à gauche / à droite
+      if (!h.s) f.glideHold = false;
+      const lim = f.glideHold ? 120 : 60;
+      f.vy = -GRAV + Math.sin(f.t * .18) * .35 + (f.y < GROUND - 38 ? Math.min(1.6, (GROUND - 38 - f.y) * .08) : 0);   // léger flottement haut / bas, à hauteur visible
+      f.vx = h.r ? 2.2 : h.l ? -2.2 : f.vx * .8;
+      if (f.t >= lim) { setState(f, 'jump'); f.airAtk = true; f.vy = 0; }   // fin du vol plané : retombe
+      break;
+    }
     case 'airflask':   // en l'air : fiole lancée tout droit en diagonale vers le sol
       if (f.t === 4) { G.flasks.push({ owner: f, x: f.x + f.dir * 16, y: f.y - 50, vx: f.dir * 3.8, vy: 4.2, t: 0, straight: true }); }
       break;
@@ -2361,7 +2370,7 @@ function updFighter(f, o) {
         const hit = f.hasHit; f.rotAng = null; setState(f, 'crushLand'); G.shake = Math.max(G.shake, 8); sfx('thud'); sfx('heavy');
         for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 12, small: true, done: hit });
       }
-      else if (['jump', 'jpunch', 'jkick', 'airflask'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
+      else if (['jump', 'jpunch', 'jkick', 'airflask', 'nyxglide'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
   } else {
@@ -3152,11 +3161,16 @@ function updNyx() {
   if (G.flasks) G.flasks = G.flasks.filter(q => !q.dead);
   for (const p of G.puddles || []) {   // flaque de feu : brûle l'adversaire qui marche dedans
     p.t++; const o = G.f.find(f => f !== p.owner);
-    if (!p.done && o && !o.air && Math.abs(o.x - p.x) < 20 && hurtbox(o)) {   // un seul coup, puis l'adversaire est enflammé
+    if (!p.done && o && !o.air && o.state !== 'tatsu' && o.state !== 'gtatsu' && Math.abs(o.x - p.x) < 20 && hurtbox(o)) {   // le tatsumaki passe au-dessus de la flamme   // un seul coup, puis l'adversaire est enflammé
       p.done = true; applyHit(p.owner, o, PUDDLE_HIT, o.x, GROUND - 14, p.x, true); nyxIgnite(o);
     }
   }
   if (G.puddles) G.puddles = G.puddles.filter(p => p.t < 300);
+  for (const f of G.f) {   // échos roses derrière Nyx quand elle plane
+    if (f.def.kit !== 'nyx') continue;
+    if (f.state === 'nyxglide') { if (G.frame % 2 === 0) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); } }
+    else if (f.echo && f.echo.length) f.echo.shift();
+  }
   for (const f of G.f) if (f.nyxBurnT > 0) {   // brûlure rose : petite perte d'énergie continue
     f.nyxBurnT--; f.burn = Math.max(f.burn || 0, 2); f.burnPal = NYX_FIRE;
     if (G.scene === 'fight' && f.hp > 1) { f.hp = Math.max(1, f.hp - .035); f.lagT = 30; }
@@ -4664,7 +4678,7 @@ const MOVES = [
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
   { title: 'NYX SPECIALS', lines: [
     ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', '2 S MIST, REVERSES MOVES, STOPS SHOTS'],
-    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'FLASK DROP'], ['', 'FLASK THROWN DOWN DIAGONALLY'] ] },
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A TO GLIDE (UP TO 2 S)'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
