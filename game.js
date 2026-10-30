@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v153';
+const VERSION = 'v154';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -19,11 +19,14 @@ let ROT = false;
 const app = document.getElementById('app');
 function resize() {
   const touchDev = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || /[?&]touch/.test(location.search);
-  ROT = touchDev && innerHeight > innerWidth;
+  let iw = innerWidth, ih = innerHeight;
+  // iPhone (appli sur l'écran d'accueil, rotation verrouillée) : innerHeight est trop petit -> on prend la taille réelle de l'écran
+  if (navigator.standalone && ih > iw) { const a = Math.min(screen.width, screen.height), b = Math.max(screen.width, screen.height); iw = a; ih = b; }
+  ROT = touchDev && ih > iw;
   document.body.classList.toggle('rot', ROT);
-  const aw = ROT ? innerHeight : innerWidth, ah = ROT ? innerWidth : innerHeight;
+  const aw = ROT ? ih : iw, ah = ROT ? iw : ih;
   app.style.width = aw + 'px'; app.style.height = ah + 'px';
-  app.style.left = ROT ? innerWidth + 'px' : '0px';
+  app.style.left = ROT ? iw + 'px' : '0px';
   // Plein écran : la largeur interne s'adapte au format de l'écran (16:9 → 21:9)
   const nw = Math.max(384, Math.min(520, Math.round(H * aw / ah)));
   if (nw !== W) {
@@ -1702,7 +1705,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=153', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=154', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {

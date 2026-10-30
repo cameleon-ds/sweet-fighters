@@ -188,7 +188,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   // Toujours en paysage : si le téléphone est tenu en portrait, toute la manette est tournée de 90°
   const app = document.getElementById('app'); let ROT = false;
   function layout() {
-    const w = innerWidth, h = innerHeight; ROT = h > w;
+    let w = innerWidth, h = innerHeight;
+    if (navigator.standalone && h > w) { w = Math.min(screen.width, screen.height); h = Math.max(screen.width, screen.height); }   // iPhone, rotation verrouillée
+    ROT = h > w;
     const AW = ROT ? h : w, AH = ROT ? w : h;
     app.style.width = AW + 'px'; app.style.height = AH + 'px';
     app.style.setProperty('--w', AW + 'px'); app.style.setProperty('--h', AH + 'px'); app.style.setProperty('--m', Math.min(AW, AH) + 'px');
