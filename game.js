@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v172';
+const VERSION = 'v173';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -257,8 +257,19 @@ const STAGE_PIC = {};
 // Chargement différé : seuls les logos, l'image titre et la musique du titre bloquent le démarrage ;
 // portraits et décors se téléchargent ensuite en arrière-plan (prêts bien avant l'écran de sélection)
 const LAZY = []; let lazyGo = false;
-const lazySrc = (im, src) => { if (lazyGo) im.src = src; else LAZY.push([im, src]); };
-function lazyStart() { if (lazyGo) return; lazyGo = true; LAZY.forEach(([im, src]) => { im.src = src; }); LAZY.length = 0; }
+// priorité : 0 = portraits (écran de sélection), 1 = portraits blessés, 2 = décors ; chaque groupe attend le précédent
+const lazySrc = (im, src, prio = 2) => { if (lazyGo) im.src = src; else LAZY.push([im, src, prio]); };
+function lazyStart() {
+  if (lazyGo) return; lazyGo = true;
+  const groups = [0, 1, 2].map(pr => LAZY.filter(e => e[2] === pr)); LAZY.length = 0;
+  const run = i => {
+    if (i >= groups.length) return;
+    const g = groups[i]; if (!g.length) { run(i + 1); return; }
+    let left = g.length; const done = () => { if (--left === 0) run(i + 1); };
+    g.forEach(([im, src]) => { im.addEventListener('load', done, { once: true }); im.addEventListener('error', done, { once: true }); im.src = src; });
+  };
+  run(0);
+}
 for (const k in STAGE_IMG) {
   const im = new Image();
   im.onload = () => { BGS[k] = buildStageBG(k); if (typeof G !== 'undefined' && G.stage === k) BG = BGS[k]; };
@@ -4001,7 +4012,7 @@ function musicWanted() {
 function updateMusic() {
   const want = musicWanted();
   if (want !== bgmKey) {   // fondu sortant de l'ancienne musique, puis fondu entrant de la nouvelle
-    if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0 && !G.musicHold) BGM.play().catch(() => {}); }
+    if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=173'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0 && !G.musicHold) BGM.play().catch(() => {}); }
     else bgmMul = Math.max(0, bgmMul - 1 / 36);
   } else bgmMul = Math.min(1, bgmMul + 1 / 60);
   let musF = 1;
@@ -4018,7 +4029,7 @@ const unlockAudio = () => {
   if (bgmUnlocked) { if (!bgmGain) bgmRoute(); if (G.gate) G.gate = false; return; }
   bgmUnlocked = true; G.gate = false;
   bgmRoute();
-  if (!BGM.src) { bgmKey = musicWanted(); BGM.src = MUSIC[bgmKey] + '?v=55'; }
+  if (!BGM.src) { bgmKey = musicWanted(); BGM.src = MUSIC[bgmKey] + '?v=173'; }
   if (OPT.music > 0 && !G.musicHold) BGM.play().catch(() => { bgmUnlocked = false; });
 };
 ['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
@@ -4418,8 +4429,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104', 0); return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104', 1); return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
