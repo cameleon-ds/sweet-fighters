@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v168';
+const VERSION = 'v169';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1794,10 +1794,10 @@ function drawQRs() {
 }
 
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
-function confuse(held, f) {   // brume de Nyx : gauche/droite, haut/bas et boutons inversés
-  if (!f || !(f.confT > 0) || G.scene !== 'fight') return held;
+function confuse(held, f) {   // brume de Nyx : gauche/droite et haut/bas inversés (les coups spéciaux restent possibles)
+  if (!f || !(f.confT > 0) || G.scene !== 'fight' || held.s) return held;
   const o = Object.assign({}, held), sw = (a, b) => { const t = o[a]; o[a] = o[b]; o[b] = t; };
-  sw('l', 'r'); sw('u', 'd'); sw('p', 'k'); sw('s', 'x'); return o;
+  sw('l', 'r'); sw('u', 'd'); return o;
 }
 function ctlUpdate(c, held) {
   c.prev = c.held; c.held = held;
@@ -1892,6 +1892,7 @@ function poseOf(f) {
     case 'jump': return f.roll && f.t > 3 ? 'tuck' : 'jump';
     case 'rupper': return f.t < 4 ? 'rup0' : f.t < 9 ? 'rup1' : f.t < 17 ? 'rup2' : 'rup3';
     case 'jpunch': return f.t < 3 ? 'jump' : 'jpunch';
+    case 'airflask': return f.t < 4 ? 'jump' : 'jpunch';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
     case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
@@ -2140,6 +2141,9 @@ function updFighter(f, o) {
         else if (f.def.kit === 'grog' && take(c, 's')) {   // Grog : chute verticale comme un poids énorme
           setState(f, 'gpound'); f.airAtk = true; f.vx = 0; f.vy = -1.2; sfx('whoosh');
         }
+        else if (f.def.kit === 'nyx' && take(c, 's')) {   // Nyx : jette une fiole en diagonale vers le bas
+          setState(f, 'airflask'); f.airAtk = true; sfx('whoosh');
+        }
         else if (f.def.kit === 'vesper' && take(c, 's')) {
           // Vesper : coup de pied plongeant en diagonale avec traînée néon
           setState(f, 'dive'); f.airAtk = true; f.trail = []; f.bounced = false; sfx('upper');
@@ -2300,6 +2304,9 @@ function updFighter(f, o) {
       if (f.t === 8) { G.flasks.push({ owner: f, x: f.x + f.dir * 18, y: f.y - 62, vx: f.dir * 3.4, vy: -3.6, t: 0 }); sfx('whoosh'); }
       if (f.t >= 24) setState(f, 'idle');
       break;
+    case 'airflask':   // en l'air : fiole lancée tout droit en diagonale vers le sol
+      if (f.t === 4) { G.flasks.push({ owner: f, x: f.x + f.dir * 16, y: f.y - 50, vx: f.dir * 3.8, vy: 4.2, t: 0, straight: true }); }
+      break;
     case 'smokeback':   // lâche un nuage toxique et recule
       if (f.t === 3) { G.smokes = G.smokes.filter(c => c.owner !== f); G.smokes.push({ owner: f, x: f.x + f.dir * 30, dir: f.dir, t: 0 }); sfx('fb'); }
       f.vx = f.t >= 3 && f.t < 18 ? -f.dir * 3.2 : 0;
@@ -2354,7 +2361,7 @@ function updFighter(f, o) {
         const hit = f.hasHit; f.rotAng = null; setState(f, 'crushLand'); G.shake = Math.max(G.shake, 8); sfx('thud'); sfx('heavy');
         for (const dd of [-1, 1]) G.waves.push({ owner: f, x: f.x + dd * 10, dir: dd, t: 0, life: 12, small: true, done: hit });
       }
-      else if (['jump', 'jpunch', 'jkick'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
+      else if (['jump', 'jpunch', 'jkick', 'airflask'].includes(f.state)) { setState(f, 'land'); f.landT = 4; }
       f.vx = 0;
     }
   } else {
@@ -3124,26 +3131,36 @@ const FLASK_HIT = { dmg: 7, stun: 16, bstun: 10, push: 1.8, chip: 1, sfx: 'hit' 
 const PUDDLE_HIT = { dmg: 3, stun: 10, bstun: 6, push: .6, chip: 0, sfx: 'hit', unblock: true };
 const GEYSER_HIT = { dmg: 12, knock: true, lift: 7, bstun: 14, push: 2, chip: 2, sfx: 'heavy' };
 const NYX_FIRE = ['#ffffff', '#ffb0e0', '#e0306a', '#6a0a8a'];
-function addPuddle(owner, x) {
+const SMOKE_T = 120;   // la fumée de confusion ne dure que 2 secondes
+function addPuddle(owner, x, done) {
   const mine = G.puddles.filter(p => p.owner === owner); if (mine.length >= 2) mine[0].t = 9999;
-  G.puddles.push({ owner, x, t: 0, last: -99 }); sfx('fb');
+  G.puddles.push({ owner, x, t: 0, last: -99, done: !!done }); sfx('fb');
 }
+function nyxIgnite(o) { o.nyxBurnT = 180; o.burn = Math.max(o.burn || 0, 180); o.burnPal = NYX_FIRE; }   // enflammé 3 s : perd un peu d'énergie, bouge normalement
 function updNyx() {
   for (const q of G.flasks || []) {
     const o = G.f.find(f => f !== q.owner);
-    q.t++; q.x += q.vx; q.y += q.vy; q.vy += .22;
-    if (o && hurtbox(o) && Math.abs(o.x - q.x) < 14 && q.y > o.y - 80 && q.y < o.y) { q.dead = true; applyHit(q.owner, o, FLASK_HIT, q.x, q.y, q.x - q.vx * 4, true); addPuddle(q.owner, o.x); continue; }
+    q.t++; q.x += q.vx; q.y += q.vy; if (!q.straight) q.vy += .22;   // en cloche (au sol) ou en ligne droite (en l'air)
+    for (const pr of G.props || []) if (pr.alive && pr.fly && pr.fly.owner !== q.owner && Math.hypot(pr.x - q.x, pr.y - q.y) < 18) {   // fiole contre objet du décor lancé : les deux s'annulent
+      q.dead = true; breakProp(pr); (G.clashFx = G.clashFx || []).push({ x: (pr.x + q.x) / 2, y: (pr.y + q.y) / 2, t: 0 }); G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); sfx('parry'); sfx('heavy'); break;
+    }
+    if (q.dead) continue;
+    if (o && hurtbox(o) && Math.abs(o.x - q.x) < 14 && q.y > o.y - 80 && q.y < o.y) { q.dead = true; applyHit(q.owner, o, FLASK_HIT, q.x, q.y, q.x - q.vx * 4, true); addPuddle(q.owner, o.x, true); nyxIgnite(o); continue; }
     if (q.y >= GROUND - 3) { q.dead = true; addPuddle(q.owner, q.x); addSpark(q.x, GROUND - 6, 'fb', NYX_FIRE); }
     if (q.x < (G.camL || 0) - 30 || q.x > (G.camL || 0) + W + 30) q.dead = true;
   }
   if (G.flasks) G.flasks = G.flasks.filter(q => !q.dead);
   for (const p of G.puddles || []) {   // flaque de feu : brûle l'adversaire qui marche dedans
     p.t++; const o = G.f.find(f => f !== p.owner);
-    if (o && !o.air && Math.abs(o.x - p.x) < 20 && hurtbox(o) && G.frame - p.last > 28) {
-      p.last = G.frame; applyHit(p.owner, o, PUDDLE_HIT, o.x, GROUND - 14, p.x, true); o.burn = Math.max(o.burn || 0, 40); o.burnPal = NYX_FIRE;
+    if (!p.done && o && !o.air && Math.abs(o.x - p.x) < 20 && hurtbox(o)) {   // un seul coup, puis l'adversaire est enflammé
+      p.done = true; applyHit(p.owner, o, PUDDLE_HIT, o.x, GROUND - 14, p.x, true); nyxIgnite(o);
     }
   }
   if (G.puddles) G.puddles = G.puddles.filter(p => p.t < 300);
+  for (const f of G.f) if (f.nyxBurnT > 0) {   // brûlure rose : petite perte d'énergie continue
+    f.nyxBurnT--; f.burn = Math.max(f.burn || 0, 2); f.burnPal = NYX_FIRE;
+    if (G.scene === 'fight' && f.hp > 1) { f.hp = Math.max(1, f.hp - .035); f.lagT = 30; }
+  }
   for (const c of G.smokes || []) {   // nuage toxique : aveugle l'adversaire et arrête ses projectiles
     c.t++; if (c.t < 90) c.x += c.dir * .5; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);
     if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.confT > 0)) { addPopup(o.x, o.y - 100, 'CONFUSED!', '#c8a0ff'); sfx('parry'); } o.confT = 180; }   // brume : inverse directions et boutons
@@ -3151,8 +3168,10 @@ function updNyx() {
     for (const q of G.blades || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
     for (const q of G.holos || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
     for (const q of G.flasks || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
+    for (const q of G.voids || []) if (!q.dead && !q.charging && q.owner !== c.owner && Math.abs(q.x - c.x) < R + (q.r || 0)) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
+    for (const q of G.sonics || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
   }
-  if (G.smokes) G.smokes = G.smokes.filter(c => c.t < 260);
+  if (G.smokes) G.smokes = G.smokes.filter(c => c.t < SMOKE_T);
   for (const f of G.f) if (f.confT > 0) f.confT--;
   for (const g of G.geysers || []) {   // gerbe de flammes en diagonale : piège ceux qui sautent
     g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 8) * 130;
@@ -3176,14 +3195,24 @@ function drawNyxFx() {
     }
     ctx.restore();
   }
-  for (const q of G.flasks || []) {   // fiole qui tourne en vol
-    const x = Math.round(q.x), y = Math.round(q.y), sp = (q.t >> 2) & 1;
-    R(x - 3, y - 2, 6, 6, '#1a2a2a'); R(x - 2, y - 1, 4, 4, '#d0204a'); R(x - 2, y - 1, 4, 2, '#50d080'); R(x - 1, y - 1, 1, 1, '#ffffff');
-    R(x - 1 + (sp ? 1 : 0), y - 5, 2, 3, '#a8c8c0');
-    ctx.save(); ctx.globalAlpha = .5; R(x - Math.sign(q.vx) * 6, y + 1, 2, 2, '#c83aff'); R(x - Math.sign(q.vx) * 10, y + 3, 2, 2, '#6a2a8a'); ctx.restore();
+  for (const q of G.flasks || []) {   // fiole de poison rose, plus grande, qui tourne en vol
+    const x = q.x, y = q.y, ang = q.t * .32 * Math.sign(q.vx || 1);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';   // halo rose
+    const hg = ctx.createRadialGradient(x, y, 1, x, y, 16); hg.addColorStop(0, 'rgba(255,90,180,.45)'); hg.addColorStop(1, 'rgba(160,20,140,0)'); ctx.fillStyle = hg; ctx.fillRect(x - 16, y - 16, 32, 32);
+    ctx.restore();
+    for (let i = 1; i <= 3; i++) { ctx.save(); ctx.globalAlpha = .45 - i * .12; R(x - q.vx * i * 2.2 - 1, y - q.vy * i * 2.2 - 1, 3, 3, i % 2 ? '#ff4aa8' : '#c83aff'); ctx.restore(); }   // gouttes roses derrière
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.fillStyle = '#10141a'; ctx.beginPath(); ctx.arc(0, 2, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-3, -9, 6, 7);   // contour du verre
+    ctx.fillStyle = '#ff3a9a'; ctx.beginPath(); ctx.arc(0, 2, 5.5, 0, Math.PI * 2); ctx.fill();   // poison rose
+    ctx.fillStyle = '#ff9ad0'; ctx.beginPath(); ctx.arc(0, 2, 5.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();   // surface claire
+    ctx.fillStyle = '#c0d8e0'; ctx.fillRect(-2, -8, 4, 6);   // goulot en verre
+    ctx.fillStyle = '#8a5a2a'; ctx.fillRect(-2.5, -11, 5, 3);   // bouchon
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-3.5, -1, 2, 2); ctx.fillRect(-1.5, -6, 1, 3);   // reflets
+    ctx.fillStyle = '#ffe0f0'; ctx.fillRect(2 + Math.sin(q.t * .5) * 1.2, 3, 1.5, 1.5);   // bulle
+    ctx.restore();
   }
   for (const c of G.smokes || []) {   // brume toxique animée : volutes douces qui ondulent et se déroulent
-    const a = Math.min(1, c.t / 10, (260 - c.t) / 60), R2 = 38 + Math.min(18, c.t * .7);
+    const a = Math.max(0, Math.min(1, c.t / 10, (SMOKE_T - c.t) / 30)), R2 = 38 + Math.min(18, c.t * .7);
     ctx.save();
     for (let i = 0; i < 28; i++) {
       const ph = i * 2.39, sp = .015 + (i % 5) * .004, t = c.t * sp + ph;
@@ -3346,7 +3375,7 @@ function clashProjectiles() {
   for (const q of G.blades || []) if (!q.dead) L.push([q, q.y, 18]);
   for (const q of G.sonics || []) if (!q.dead) L.push([q, q.y, 16]);
   for (const q of G.voids || []) if (!q.dead && !q.charging) L.push([q, q.y, q.r || 14]);
-  for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 10]);
+  for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 13]);   // fiole de Nyx : s'annule avec boules de feu, clones, sphères...
   for (const q of G.holos || []) if (!q.dead) L.push([q, q.y - 50, 16]);   // clone énergétique de Vesper = projectile
   for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14]);
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
@@ -3753,7 +3782,7 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [], rampT: 0 });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, nyxBurnT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [], rampT: 0 });
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
@@ -4632,8 +4661,8 @@ const MOVES = [
     ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, NEXT PUNCH x2'],
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
   { title: 'NYX SPECIALS', lines: [
-    ['A', 'MAGMA FLASK'], ['', 'THROWN FLASK, BURNING PUDDLE'], ['BACK + A', 'TOXIC MIST'], ['', 'REVERSES FOE CONTROLS, STOPS SHOTS'],
-    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'] ] },
+    ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', '2 S MIST, REVERSES MOVES, STOPS SHOTS'],
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'FLASK DROP'], ['', 'FLASK THROWN DOWN DIAGONALLY'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
