@@ -226,7 +226,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
       c.on('close', () => { if (conn !== c || parked) return; ok = false; setSt('RECONNECTING...', 'bad'); schedule(); });
       c.on('error', () => { if (conn !== c) return; ok = false; schedule(); });
     };
-    park('start');   // rien ne se connecte tant qu'on n'a pas appuyé sur CONNECT
+    // Appli installée (écran d'accueil iOS / Android) : jamais de déconnexion pour inactivité, reconnexion automatique
+    const APP = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches || (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement));
+    park('start');   // navigateur : rien ne se connecte tant qu'on n'a pas appuyé sur CONNECT
+    if (APP && host) unpark();   // appli : se connecte toute seule au dernier jeu connu
     // le PC envoie un signal chaque seconde : sans nouvelles depuis 5 s, la manette se reconnecte
     setInterval(() => { if (!parked && ok && Date.now() - lastMsg > 5000) { ok = false; setSt('RECONNECTING...', 'bad'); try { conn.close(); } catch (_) {} schedule(10); } }, 1000);
     // retour sur la page (écran rallumé, appli rouverte) : reconnexion immédiate
@@ -238,15 +241,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     const idleCheck = () => {
       const now = Date.now(), slept = now - lastTick > 15000;   // gros trou entre deux vérifications = téléphone en veille / appli suspendue
       lastTick = now;
-      if (!parked && (slept || now - lastAct > 60000)) park('idle');   // -> PAUSED + bouton CONNECT
+      if (APP) { if (slept && !parked) { ok = false; try { conn && conn.close(); } catch (_) {} clearTimeout(retryT); retryT = null; schedule(10); } return; }   // appli : se reconnecte après la veille
+      if (!parked && (slept || now - lastAct > 60000)) park('idle');   // navigateur -> PAUSED + bouton CONNECT
     };
     setInterval(idleCheck, 2000);
     ['pageshow', 'focus', 'resume'].forEach(ev => addEventListener(ev, idleCheck));
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); clearTimeout(hidT); hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
+      if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); clearTimeout(hidT); if (APP) return; hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
       clearTimeout(hidT); wake(); idleCheck(); if (parked) return;
-      if (!parked && hiddenAt && Date.now() - hiddenAt > 60000) { park('idle'); return; }   // onglet resté en arrière-plan (téléphone : minuteries gelées)
-      if (!parked && Date.now() - lastAct > 60000) { park('idle'); return; }
+      if (!APP && !parked && hiddenAt && Date.now() - hiddenAt > 60000) { park('idle'); return; }   // onglet resté en arrière-plan (téléphone : minuteries gelées)
+      if (!APP && !parked && Date.now() - lastAct > 60000) { park('idle'); return; }
       if (parked) return;   // en pause : on attend l'appui sur CONNECT
       if (!ok) { clearTimeout(retryT); retryT = null; schedule(10); }
     });
