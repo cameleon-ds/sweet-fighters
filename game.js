@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v184';
+const VERSION = 'v185';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -5094,7 +5094,7 @@ function drawTitle() {
     text('POWERED BY SUPER ROCKET GAMES', CX, 197, 8, '#c8b8a0', 'center');
     text('ALL RIGHTS RESERVED 2026', CX, 207, 8, '#9a8a70', 'center');
   }
-  text(VERSION, W - 4, 4, 8, '#5a4a40', 'right');
+  text(VERSION, W - (isTouch ? 34 : 4), isTouch ? 8 : 4, 8, '#5a4a40', 'right');   // mobile : à l'écart des bords arrondis
 }
 
 function drawSelect() {
