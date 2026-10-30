@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v186';
+const VERSION = 'v187';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2381,6 +2381,7 @@ function updFighter(f, o) {
       break;
     case 'plasmawall':   // bras levé, vu de face : mur électrique du sol jusqu'en haut de l'écran
       f.vx = 0;
+      if (f.t < 8) killShots(f, f.x - 30, f.x + 30, f.y - 110, f.y + 6);   // déjà protégé pendant qu'il lève le bras
       if (f.t === 8) { G.pwalls.push({ owner: f, x: f.x + f.dir * 26, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; G.shake = Math.max(G.shake, 4); G.flashT = Math.max(G.flashT, 4); sfx('parry'); sfx('heavy'); }
       if (f.t >= 40) setState(f, 'idle');
       break;
@@ -3243,9 +3244,8 @@ function updKael() {
   for (const w of G.pwalls || []) {   // mur de plasma : touche l'adversaire collé et arrête les projectiles
     w.t++; const o = G.f.find(f => f !== w.owner), half = w.big ? 26 : 20;
     if (!w.done && o && w.t < 26 && hurtbox(o) && Math.abs(o.x - w.x) < half + 10) { w.done = true; applyHit(w.owner, o, w.big ? Object.assign({}, PWALL_HIT, { dmg: 20 }) : PWALL_HIT, w.x, o.y - 50, w.x - Math.sign(o.x - w.x || 1), true); }
-    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== w.owner && Math.abs(fb.x - w.x) < half) { fb.alive = false; addSpark(fb.x, fb.y, 'parry'); }
-    for (const b of G.blades || []) if (!b.dead && b.owner !== w.owner && Math.abs(b.x - w.x) < half) { b.dead = true; addSpark(b.x, b.y, 'parry'); }
-    for (const b of G.sonics || []) if (!b.dead && b.owner !== w.owner && Math.abs(b.x - w.x) < half) { b.dead = true; addSpark(b.x, b.y, 'parry'); }
+    { const k = w.owner, xa = Math.min(w.x, k.x) - half - 6, xb = Math.max(w.x, k.x) + half + 6;   // annule toutes les boules de feu, clones, fioles et projectiles (entre Kael et le mur)
+      killShots(k, xa, xb, -400, GROUND + 10); }
   }
   if (G.pwalls) G.pwalls = G.pwalls.filter(w => w.t < 40);
   for (const f of G.f) { if (f.kcharge > 0) f.kcharge--; if (f.def.kit === 'kael' && f.state === 'flashstep' && G.frame % 2 === 0) (f.ghosts = f.ghosts || []).push({ x: f.x, t: 0 }); if (f.ghosts) { f.ghosts.forEach(g => g.t++); f.ghosts = f.ghosts.filter(g => g.t < 12); } }
