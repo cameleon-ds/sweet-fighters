@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v151';
+const VERSION = 'v152';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1622,6 +1622,25 @@ function readRemote(p) {
   return o;
 }
 const remoteOn = p => !!(NET.rem[p] && NET.rem[p].open);
+// État envoyé à chaque manette smartphone : personnage choisi, énergie, résultat (YOU WIN / YOU LOSE)
+function netStateFor(p) {
+  const fi = p - 1, fightSc = ['intro', 'fight', 'ko', 'timeup', 'over'].includes(G.scene);
+  if (fightSc && G.f && G.f[fi]) {
+    const f = G.f[fi];
+    return { t: 'st', ch: f.def.idx, name: f.def.name, hp: Math.round(f.hp), res: G.scene === 'over' ? (f.wins >= 2 ? 'win' : 'lose') : null };
+  }
+  let ch = null;
+  if (G.scene === 'select' || G.scene === 'stage') ch = p === 1 ? (G.selPhase || G.scene === 'stage' ? G.p1 : null) : (G.scene === 'stage' ? G.p2 : null);
+  return ch == null ? { t: 'st', ch: null } : { t: 'st', ch, name: fighterDef(ch).name, hp: 100, res: null };
+}
+function netSendState() {
+  if (G.frame % 6) return;
+  for (const p of [1, 2]) {
+    const r = NET.rem[p]; if (!r || !r.open) continue;
+    const m = netStateFor(p), k = JSON.stringify(m);
+    if (k !== r.sent || G.frame - (r.sentF || 0) > 60) { r.sent = k; r.sentF = G.frame; try { r.conn.send(m); } catch (e) {} }
+  }
+}
 // Répartition des manettes du PC (Xbox, etc.) entre les joueurs :
 // smartphone en joueur 1 → la 1re manette va au joueur 2 ; sinon 1re manette = joueur 1, 2e manette = joueur 2
 function padSlots() {
@@ -1683,7 +1702,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=151', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=152', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {
@@ -3906,6 +3925,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.p
 function step() {
   updateMusic();
   G.frame++; G.st = (G.st || 0) + 1;
+  netSendState();
   ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
   ctlUpdate(p2ctl, confuse(readP2(), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
   if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && (edge(pctl, 's') || edge(pctl, 'back') || edge(pctl, 'start') || edge(pctl, 'p') || edge(pctl, 'k'))) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); } tap = null; return; }
