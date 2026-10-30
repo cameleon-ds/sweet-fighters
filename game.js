@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v181';
+const VERSION = 'v182';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1909,7 +1909,7 @@ function poseOf(f) {
     case 'airflask': return f.t < 4 ? 'jump' : 'jpunch';
     case 'nyxglide': return 'jump';
     case 'kbarrage': return f.t >= 30 ? 'punch0' : (f.t % 6) < 3 ? 'punch1' : 'fpunch1';
-    case 'kspin': return f.t < 2 ? 'jump' : 'scissor';
+    case 'kspin': return f.t < 2 ? 'jump' : 'tuck';   // roulade en boule, comme Grog (haut + A)
     case 'nyxspin': return f.t < 2 ? 'jump' : 'jkick';
     case 'flipk': return f.t < 4 ? 'crouch' : 'jkick';
     case 'nslide': return f.t < 3 || f.t >= 26 ? 'crouch' : 'slide';
@@ -2397,8 +2397,6 @@ function updFighter(f, o) {
       if (f.vy > 0) f.vy = Math.min(1.6, f.vy - GRAV * .65);
       f.rotAng = f.dir * f.t * (Math.PI * 2 / 7);
       reflectNear(f, 48, f.y - 54, 44); if (f.t % 7 === 1) sfx('whoosh');
-      const dx = f.dir * 28 * K * UP, dy = 4 * K * UP, cy = f.y - 30 * K * UP, cs = Math.cos(f.rotAng), sn = Math.sin(f.rotAng);
-      (f.ftrail2 = f.ftrail2 || []).push({ x: f.x + dx * cs - dy * sn, y: cy + dx * sn + dy * cs }); if (f.ftrail2.length > 9) f.ftrail2.shift();   // traînée électrique du pied
       break;
     }
     case 'aflip': {   // 3 saltos avant coup de pied en l'air
@@ -3243,8 +3241,8 @@ function updKael() {
 }
 function drawFlipFire() {   // 4e salto de Hiro (feu bleu) / Axel (feu orange) : roue de flammes
   for (const f of G.f) {
-    if (!f.ftrail2 || !((f.state === 'flipk' && f.flipFin) || f.state === 'kspin')) continue;
-    const pal = f.state === 'kspin' ? ['#ffffff', '#c8faff', '#5af0ff', '#1a78d0'] : f.def.fb; ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    if (!f.ftrail2 || !(f.state === 'flipk' && f.flipFin)) continue;
+    const pal = f.def.fb; ctx.save(); ctx.globalCompositeOperation = 'lighter';
     f.ftrail2.forEach((p, i) => { const k = (i + 1) / f.ftrail2.length, r = 3 + k * 7;
       for (let j = 0; j < 3; j++) { const gx = p.x + (Math.random() - .5) * 6, gy = p.y + (Math.random() - .5) * 6 - j * 2, gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
         gr.addColorStop(0, pal[0]); gr.addColorStop(.35, pal[1]); gr.addColorStop(.7, pal[2]); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = .55 * k; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.fill(); } });
@@ -3293,10 +3291,11 @@ function drawKaelFx() {
       gl.addColorStop(0, 'rgba(200,250,255,.8)'); gl.addColorStop(1, 'rgba(26,120,208,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(hx2, hy2, 12, 0, Math.PI * 2); ctx.fill();
       for (let b = 0; b < 2; b++) { const a = Math.random() * 6.28; elecArc([[hx2, hy2], [hx2 + Math.cos(a) * 6, hy2 + Math.sin(a) * 6], [hx2 + Math.cos(a) * 12, hy2 + Math.sin(a) * 12]], 'rgba(90,240,255,.9)', 1); }
     }
-    if (f.state === 'kspin' && f.t >= 2 && f.t < 16) {   // coup de pied rotatif : anneau électrique autour du corps
-      const cx = f.x, cy = f.y - 54, ph = f.t * 1.6;
-      for (let b = 0; b < 4; b++) { const L = []; for (let s2 = 0; s2 <= 8; s2++) { const an = ph + b * 1.57 + s2 * .22; L.push([cx + Math.cos(an) * 40, cy + Math.sin(an) * 9 + (Math.random() - .5) * 4]); } elecArc(L, b % 2 ? 'rgba(200,250,255,.9)' : 'rgba(90,240,255,.85)', 1.3); }
-      const gl = ctx.createRadialGradient(cx, cy, 2, cx, cy, 44); gl.addColorStop(0, 'rgba(160,240,255,.25)'); gl.addColorStop(1, 'rgba(26,120,208,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(cx, cy, 44, 18, 0, 0, Math.PI * 2); ctx.fill();
+    if (f.state === 'kspin' && f.t >= 2) {   // même glow et mêmes éclairs que la roulade de Grog (haut + A)
+      const cx = f.x, cy = f.y - 40, g = ctx.createRadialGradient(cx, cy, 3, cx, cy, 60);
+      g.addColorStop(0, 'rgba(168,244,255,.55)'); g.addColorStop(.5, 'rgba(47,140,255,.3)'); g.addColorStop(1, 'rgba(20,60,196,0)');
+      ctx.fillStyle = g; ctx.fillRect(cx - 62, cy - 62, 124, 124);
+      for (let b = 0; b < 4; b++) { const a0 = Math.random() * 6.28, L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx + Math.cos(a0 + s2 * .5) * (14 + s2 * 6), cy + Math.sin(a0 + s2 * .5) * (18 + s2 * 6)]); elecArc(L, b % 2 ? 'rgba(168,244,255,.9)' : 'rgba(47,180,255,.9)', 1.3); }
     }
     if (f.state === 'kbarrage' && f.t < 30 && f.handW) {   // rafale : éclairs devant le poing
       const [hx2, hy2] = f.handW;
