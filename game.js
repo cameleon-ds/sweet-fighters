@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v189';
+const VERSION = 'v190';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3623,7 +3623,7 @@ function drawClashFx() {
 }
 function updGrog() {
   for (const g of G.f) {   // Rempart : renvoie les projectiles comme un miroir
-    if (g.def.kit !== 'grog' || !(g.state === 'rampart' || g.rampT > 0)) continue;
+    if (g.def.kit !== 'grog' || !(g.state === 'rampart' || g.rampT > 0) || g.air || g.state === 'gpound') continue;   // en l'air (saut, chute) : ne renvoie rien
     const mir = (q, vk) => { if (q.owner === g || q.dead || q.alive === false) return; const v = vk ? q[vk] : q.dir; if (Math.sign(v) !== Math.sign(g.x - q.x) || Math.abs(q.x - g.x) > 36) return;
       if (q.owner && q.owner.fb === q) q.owner.fb = null;
       q.owner = g; q.dir = -(q.dir || Math.sign(v)); if (vk) q[vk] = -q[vk]; if ('x0' in q) q.x0 = q.x; q.x = g.x + q.dir * 38; q.t = 0;
