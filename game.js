@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v164';
+const VERSION = 'v165';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3742,7 +3742,7 @@ function startMatch(p1, p2, stage) {
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  const vs2 = p2On();   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
+  const vs2 = G.mode !== 'arcade' && p2On();   // en ARCADE, l'adversaire est toujours le CPU   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
   G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, !vs2)];
   if (vs2) G.f[1].ctl = p2ctl;
   G.f[0].ctl = pctl;
@@ -3778,8 +3778,62 @@ const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
 const DIFFS = ['EASY', 'NORMAL', 'HARD', 'TRAINING'];
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
-const TITLE_ITEMS = ['SELECT CHARACTER', 'VIEW COMMANDS', 'OPTIONS'];
-function goTitle() { G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
+const TITLE_ITEMS = ['ARCADE MODE', 'V.S. BATTLE', 'VIEW COMMANDS', 'OPTIONS'];
+/* ---------------- ARCADE MODE ---------------- */
+// Tous les personnages dans l'ordre (y compris son double), Lord Vane en dernier
+function arcadeStart() {
+  const L = DEFS.map((d, i) => i).filter(i => DEFS[i].kit !== 'vane'); L.push(DEFS.findIndex(d => d.kit === 'vane'));
+  G.arc = { list: L, i: 0 }; arcadeFight();
+}
+function arcadeFight() { const i = G.arc.i; startMatch(G.p1, G.arc.list[i], STAGES[i % STAGES.length][0]); }
+const arcLast = () => G.arc && G.arc.i >= G.arc.list.length - 1;
+function overItems(won) {
+  if (G.mode === 'arcade' && G.arc) return won ? (arcLast() ? [] : ['NEXT FIGHT (' + btnLabel('A') + ')']) : ['CONTINUE', 'TITLE SCREEN'];
+  return ['RETRY', 'SELECT CHARACTER'];
+}
+// Fin du mode ARCADE : fondu au noir, musique du thème, personnage qui enchaîne des coups puis lève le bras, CONGRATULATIONS !, confettis
+const CONF_COL = ['#ffd23a', '#ff4a8a', '#5ac8ff', '#5ae06a', '#c88aff', '#ff8a3a', '#ffffff'];
+function startEnding() {
+  const f = makeFighter(fighterDef(G.p1), 0, CX, 1, false); f.state = 'idle'; f.t = 0;
+  const conf = []; for (let i = 0; i < 140; i++) conf.push({ x: Math.random() * (W + 80), y: -Math.random() * H * 1.2, vy: .25 + Math.random() * .4, ph: Math.random() * 6.28, c: CONF_COL[i % CONF_COL.length], s: 1 + (Math.random() < .35) });
+  G.end = { f, conf, out: 0 }; G.scene = 'ending'; G.t = 0; G.arc = null;
+}
+const END_ATK = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick'];
+function stepEnding() {
+  const E = G.end; G.t++;
+  for (const c of E.conf) { c.y += c.vy; c.x += -.28 + Math.sin(G.t * .03 + c.ph) * .35; if (c.y > H + 4) { c.y = -4; c.x = Math.random() * (W + 80); } if (c.x < -6) c.x += W + 12; }   // chute lente, vent vers la gauche
+  const f = E.f, T = G.t - 80;   // le personnage apparaît vers 80
+  if (T >= 0) {
+    f.t++;
+    if (T < 190) { if ((f.state === 'idle' && f.t > 8) || (f.state !== 'idle' && f.t > 22)) { if (f.state === 'idle') { f.state = END_ATK[Math.random() * END_ATK.length | 0]; f.t = 0; sfx('whoosh'); } else { f.state = 'idle'; f.t = 0; } } }   // coups au hasard pendant ~3 s
+    else if (f.state !== 'win') { f.state = 'win'; f.t = 0; sfx('select'); }   // lève le bras
+  }
+  if (E.out) {   // sortie : fondu au noir + musique coupée, puis écran titre
+    E.out++;
+    if (E.out > 45) { goTitle(); G.t = SPLASH; G.musIn = 70; BGM.currentTime = 0; }
+    return;
+  }
+  if (G.t > 300 && (BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap)) { E.out = 1; sfx('select'); }
+}
+function drawEnding() {
+  const E = G.end, t = G.t;
+  R(0, 0, W, H, '#000');
+  if (t < 45) { drawOver(); R(0, 0, W, H, `rgba(0,0,0,${Math.min(1, t / 40)})`); return; }   // fondu au noir
+  const a = Math.min(1, Math.max(0, (t - 70) / 30));
+  ctx.save(); ctx.globalAlpha = a;
+  const drawConf = front => { for (const [i, c] of E.conf.entries()) { if ((i % 3 === 0) !== front) continue; const tw = .45 + .55 * Math.abs(Math.sin(t * .12 + c.ph)); ctx.globalAlpha = a * tw; R(c.x, c.y, c.s + 1, c.s + (i % 2), (t + i) % 47 < 3 ? '#ffffff' : c.c); } ctx.globalAlpha = a; };
+  drawConf(false);   // confettis derrière le personnage
+  if (t >= 80) {
+    ctx.save(); ctx.globalAlpha = a * .35; const g = ctx.createRadialGradient(CX, 110, 4, CX, 110, 70); g.addColorStop(0, 'rgba(255,210,58,.5)'); g.addColorStop(1, 'rgba(255,210,58,0)'); ctx.fillStyle = g; ctx.fillRect(CX - 70, 40, 140, 140); ctx.restore();
+    drawFighter(E.f, CX, 142); if (E.f.def.float && typeof drawVaneGhost === 'function') drawVaneGhost(Object.assign(E.f, { x: CX, y: 142 }));
+  }
+  drawConf(true);   // quelques confettis devant
+  if (t > 110) { const k = Math.min(1, (t - 110) / 12), sc = 1 + (1 - k) * 1.5; ctx.save(); ctx.globalAlpha = a * k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('CONGRATULATIONS !', 0, -8, 16, (G.frame >> 4) % 2 ? '#ffd23a' : '#ffe98a', 'center'); ctx.restore(); }
+  if (t > 300 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 196, 8, '#ffffff', 'center');
+  ctx.restore();
+  if (E.out) R(0, 0, W, H, `rgba(0,0,0,${Math.min(1, E.out / 40)})`);   // fondu de sortie
+}
+function goTitle() { G.arc = null; G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
 // Menus : un cran par appui ; stick maintenu = descend/monte ligne par ligne
 const navHold = { u: 0, d: 0 };
 function nav(b) {
@@ -3883,6 +3937,7 @@ function bgmRoute() {
   catch (e) { bgmGain = null; }
 }
 function musicWanted() {
+  if (G.scene === 'ending') return G.t < 50 ? bgmKey : 'title';   // fin ARCADE : la musique s'arrête puis le thème principal
   if (G.scene === 'title') return 'title';
   if (G.scene === 'select' || G.scene === 'stage' || G.scene === 'over') return 'select';
   return MUSIC[G.stage] ? G.stage : 'city';   // musique propre à chaque décor (sinon celle de la ville)
@@ -3893,7 +3948,10 @@ function updateMusic() {
     if (!BGM.src || BGM.paused || bgmMul <= 0) { bgmKey = want; BGM.src = MUSIC[want] + '?v=55'; BGM.currentTime = 0; bgmMul = 0; if (bgmUnlocked && OPT.music > 0 && !G.musicHold) BGM.play().catch(() => {}); }
     else bgmMul = Math.max(0, bgmMul - 1 / 36);
   } else bgmMul = Math.min(1, bgmMul + 1 / 60);
-  const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1) * bgmMul));
+  let musF = 1;
+  if (G.scene === 'ending') musF = G.t < 50 ? Math.max(0, 1 - G.t / 40) : G.end && G.end.out ? Math.max(0, 1 - G.end.out / 40) : 1;
+  if (G.musIn > 0) { G.musIn--; musF = 1 - G.musIn / 70; }   // retour à l'écran titre : fondu entrant
+  const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1) * bgmMul * musF));
   if (bgmGain) bgmGain.gain.value = vol; else BGM.volume = vol;   // réglage appliqué en temps réel
   if (bgmGain && AC && AC.state !== 'running' && bgmUnlocked && !document.hidden) AC.resume().catch(() => {});
   if (OPT.music === 0 && !BGM.paused) BGM.pause();
@@ -4058,12 +4116,12 @@ function step() {
         G.tmenu = (G.tmenu || 0) + 1;
         const tc = Math.max(0, Math.min(TITLE_ITEMS.length - 1, (G.tcur || 0) + navStep()));
         if (tc !== (G.tcur || 0)) { G.tcur = tc; sfx('beep'); }
-        if (tap) { const i = Math.floor((tap.y - 159) / 11); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
+        if (tap) { const i = Math.floor((tap.y - 149) / 11); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
-          if ((G.tcur || 0) === 0) { G.scene = 'select'; G.t = 0; }
-          else if (G.tcur === 1) { G.showMoves = true; G.mscroll = 0; }
+          if ((G.tcur || 0) <= 1) { G.mode = G.tcur ? 'vs' : 'arcade'; G.arc = null; G.scene = 'select'; G.selPhase = 0; G.t = 0; }   // ARCADE MODE / V.S. BATTLE
+          else if (G.tcur === 2) { G.showMoves = true; G.mscroll = 0; }
           else { G.showOpts = true; G.ocur = 0; }
         }
       }
@@ -4085,6 +4143,7 @@ function step() {
       if (G.t > 10 && (okPress(sc) || (sc !== pctl && okPress(pctl)))) {
         const c = ROSTER[G.sel || 0];
         if (c == null) sfx('block');
+        else if (!G.selPhase && G.mode === 'arcade') { G.p1 = c; sfx('select'); arcadeStart(); }   // ARCADE : on enchaîne les combats
         else if (!G.selPhase) { G.p1 = c; G.selPhase = 1; sfx('select'); }                 // 1) mon personnage
         else { G.p2 = c; G.selPhase = 0; G.scene = 'stage'; G.t = 0; sfx('select'); }    // 2) le CPU
       }
@@ -4104,20 +4163,29 @@ function step() {
     case 'intro': case 'fight': case 'ko': case 'timeup':
       stepFight();
       break;
+    case 'ending': stepEnding(); break;
     case 'over':
       G.t++;
       if (G.t === 20 && AC) { const [a, b] = G.f, won = a.cpu === false ? a.wins >= 2 : b.wins >= 2; playSample(won ? 'win' : 'lose', 1.4, VOX, true); }
       if (G.t === 20) { const w = G.f[0].wins >= 2 ? 0 : G.f[1].wins >= 2 ? 1 : -1; G.perfect = w >= 0 && G.hurt && !G.hurt[w]; }   // le vainqueur (joueur ou adversaire) n'a pris aucun coup
       if (G.t === 100 && G.perfect && AC) playSample('perfect', 1.5, VOX, true);   // « PERFECT » juste après « YOU WIN »   // annonceur : « YOU WIN » / « YOU LOSE »
-      if (G.t > 30) {
-        const m = navStep(), oc = Math.max(0, Math.min(1, (G.ocurOver || 0) + m));
-        if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
-        if (okPress(pctl)) {
-          sfx('select');
-          if ((G.ocurOver || 0) === 0) startMatch(G.p1, G.p2, G.stage);       // RETRY : mêmes personnages, même stage
-          else { G.scene = 'select'; G.selPhase = 0; G.t = 0; }
-        }
-      }
+      { const won = G.f[0].wins >= 2, items = overItems(won);
+        if (G.mode === 'arcade' && G.arc && won && arcLast()) { if (G.t >= 150) startEnding(); break; }   // Lord Vane battu : fin du mode ARCADE
+        if (G.t > 30) {
+          const m = navStep(), oc = Math.max(0, Math.min(items.length - 1, (G.ocurOver || 0) + m));
+          if (oc !== (G.ocurOver || 0)) { G.ocurOver = oc; sfx('beep'); }
+          const ok = G.mode === 'arcade' && G.arc && won ? edge(pctl, 's') || edge(pctl, 'start') : okPress(pctl);   // NEXT FIGHT : bouton A
+          if (ok) {
+            sfx('select');
+            if (G.mode === 'arcade' && G.arc) {
+              if (won) { G.arc.i++; arcadeFight(); }                                   // combat suivant
+              else if ((G.ocurOver || 0) === 0) arcadeFight();                         // CONTINUE : même adversaire
+              else goTitle();
+            }
+            else if ((G.ocurOver || 0) === 0) startMatch(G.p1, G.p2, G.stage);       // RETRY : mêmes personnages, même stage
+            else { G.scene = 'select'; G.selPhase = 0; G.t = 0; }
+          }
+        } }
       break;
   }
   tap = null;
@@ -4752,7 +4820,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 152 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
     });
   }
   if (L > 30) {
@@ -4766,7 +4834,8 @@ function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
-  const two = p2On(), L2 = two ? '2P' : 'CPU';
+  const arc = G.mode === 'arcade', two = !arc && p2On(), L2 = two ? '2P' : 'CPU';
+  if (arc) text('ARCADE MODE: SELECT YOUR FIGHTER', CX, 6, 8, '#5ac8ff', 'center'); else
   text(ph === 0 ? (two ? 'PLAYER 1: SELECT FIGHTER' : 'SELECT YOUR FIGHTER') : (two ? 'PLAYER 2: SELECT FIGHTER' : 'SELECT CPU FIGHTER'), CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
   drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
@@ -4833,7 +4902,8 @@ function drawOver() {
   const won = a.cpu === false ? aw : bw;
   if (G.t > 20) text(won ? 'YOU WIN!' : 'YOU LOSE...', CX, 4, 8, won ? '#ffd23a' : '#ff5a4a', 'center');
   if (G.perfect && G.t > 100) { const k = Math.min(1, (G.t - 100) / 8), sc = 1 + (1 - k) * 2; ctx.save(); ctx.globalAlpha = k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('PERFECT!', 0, -8, 16, (G.frame >> 3) % 2 ? '#ffd23a' : '#ffffff', 'center'); ctx.restore(); }
-  if (G.t > 30) ['RETRY', 'SELECT CHARACTER'].forEach((m, i) => {
+  if (G.mode === 'arcade' && G.arc && won) text('STAGE ' + (G.arc.i + 1) + ' / ' + G.arc.list.length + ' CLEAR', CX, 14, 8, '#ffffff', 'center');
+  if (G.t > 30) overItems(won).forEach((m, i) => {
     const sel = (G.ocurOver || 0) === i;
     text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
   });
@@ -4852,6 +4922,7 @@ function render() {
     case 'select': drawSelect(); break;
     case 'stage': drawStageSelect(); break;
     case 'over': drawOver(); break;
+    case 'ending': drawEnding(); break;
     default: drawFight();
   }
   ctx.restore();
