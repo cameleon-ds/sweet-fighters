@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v169';
+const VERSION = 'v170';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3164,14 +3164,16 @@ function updNyx() {
   for (const c of G.smokes || []) {   // nuage toxique : aveugle l'adversaire et arrête ses projectiles
     c.t++; if (c.t < 90) c.x += c.dir * .5; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);
     if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.confT > 0)) { addPopup(o.x, o.y - 100, 'CONFUSED!', '#c8a0ff'); sfx('parry'); } o.confT = 180; }   // brume : inverse directions et boutons
-    for (const fb of G.fbs || []) if (fb.alive && fb.owner !== c.owner && Math.abs(fb.x - c.x) < R) { fb.alive = false; addSpark(fb.x, fb.y, 'parry'); }
-    for (const q of G.blades || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
-    for (const q of G.holos || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
-    for (const q of G.flasks || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) q.dead = true;
-    for (const q of G.voids || []) if (!q.dead && !q.charging && q.owner !== c.owner && Math.abs(q.x - c.x) < R + (q.r || 0)) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
-    for (const q of G.sonics || []) if (!q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; addSpark(q.x, q.y, 'parry'); }
+    // fumée contre boule de feu / clone / projectile d'énergie : les deux s'annulent
+    const hitSmoke = (q, x, y) => { c.dead = true; (G.clashFx = G.clashFx || []).push({ x, y, t: 0 }); G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); sfx('parry'); };
+    for (const fb of G.fbs || []) if (!c.dead && fb.alive && fb.owner !== c.owner && Math.abs(fb.x - c.x) < R) { fb.alive = false; if (fb.owner.fb === fb) fb.owner.fb = null; hitSmoke(fb, fb.x, fb.y); }
+    for (const q of G.blades || []) if (!c.dead && !q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; hitSmoke(q, q.x, q.y); }
+    for (const q of G.holos || []) if (!c.dead && !q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; hitSmoke(q, q.x, q.y - 50); }
+    for (const q of G.flasks || []) if (!c.dead && !q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; hitSmoke(q, q.x, q.y); }
+    for (const q of G.voids || []) if (!c.dead && !q.dead && !q.charging && q.owner !== c.owner && Math.abs(q.x - c.x) < R + (q.r || 0)) { q.dead = true; hitSmoke(q, q.x, q.y); }
+    for (const q of G.sonics || []) if (!c.dead && !q.dead && q.owner !== c.owner && Math.abs(q.x - c.x) < R) { q.dead = true; hitSmoke(q, q.x, q.y); }
   }
-  if (G.smokes) G.smokes = G.smokes.filter(c => c.t < SMOKE_T);
+  if (G.smokes) G.smokes = G.smokes.filter(c => c.t < SMOKE_T && !c.dead);
   for (const f of G.f) if (f.confT > 0) f.confT--;
   for (const g of G.geysers || []) {   // gerbe de flammes en diagonale : piège ceux qui sautent
     g.t++; const o = G.f.find(f => f !== g.owner), L = Math.min(1, g.t / 8) * 130;
