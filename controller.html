@@ -53,6 +53,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 #fig.lose .pic{border-color:#7a2a2a;box-shadow:none}
 #fig.lose img{filter:saturate(.6)}
 @keyframes pop{0%{transform:scale(2.4);opacity:0}100%{transform:scale(1);opacity:1}}
+#connect{position:absolute;left:50%;top:calc(var(--h)*.42);transform:translate(-50%,-50%);z-index:5;display:none;padding:16px 26px;border-radius:16px;border:3px solid #ffd23a;background:rgba(14,8,22,.85);color:#ffd23a;font-size:14px;box-shadow:0 0 22px rgba(255,210,58,.45);animation:glow 1.6s ease-in-out infinite}
+#connect.on{transform:translate(-50%,-50%) scale(.94);background:rgba(255,210,58,.25)}
+@keyframes glow{50%{box-shadow:0 0 6px rgba(255,210,58,.2)}}
 #inst{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:4;display:none;align-items:center;gap:6px;padding:7px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:7px;color:rgba(255,255,255,.9)}
 #inst svg{width:14px;height:14px}
 #help{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
@@ -66,6 +69,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 <div id="bg"></div>
 <div id="top"><div id="who">PLAYER 1</div><div id="st">CONNECTING...</div></div>
 <div id="fig"><div class="pic"><img alt=""></div><div class="nm"></div><div class="hp"><i></i></div><div class="res"></div></div>
+<div id="connect">CONNECT</div>
 <div id="stickZone"><div id="stick"><div id="knob"></div></div></div>
 <div id="btnZone"><div id="btns">
   <div class="b by" data-b="p">Y<small>PUNCH</small></div>
@@ -127,41 +131,56 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
       { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
       { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
     ] };
-    let lastMsg = 0, retryT = null, tries = 0;
+    let lastMsg = 0, retryT = null, tries = 0, parked = null, hidT = null;
+    // Mise en veille : manette remplacée par une autre page (même joueur) ou page cachée depuis plus d'1 minute
+    // Bouton CONNECT au milieu : seule la page où l'on appuie se connecte, les autres pages sont déconnectées
+    const cbtn = document.getElementById('connect');
+    const park = why => {
+      parked = why; ok = false; clearTimeout(retryT); retryT = null;
+      try { if (conn) conn.close(); } catch (_) {} try { if (peer) peer.destroy(); } catch (_) {} peer = null; conn = null;
+      setSt(why === 'replaced' ? 'CONNECTED ON ANOTHER SCREEN' : why === 'idle' ? 'PAUSED' : 'PRESS CONNECT', why === 'start' ? '' : 'bad');
+      cbtn.style.display = 'block'; fig.style.display = 'none';
+    };
+    const unpark = () => { if (!parked) return; parked = null; tries = 0; cbtn.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
+    cbtn.addEventListener('pointerdown', e => { cbtn.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
+    cbtn.addEventListener('pointerup', e => { cbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); unpark(); });
+    cbtn.addEventListener('pointercancel', () => cbtn.classList.remove('on'));
     const newPeer = () => {
       try { if (peer) peer.destroy(); } catch (_) {}
+      if (parked) return;
       peer = new Peer({ config: ICE });
       peer.on('open', connect);
       peer.on('error', e => {
-        ok = false;
+        if (parked) return; ok = false;
         setSt(e && e.type === 'peer-unavailable' ? 'WAITING FOR THE GAME...' : 'RECONNECTING...', 'bad');
         schedule();
       });
       peer.on('disconnected', () => { setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch (_) {} }, 1000); });
     };
     const schedule = (ms) => {   // nouvelle tentative (de plus en plus espacée, max 5 s)
-      if (retryT) return;
+      if (retryT || parked) return;
       retryT = setTimeout(() => { retryT = null; if (ok) return; if (!peer || peer.destroyed || peer.disconnected) newPeer(); else connect(); }, ms || Math.min(5000, 1000 + tries * 700));
     };
     const connect = () => {
-      if (ok) return;
+      if (ok || parked || !peer) return;
       tries++;
       setSt('CONNECTING...');
       try { if (conn) conn.close(); } catch (_) {}
       const c = conn = peer.connect(host, { metadata: { p: P }, reliable: true });
       const t0 = setTimeout(() => { if (conn === c && !ok) schedule(10); }, 8000);   // pas de réponse : on réessaie
       c.on('open', () => { clearTimeout(t0); if (conn !== c) return; ok = true; tries = 0; lastMsg = Date.now(); setSt('CONNECTED', 'ok'); emit(); });
-      c.on('data', m => { lastMsg = Date.now(); if (m && m.t === 'st') showState(m); });
-      c.on('close', () => { if (conn !== c) return; ok = false; setSt('RECONNECTING...', 'bad'); schedule(); });
+      c.on('data', m => { lastMsg = Date.now(); if (!m) return; if (m.t === 'bye') { park(m.why || 'replaced'); return; } if (m.t === 'st') showState(m); });
+      c.on('close', () => { if (conn !== c || parked) return; ok = false; setSt('RECONNECTING...', 'bad'); schedule(); });
       c.on('error', () => { if (conn !== c) return; ok = false; schedule(); });
     };
-    newPeer();
+    park('start');   // rien ne se connecte tant qu'on n'a pas appuyé sur CONNECT
     // le PC envoie un signal chaque seconde : sans nouvelles depuis 5 s, la manette se reconnecte
-    setInterval(() => { if (ok && Date.now() - lastMsg > 5000) { ok = false; setSt('RECONNECTING...', 'bad'); try { conn.close(); } catch (_) {} schedule(10); } }, 1000);
+    setInterval(() => { if (!parked && ok && Date.now() - lastMsg > 5000) { ok = false; setSt('RECONNECTING...', 'bad'); try { conn.close(); } catch (_) {} schedule(10); } }, 1000);
     // retour sur la page (écran rallumé, appli rouverte) : reconnexion immédiate
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
-      wake();
+      if (document.visibilityState !== 'visible') { clearTimeout(hidT); hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
+      clearTimeout(hidT); wake();
+      if (parked) return;   // en pause : on attend l'appui sur CONNECT
       if (!ok) { clearTimeout(retryT); retryT = null; schedule(10); }
     });
   }

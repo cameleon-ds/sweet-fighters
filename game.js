@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v152';
+const VERSION = 'v153';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1678,7 +1678,7 @@ function netStart() {
   NET.peer.on('disconnected', () => { setTimeout(() => { try { if (NET.peer && !NET.peer.destroyed) NET.peer.reconnect(); } catch (e) {} }, 1000); });   // reconnexion au serveur de signalisation
   NET.peer.on('connection', conn => {
     const p = (conn.metadata && conn.metadata.p) === 2 ? 2 : 1;
-    if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { try { NET.rem[p].conn.close(); } catch (e) {} }
+    if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { const old = NET.rem[p].conn; try { old.send({ t: 'bye', why: 'replaced' }); } catch (e) {} setTimeout(() => { try { old.close(); } catch (e) {} }, 300); }   // une seule manette par joueur : l'ancienne page est prévenue et s'arrête
     const r = NET.rem[p] = { conn, open: false, held: {}, tap: {}, x: 0, y: 0, last: performance.now() };
     const opened = () => { if (r.open) return; r.open = true; r.last = performance.now(); sfx('select'); try { conn.send({ t: 'hi', p }); } catch (e) {} };
     conn.on('open', opened); if (conn.open) opened();
@@ -1702,7 +1702,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=152', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=153', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {
