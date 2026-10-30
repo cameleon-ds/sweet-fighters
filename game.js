@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v166';
+const VERSION = 'v167';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3850,7 +3850,7 @@ function stepMoves() {
   if (pctl.held.u) G.mscroll = Math.max(0, (G.mscroll || 0) - 1.5);
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
-const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
+const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS', 'BACK TO TITLE'];
 // ordre d'affichage : FULL SCREEN en premier ; sur PC : KEYBOARD et GAMEPAD ; en bas : installer l'application (9)
 const optOrder = () => { const o = isTouch && !padOn() ? [6, 0, 1, 2, 3, 4, 5] : [6, 0, 1, 2, 3, 4, 5, 7, 8]; if (installAvail()) o.push(9); return o; };
 const optL = () => optOrder()[G.ocur] != null ? optOrder()[G.ocur] : -1;
@@ -3909,6 +3909,12 @@ function stepOptions() {
   }
 }
 function stepPause() {
+  if (G.pconf != null) {   // « ARE YOU SURE TO QUIT THE FIGHT ? » YES / NO
+    if (edge(pctl, 'l') || edge(pctl, 'r') || navStep()) { G.pconf = 1 - G.pconf; sfx('beep'); }
+    if (backPress(pctl)) { G.pconf = null; sfx('beep'); }
+    else if (edge(pctl, 's') || edge(pctl, 'start')) { sfx('select'); if (G.pconf === 0) { G.pconf = null; goTitle(); } else G.pconf = null; }
+    return;
+  }
   if (!G.showOpts && !G.showMoves && (edge(pctl, 'start') || edge(p2ctl, 'start'))) { G.paused = false; sfx('beep'); return; }   // START (manette) / ENTRÉE (clavier) = reprendre le combat directement
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
@@ -3920,7 +3926,8 @@ function stepPause() {
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
     else if (G.pcur === 2) { G.paused = false; G.scene = 'select'; G.t = 0; }
-    else { G.showOpts = true; G.ocur = 0; }
+    else if (G.pcur === 3) { G.showOpts = true; G.ocur = 0; }
+    else G.pconf = 1;   // BACK TO TITLE : confirmation (NO par défaut)
   }
 }
 /* ---------------- Musiques ---------------- */
@@ -4091,7 +4098,7 @@ function step() {
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
     if (G.paused) { stepPause(); tap = null; return; }
-    if (edge(pctl, 'start') || edge(p2ctl, 'start')) { G.paused = true; G.pcur = 0; G.showMoves = false; G.showOpts = false; sfx('select'); tap = null; return; }
+    if (edge(pctl, 'start') || edge(p2ctl, 'start')) { G.paused = true; G.pcur = 0; G.pconf = null; G.showMoves = false; G.showOpts = false; sfx('select'); tap = null; return; }
   }
 
   switch (G.scene) {
@@ -4728,13 +4735,19 @@ function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
   if (G.showMoves) { drawMoves(); return; }
   if (G.showOpts) { drawOptions(); return; }
-  panel(40, 136, 'PAUSE');
+  panel(34, 148, 'PAUSE');
   PAUSE_ITEMS.forEach((t, i) => {
     const sel = G.pcur === i;
-    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 70 + i * 18, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   });
   const kb = !isTouch && !padOn();
-  text(kb ? keyName(KEYS.s) + ': SELECT   ' + keyName(KEYS.start) + ': RESUME' : 'A: SELECT   START: RESUME   B: BACK', CX, 160, 8, 'rgba(255,255,255,.35)', 'center');
+  text(kb ? keyName(KEYS.s) + ': SELECT   ' + keyName(KEYS.start) + ': RESUME' : 'A: SELECT   START: RESUME   B: BACK', CX, 166, 8, 'rgba(255,255,255,.35)', 'center');
+  if (G.pconf != null) {   // fenêtre de confirmation
+    R(0, 0, W, H, 'rgba(0,0,0,.5)');
+    const PW = 250; R(CX - PW / 2, 78, PW, 64, '#0e0816');
+    text('ARE YOU SURE TO QUIT THE FIGHT ?', CX, 92, 8, '#ffffff', 'center');
+    ['YES', 'NO'].forEach((t, i) => { const sel = G.pconf === i; text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX + (i ? 40 : -40), 116, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center'); });
+  }
 }
 
 const LOGO = new Image();
