@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v144';
+const VERSION = 'v163';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -19,11 +19,14 @@ let ROT = false;
 const app = document.getElementById('app');
 function resize() {
   const touchDev = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || /[?&]touch/.test(location.search);
-  ROT = touchDev && innerHeight > innerWidth;
+  let iw = innerWidth, ih = innerHeight;
+  // iPhone (appli sur l'écran d'accueil, rotation verrouillée) : innerHeight est trop petit -> on prend la taille réelle de l'écran
+  if (navigator.standalone && ih > iw) { const a = Math.min(screen.width, screen.height), b = Math.max(screen.width, screen.height); iw = a; ih = b; }
+  ROT = touchDev && ih > iw;
   document.body.classList.toggle('rot', ROT);
-  const aw = ROT ? innerHeight : innerWidth, ah = ROT ? innerWidth : innerHeight;
+  const aw = ROT ? ih : iw, ah = ROT ? iw : ih;
   app.style.width = aw + 'px'; app.style.height = ah + 'px';
-  app.style.left = ROT ? innerWidth + 'px' : '0px';
+  app.style.left = ROT ? iw + 'px' : '0px';
   // Plein écran : la largeur interne s'adapte au format de l'écran (16:9 → 21:9)
   const nw = Math.max(384, Math.min(520, Math.round(H * aw / ah)));
   if (nw !== W) {
@@ -220,10 +223,15 @@ const BGS = {};
 const STAGE_IMG = { dojo: ['stage_dojo.jpg', 650], city: ['stage_city.jpg', 652], temple: ['stage_temple.jpg', 668], hall: ['stage_hall.jpg', 668], terrace: ['stage_terrace.jpg', 660], alley: ['stage_alley.jpg', 630], ring: ['stage_ring.jpg', 722], lab: ['stage_lab.jpg', 676] };
 const URBAN = ['city', 'terrace', 'alley', 'ring', 'lab'];   // décors urbains : poubelles, cônes, bouteilles
 const STAGE_PIC = {};
+// Chargement différé : seuls les logos, l'image titre et la musique du titre bloquent le démarrage ;
+// portraits et décors se téléchargent ensuite en arrière-plan (prêts bien avant l'écran de sélection)
+const LAZY = []; let lazyGo = false;
+const lazySrc = (im, src) => { if (lazyGo) im.src = src; else LAZY.push([im, src]); };
+function lazyStart() { if (lazyGo) return; lazyGo = true; LAZY.forEach(([im, src]) => { im.src = src; }); LAZY.length = 0; }
 for (const k in STAGE_IMG) {
   const im = new Image();
   im.onload = () => { BGS[k] = buildStageBG(k); if (typeof G !== 'undefined' && G.stage === k) BG = BGS[k]; };
-  im.src = STAGE_IMG[k][0] + '?v=104';
+  lazySrc(im, STAGE_IMG[k][0] + '?v=104');
   STAGE_PIC[k] = im;
 }
 function buildStageBG(k) {
@@ -470,7 +478,7 @@ const HEAD_SORA_BACK = [
 
 // Palettes 4 tons : [bord, ombre, moyen, reflet]
 const DEFS = [
-  { name: 'KAITO', twinFb: true, style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
+  { name: 'HIRO', twinFb: true, style: 'tshirt', vneck: true, head: HEAD_KAITO, headBack: HEAD_KAITO_BACK, band: true, torn: false, hem: true,
     skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],
     hair:  { a: '#2a1a10', h: '#4a3020', H: '#6c4830', L: '#94704a' },
     bandP: ['#08080c', '#18181e', '#2c2c36', '#50505c'],
@@ -479,7 +487,7 @@ const DEFS = [
     belt:  ['#040406', '#121216', '#26262e', '#44444e'],
     glove: ['#08080c', '#18181e', '#2e2e3a', '#565664'],
     fb: ['#ffffff', '#a8f4ff', '#2fb4ff', '#1458c4'] },
-  { name: 'JOHN', fireUpper: true, style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
+  { name: 'AXEL', fireUpper: true, style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, braid: true, jeans: true, shoes: true,
     skin:  ['#6a3418', '#a45e34', '#d8945c', '#f8c48c'],
     hair:  { a: '#8a5a14', h: '#c08a24', H: '#ecc048', L: '#fff08a' },   // blond
     top:   ['#5a0c0c', '#9a1818', '#d8302a', '#ff7058'],                 // t-shirt rouge
@@ -1415,8 +1423,23 @@ for (let i = 0; i < WALK_N; i++) {
 const KEY_DEF = { l: 'ArrowLeft', r: 'ArrowRight', u: 'ArrowUp', d: 'ArrowDown', p: 'KeyJ', k: 'KeyK', s: 'KeyL', x: 'Space', start: 'Enter', back: 'Escape' };
 const PAD_DEF = { p: 3, k: 1, s: 0, x: 2, start: 9, back: 8 };   // manette Xbox : Y = coup de poing, B = pied, A = spécial, X = contre
 let KEYS = Object.assign({}, KEY_DEF), PADB = Object.assign({}, PAD_DEF);
-try { const sv = JSON.parse(localStorage.getItem('sf2keys') || 'null'); if (sv) { Object.assign(KEYS, sv.k || {}); Object.assign(PADB, sv.p || {}); } } catch (e) {}
-const saveKeys = () => { try { localStorage.setItem('sf2keys', JSON.stringify({ k: KEYS, p: PADB })); } catch (e) {} };
+let padCustom = false;   // boutons de manette modifiés à la main
+try { const sv = JSON.parse(localStorage.getItem('sf2keys') || 'null'); if (sv) { Object.assign(KEYS, sv.k || {}); if (sv.p) { Object.assign(PADB, sv.p); padCustom = !!sv.pc; } } } catch (e) {}
+const saveKeys = () => { try { localStorage.setItem('sf2keys', JSON.stringify({ k: KEYS, p: PADB, pc: padCustom })); } catch (e) {} };
+// Type de manette : AUTO (détecté), XBOX, PLAYSTATION, SWITCH PRO, JOY-CON -> noms des boutons et boutons par défaut adaptés
+const PAD_TYPES = ['AUTO', 'XBOX', 'PLAYSTATION', 'SWITCH PRO', 'JOY-CON'];
+let padType = 0; try { padType = Math.max(0, Math.min(4, +(localStorage.getItem('sf2padtype') || 0))); } catch (e) {}
+function padKind() {   // type réellement utilisé : 'xbox' | 'ps' | 'switch' | 'joycon'
+  if (padType) return ['', 'xbox', 'ps', 'switch', 'joycon'][padType];
+  let id = ''; try { const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(Boolean); id = g ? g.id : ''; } catch (e) {}
+  if (/joy-?con/i.test(id)) return 'joycon';
+  if (/057e|nintendo|pro controller|switch/i.test(id)) return 'switch';
+  if (/054c|playstation|dualshock|dualsense|wireless controller|ps[345]/i.test(id)) return 'ps';
+  return 'xbox';
+}
+// Switch : boutons placés comme sur la manette (A à droite, B en bas, Y à gauche, X en haut) -> A = spécial, B = pied, Y = poing, X = contre
+const padDefault = () => (padKind() === 'switch' || padKind() === 'joycon') ? { p: 2, k: 0, s: 1, x: 3, start: 9, back: 8 } : Object.assign({}, PAD_DEF);
+function padApplyDefault() { PADB = padDefault(); padCustom = false; saveKeys(); }
 function keyAction(code) {
   for (const a in KEYS) if (KEYS[a] === code) return a;
   if (code === 'Enter') return 'start'; if (code === 'Escape' || code === 'Backspace') return 'back';   // toujours utilisables dans les menus
@@ -1429,6 +1452,10 @@ addEventListener('keydown', e => {
     e.preventDefault();
     if (e.code !== 'Escape') bindKey('kb', bindWait.act, e.code);
     bindWait = null; keys.clear(); return;
+  }
+  if (bindWait && bindWait.dev === 'pad') {   // réglage manette en attente : ÉCHAP annule, HAUT / BAS change de ligne sans rien modifier
+    if (e.code === 'Escape' || e.code === 'Backspace') { e.preventDefault(); bindWait = null; keys.clear(); sfx('beep'); return; }
+    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { e.preventDefault(); bindMove(e.code === 'ArrowUp' ? -1 : 1); return; }
   }
   const m = keyAction(e.code);
   if (m) { keys.add(m); latched.add(m); e.preventDefault(); }
@@ -1443,24 +1470,37 @@ function bindKey(dev, act, val) {   // associe et échange si la touche était d
 // Manette (Xbox en Bluetooth, etc.) : API Gamepad du navigateur
 let padPrev = [];
 function padList() { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean); } catch (e) { return []; } }
+let padKindLast = null;
 function readPad(i) {
   const gp = padList()[i], o = {}; if (!gp) return o;
+  if (i === 0 && !padCustom) { const k = padKind(); if (k !== padKindLast) { padKindLast = k; PADB = padDefault(); } }   // boutons par défaut selon la manette détectée
   const B = n => !!(gp.buttons[n] && gp.buttons[n].pressed), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, menu = inMenu(), dz = menu ? .6 : .38;
   o.l = B(14) || ax < -dz; o.r = B(15) || ax > dz; o.u = B(12) || ay < -dz; o.d = B(13) || ay > dz;
   for (const a in PADB) if (B(PADB[a])) o[a] = true;
+  if (o.l || o.r || o.u || o.d || gp.buttons.some(b => b.pressed)) initAudio();   // manette : active le son dès le premier appui (sons du menu de démarrage)
   if (i === 0 && bindWait && bindWait.dev === 'pad') {   // capture du nouveau bouton
     const now = gp.buttons.map(b => b.pressed);
     const n = now.findIndex((p, k) => p && !padPrev[k] && k !== 12 && k !== 13 && k !== 14 && k !== 15);
+    const mv = now[12] && !padPrev[12] ? -1 : now[13] && !padPrev[13] ? 1 : 0;   // croix haut / bas : ligne suivante / précédente sans changement
     padPrev = now;
-    if (n >= 0) { bindKey('pad', bindWait.act, n); bindWait = null; G.padLock = 12; }
+    if (mv) { bindMove(mv); return {}; }
+    if (n >= 0) { padCustom = true; bindKey('pad', bindWait.act, n); bindWait = null; G.padLock = 12; }
     return {};
   }
   if (i === 0) padPrev = gp.buttons.map(b => b.pressed);
   if (G.padLock > 0) { G.padLock--; return {}; }
   return o;
 }
-const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'XBOX'];
-const padName = n => PAD_NAMES[n] || 'B' + n;
+function bindMove(m) {   // annule l'attente et passe à la ligne précédente / suivante
+  bindWait = null; keys.clear(); G.padLock = 8;
+  const N = bindRows().length + 2; G.kcur = Math.max(0, Math.min(N - 1, (G.kcur || 0) + m)); sfx('beep');
+}
+const PAD_NAMES = {
+  xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'XBOX'],
+  ps: ['CROSS', 'CIRCLE', 'SQUARE', 'TRIANGLE', 'L1', 'R1', 'L2', 'R2', 'CREATE', 'OPTIONS', 'L3', 'R3', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'PS'],
+  switch: ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '-', '+', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME', 'CAPTURE'],
+  joycon: ['B', 'A', 'Y', 'X', 'SL', 'SR', 'ZL', 'ZR', '-', '+', 'STICK', 'STICK', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME', 'CAPTURE'] };
+const padName = n => (PAD_NAMES[padKind()] || PAD_NAMES.xbox)[n] || 'BTN ' + n;
 function keyName(c) {
   if (!c) return '-';
   const M = { ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', ArrowUp: 'UP', ArrowDown: 'DOWN', Space: 'SPACE', Enter: 'ENTER', Escape: 'ESC', Backspace: 'BKSP', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL', ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB' };
@@ -1586,7 +1626,7 @@ function readPlayer() {
     back: K('back'),
   };
   latched.clear();
-  const gp = readPad(0); for (const b in gp) if (gp[b]) r[b] = true;   // manette branchée sur le PC
+  const ps = padSlots(); if (ps.p1 != null) { const gp = readPad(ps.p1); for (const b in gp) if (gp[b]) r[b] = true; }   // manette branchée sur le PC
   const rm = readRemote(1);   // manette smartphone du joueur 1
   for (const b in rm) if (rm[b]) r[b] = true;
   return r;
@@ -1617,6 +1657,39 @@ function readRemote(p) {
   return o;
 }
 const remoteOn = p => !!(NET.rem[p] && NET.rem[p].open);
+// État envoyé à chaque manette smartphone : personnage choisi, énergie, résultat (YOU WIN / YOU LOSE)
+function netStateFor(p) {
+  const fi = p - 1, fightSc = ['intro', 'fight', 'ko', 'timeup', 'over'].includes(G.scene);
+  if (fightSc && G.f && G.f[fi]) {
+    const f = G.f[fi];
+    return { t: 'st', ch: f.def.idx, name: f.def.name, hp: Math.round(f.hp), res: G.scene === 'over' ? (f.wins >= 2 ? 'win' : 'lose') : null };
+  }
+  let ch = null;
+  if (G.scene === 'select' || G.scene === 'stage') ch = p === 1 ? (G.selPhase || G.scene === 'stage' ? G.p1 : null) : (G.scene === 'stage' ? G.p2 : null);
+  return ch == null ? { t: 'st', ch: null } : { t: 'st', ch, name: fighterDef(ch).name, hp: 100, res: null };
+}
+function netSendState() {
+  if (G.frame % 6) return;
+  for (const p of [1, 2]) {
+    const r = NET.rem[p]; if (!r || !r.open) continue;
+    const m = netStateFor(p), k = JSON.stringify(m);
+    if (k !== r.sent || G.frame - (r.sentF || 0) > 60) { r.sent = k; r.sentF = G.frame; try { r.conn.send(m); } catch (e) {} }
+  }
+}
+// Répartition des manettes du PC (Xbox, etc.) entre les joueurs :
+// smartphone en joueur 1 → la 1re manette va au joueur 2 ; sinon 1re manette = joueur 1, 2e manette = joueur 2
+function padSlots() {
+  const n = padList().length, o = { p1: null, p2: null };
+  if (remoteOn(1)) { if (!remoteOn(2) && n >= 1) o.p2 = 0; else if (n >= 1) o.p1 = 0; }
+  else { if (n >= 1) o.p1 = 0; if (!remoteOn(2) && n >= 2) o.p2 = 1; }
+  return o;
+}
+const p2On = () => remoteOn(2) || padSlots().p2 != null;   // joueur 2 humain (smartphone ou manette)
+function readP2() {
+  const o = readRemote(2), ps = padSlots();
+  if (ps.p2 != null) { const gp = readPad(ps.p2); for (const b in gp) if (gp[b]) o[b] = true; }
+  return o;
+}
 // Serveurs STUN/TURN publics : aident les téléphones à se connecter même derrière une box ou en 4G
 const ICE = { iceServers: [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
@@ -1640,7 +1713,7 @@ function netStart() {
   NET.peer.on('disconnected', () => { setTimeout(() => { try { if (NET.peer && !NET.peer.destroyed) NET.peer.reconnect(); } catch (e) {} }, 1000); });   // reconnexion au serveur de signalisation
   NET.peer.on('connection', conn => {
     const p = (conn.metadata && conn.metadata.p) === 2 ? 2 : 1;
-    if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { try { NET.rem[p].conn.close(); } catch (e) {} }
+    if (NET.rem[p] && NET.rem[p].conn && NET.rem[p].conn !== conn) { const old = NET.rem[p].conn; try { old.send({ t: 'bye', why: 'replaced' }); } catch (e) {} setTimeout(() => { try { old.close(); } catch (e) {} }, 300); }   // une seule manette par joueur : l'ancienne page est prévenue et s'arrête
     const r = NET.rem[p] = { conn, open: false, held: {}, tap: {}, x: 0, y: 0, last: performance.now() };
     const opened = () => { if (r.open) return; r.open = true; r.last = performance.now(); sfx('select'); try { conn.send({ t: 'hi', p }); } catch (e) {} };
     conn.on('open', opened); if (conn.open) opened();
@@ -1664,7 +1737,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=144', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=155', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {
@@ -1679,12 +1752,12 @@ function makeQRs() {
 function drawQRs() {
   if (isTouch) return;
   for (const p of [1, 2]) {
-    const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', on = remoteOn(p);
+    const q = QR[p], col = p === 1 ? '#5ac8ff' : '#ff7a6a', ps = padSlots(), padP = ps['p' + p] != null && !remoteOn(p), on = remoteOn(p) || (p === 2 && padP);
     const sz = Math.round((q ? q.width : 74) * .72), x = p === 1 ? 8 : W - 8 - sz, y = 36;   // QR codes plus petits
     text('PLAYER ' + p, x + sz / 2, y - 12, 8, col, 'center');
     if (q) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.globalAlpha = on ? .35 : 1; ctx.drawImage(q, x, y, sz, sz); ctx.restore(); }
     else { R(x, y, sz, sz, '#111'); text(NET.status === 'error' ? 'OFFLINE' : '...', x + sz / 2, y + sz / 2 - 4, 8, '#9a8aa0', 'center'); }
-    text(on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
+    text(padP && p === 2 ? 'GAMEPAD' : on ? 'CONNECTED' : 'SCAN', x + sz / 2, y + sz + 4, 8, on ? '#5ae06a' : '#d8c8a8', 'center');
     if (!on) text('TO PLAY', x + sz / 2, y + sz + 14, 8, '#d8c8a8', 'center');
   }
 }
@@ -1891,7 +1964,9 @@ function updFighter(f, o) {
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
           if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }
-          if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
+          // Clone énergétique : 3 tirs d'affilée, puis 1 seconde d'attente
+          if (G.frame - (f.holoLast || -999) > 90) f.holoN = 0;   // pause assez longue : compteur remis à zéro
+          if (G.frame >= (f.holoCd || 0) && (f.holoN || 0) < 3) { setState(f, 'holo'); f.vx = 0; f.holoN = (f.holoN || 0) + 1; f.holoLast = G.frame; if (f.holoN >= 3) { f.holoCd = G.frame + 24 + 60; f.holoN = 0; } }
           break;
         }
         if (f.def.kit === 'vane') {   // Vane : Impact Météore / Téléportation Fantôme / Éclair du Vide
@@ -2723,7 +2798,8 @@ function updBlood() {
 function drawStains() { for (const s of G.stains || []) { R(s.x - s.w / 2, s.y, s.w, 1, '#6a0a0a'); if (s.w > 2) R(s.x - s.w / 2 + 1, s.y - 1, s.w - 2, 1, '#8a1010'); } }
 function drawBlood() { for (const d of G.blood || []) R(d.x, d.y, d.s + 1, d.s, d.s > 1 ? '#a01010' : '#c81818'); }
 /* ---------- Vesper : hologramme et mines ---------- */
-const HOLO_HIT = { dmg: 6, stun: 42, bstun: 12, push: 1.2, chip: 1, sfx: 'hit' };       // décharge paralysante
+const HOLO_HIT = { dmg: 6, stun: 16, bstun: 12, push: 1.2, chip: 1, sfx: 'hit' };       // décharge simple (pas de paralysie)
+const HOLO_PARA = { dmg: 7, stun: 80, bstun: 12, push: .6, chip: 1, sfx: 'hit' };      // 3e décharge d'affilée : paralysie
 const MINE_HIT = { dmg: 8, knock: true, stun: 20, bstun: 14, push: 5, chip: 0, sfx: 'heavy', unblock: true };
 function shock(att, o, data, x, y) {
   addSpark(x, y, 'parry'); G.flashT = Math.max(G.flashT, 6); G.boltX = x; G.boltY = y;
@@ -2739,7 +2815,16 @@ function updVesper() {
     const hb = hurtbox(o), ab = rawAtkBox(o);
     const touch = hb && Math.abs(o.x - q.x) < 16 && o.y > q.y - 70;
     const struck = ab && ab[0] < q.x + 12 && ab[2] > q.x - 12;   // l'adversaire frappe l'hologramme
-    if (touch || struck) { q.dead = true; if (hurtbox(o)) shock(q.owner, o, HOLO_HIT, q.x, q.y - 50); else addSpark(q.x, q.y - 50, 'parry'); }
+    if (touch || struck) {
+      q.dead = true;
+      if (!hurtbox(o)) { addSpark(q.x, q.y - 50, 'parry'); continue; }
+      const n = (o.holoHitT != null && G.frame - o.holoHitT < 180 ? (o.holoHits || 0) : 0) + 1;   // touches d'affilée (moins de 3 s d'écart)
+      shock(q.owner, o, n >= 3 ? HOLO_PARA : HOLO_HIT, q.x, q.y - 50);
+      if (o.state === 'hit' || o.state === 'fall') {
+        o.holoHitT = G.frame; o.holoHits = n >= 3 ? 0 : n;
+        if (n >= 3) { o.paraT = 80; addPopup(o.x, o.y - 104, 'PARALYZED!', '#c88aff'); G.shake = Math.max(G.shake, 4); }
+      } else o.holoHits = 0;   // décharge parée : la série repart à zéro
+    }
   }
   if (G.holos) G.holos = G.holos.filter(q => !q.dead);
   for (const m of G.mines || []) {
@@ -2750,6 +2835,11 @@ function updVesper() {
     if (!o.air && Math.abs(o.x - m.x) < 14 && hurtbox(o)) { m.dead = true; shock(m.owner, o, MINE_HIT, m.x, GROUND - 10); G.shake = 5; }
   }
   if (G.mines) G.mines = G.mines.filter(m => !m.dead);
+  for (const f of G.f) {   // échos derrière Vesper : coup de pied plongeant et Pas de l'Ombre (arrière + A)
+    if (f.def.kit !== 'vesper') continue;
+    if (f.state === 'dive' || (f.state === 'shadow' && f.t < 16)) { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
+    else if (f.echo && f.echo.length) f.echo.shift();
+  }
 }
 /* ---------- Grog : ondes de choc au sol ---------- */
 const QUAKE_HIT = { dmg: 9, knock: true, stun: 20, bstun: 14, push: 3, chip: 0, sfx: 'heavy', unblock: true };
@@ -2813,7 +2903,7 @@ function drawVaneBehind() {   // échos derrière Vane
     if (!f.echo || !f.echo.length) continue;
     f.echo.forEach((e, i) => {
       const a = (i + 1) / (f.echo.length + 1);
-      ctx.save(); ctx.globalAlpha = .55 * a; if (i % 2 === 0) ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, e, { flash: 0, tint: i % 2 ? 'rgba(10,0,20,.85)' : 'rgba(255,60,200,.85)' }), e.x, e.y); ctx.restore();
+      ctx.save(); ctx.globalAlpha = .55 * a; if (i % 2 === 0) ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, e, { flash: 0, tint: i % 2 ? 'rgba(10,0,20,.85)' : (f.def.kit === 'vesper' ? 'rgba(58,220,255,.85)' : 'rgba(255,60,200,.85)') }), e.x, e.y); ctx.restore();
     });
   }
 }
@@ -3226,6 +3316,7 @@ function clashProjectiles() {
   for (const q of G.sonics || []) if (!q.dead) L.push([q, q.y, 16]);
   for (const q of G.voids || []) if (!q.dead && !q.charging) L.push([q, q.y, q.r || 14]);
   for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 10]);
+  for (const q of G.holos || []) if (!q.dead) L.push([q, q.y - 50, 16]);   // clone énergétique de Vesper = projectile
   for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14]);
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
     const [a, ay, ar] = L[i], [b, by, br] = L[j];
@@ -3378,11 +3469,11 @@ function drawGrogFx() {   // ondes électriques bleues de Grog
 function drawDiveTrail() {
   for (const f of G.f) {   // traînée néon du coup de pied plongeant
     if (f.state !== 'dive' || !f.trail || f.trail.length < 2) continue;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-    const T = f.trail, cols = [['rgba(58,240,255,.8)', 3], ['rgba(255,255,255,.9)', 1]];   // même style que l'arc de la Lame Zénith
-    for (const [c, w] of cols) for (let i = 1; i < T.length; i++) {
-      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.globalAlpha = Math.min(1, 1.6 * i / T.length);
-      ctx.beginPath(); ctx.moveTo(T[i - 1][0], T[i - 1][1]); ctx.lineTo(T[i][0], T[i][1]); ctx.stroke();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const T = f.trail.slice(-9);   // traînée électrique zigzag (même style que les éclairs de Grog)
+    for (let b = 0; b < 2; b++) {
+      const L = T.map(([x, y], i) => [x + (Math.random() - .5) * 7, y + (Math.random() - .5) * 7]);
+      ctx.globalAlpha = 1; elecArc(L, 'rgba(20,160,255,.6)', 3.5); elecArc(L, 'rgba(200,250,255,.95)', 1.1);
     }
     ctx.restore();
   }
@@ -3402,7 +3493,11 @@ function drawVesperFx() {
   }
   for (const f of G.f) if (f.state === 'dive' && f.t >= 3 && f.trail) {   // éclat néon au bout du pied
     const [x, y] = f.trail[f.trail.length - 1];
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .4; disc(x, y, 3, '#3af0ff'); ctx.globalAlpha = .9; disc(x, y, 1, '#ffffff'); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    const g = ctx.createRadialGradient(x, y, 1, x, y, 16); g.addColorStop(0, 'rgba(200,250,255,.8)'); g.addColorStop(.45, 'rgba(47,170,255,.35)'); g.addColorStop(1, 'rgba(20,88,196,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - 16, y - 16, 32, 32);   // halo électrique autour du pied
+    for (let b = 0; b < 3; b++) { const a = Math.random() * 6.28, r = 7 + Math.random() * 8, L = [[x, y]]; for (let s2 = 1; s2 <= 3; s2++) L.push([x + Math.cos(a) * r * s2 / 3 + (Math.random() - .5) * 4, y + Math.sin(a) * r * s2 / 3 + (Math.random() - .5) * 4]); elecArc(L, 'rgba(20,160,255,.6)', 2.5); elecArc(L, 'rgba(200,250,255,.95)', .9); }
+    ctx.restore();
   }
   for (const f of G.f) {   // traînée et croissant de lame pour Pas de l'Ombre / Lame Zénith
     if (f.state === 'shadow' && f.t < 12) { ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { x: f.x + f.dir * 10 }), f.x + f.dir * 10, f.y); ctx.restore(); }
@@ -3616,7 +3711,7 @@ function startMatch(p1, p2, stage) {
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  const vs2 = remoteOn(2);   // 2e manette connectée : joueur 2 humain au lieu du CPU
+  const vs2 = p2On();   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
   G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, !vs2)];
   if (vs2) G.f[1].ctl = p2ctl;
   G.f[0].ctl = pctl;
@@ -3671,20 +3766,27 @@ function stepMoves() {
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
 }
 const PAUSE_ITEMS = ['CONTINUE', 'MOVE LIST', 'CHARACTER SELECT', 'OPTIONS'];
-const OPT_ORDER = [6, 0, 1, 2, 3, 4, 5, 7, 8];   // ordre d'affichage : FULL SCREEN en premier
-const optL = () => OPT_ORDER[G.ocur] != null ? OPT_ORDER[G.ocur] : -1;
-const OPT_BACK = () => isTouch && !padOn() ? 7 : 9;   // ligne FULL SCREEN, puis sur PC : KEYBOARD et GAMEPAD
+// ordre d'affichage : FULL SCREEN en premier ; sur PC : KEYBOARD et GAMEPAD ; en bas : installer l'application (9)
+const optOrder = () => { const o = isTouch && !padOn() ? [6, 0, 1, 2, 3, 4, 5] : [6, 0, 1, 2, 3, 4, 5, 7, 8]; if (installAvail()) o.push(9); return o; };
+const optL = () => optOrder()[G.ocur] != null ? optOrder()[G.ocur] : -1;
+const OPT_BACK = () => optOrder().length;
+const optPC = () => !(isTouch && !padOn());
 const BIND_ROWS = [['l', 'LEFT'], ['r', 'RIGHT'], ['u', 'UP'], ['d', 'DOWN'], ['p', 'PUNCH (Y)'], ['k', 'KICK (B)'], ['s', 'SPECIAL (A)'], ['x', 'COUNTER (X)'], ['start', 'START / PAUSE'], ['back', 'BACK']];
-const bindRows = () => G.showKeys === 'pad' ? BIND_ROWS.slice(4) : BIND_ROWS;
+const bindRows = () => G.showKeys === 'pad' ? [['type', 'CONTROLLER'], ...BIND_ROWS.slice(4, 9)] : BIND_ROWS;
 function stepKeys() {
   if (bindWait) return;   // en attente d'une touche
   const rows = bindRows(), N = rows.length + 2, m = navStep();
   const kc = Math.max(0, Math.min(N - 1, (G.kcur || 0) + m)); if (kc !== (G.kcur || 0)) { G.kcur = kc; sfx('beep'); }
   const ok = edge(pctl, 's') || edge(pctl, 'start');
   if (edge(pctl, 'back') || (ok && G.kcur === N - 1)) { G.showKeys = null; sfx('beep'); return; }
+  if (rows[G.kcur] && rows[G.kcur][0] === 'type') {   // type de manette : < > ou A pour changer
+    const l = edge(pctl, 'l'), r = edge(pctl, 'r');
+    if (l || r || ok) { padType = (padType + (l ? 4 : 1)) % 5; try { localStorage.setItem('sf2padtype', padType); } catch (e) {} padApplyDefault(); padKindLast = padKind(); sfx('select'); }
+    return;
+  }
   if (!ok) return;
   if (G.kcur === N - 2) {   // réinitialiser
-    if (G.showKeys === 'pad') PADB = Object.assign({}, PAD_DEF); else KEYS = Object.assign({}, KEY_DEF);
+    if (G.showKeys === 'pad') { padApplyDefault(); padKindLast = padKind(); } else KEYS = Object.assign({}, KEY_DEF);
     saveKeys(); sfx('select'); return;
   }
   bindWait = { dev: G.showKeys, act: rows[G.kcur][0] }; keys.clear(); sfx('beep');
@@ -3700,7 +3802,8 @@ function stepOptions() {
     OPT.full = !OPT.full; saveOpt(); sfx('select'); G.fsDone = G.frame;
     if (OPT.full) enterFS(); else exitFS();   // sur mobile, l'entrée se fait au prochain toucher si le navigateur la refuse ici
   }
-  if (OB === 9 && ok && (L === 7 || L === 8)) { G.showKeys = L === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
+  if (L === 9 && ok) { sfx('select'); doInstall(); return; }
+  if (optPC() && ok && (L === 7 || L === 8)) { G.showKeys = L === 7 ? 'kb' : 'pad'; G.kcur = 0; sfx('select'); return; }
   if (L === 5 && (l || r || ok)) {
     OPT.sfx = l ? Math.max(0, OPT.sfx - 1) : r ? Math.min(4, OPT.sfx + 1) : (OPT.sfx + 1) % 5;
     saveOpt(); sfx('select');
@@ -3721,13 +3824,13 @@ function stepOptions() {
   }
 }
 function stepPause() {
-  if (edge(pctl, 'start') && !G.showOpts && !G.showMoves && padOn() && !keys.has('start')) { G.paused = false; sfx('beep'); return; }   // bouton MENU de la manette = reprendre
+  if (!G.showOpts && !G.showMoves && (edge(pctl, 'start') || edge(p2ctl, 'start'))) { G.paused = false; sfx('beep'); return; }   // START (manette) / ENTRÉE (clavier) = reprendre le combat directement
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
   const pc = Math.max(0, Math.min(n - 1, G.pcur + m)); if (pc !== G.pcur) { G.pcur = pc; sfx('beep'); }
-  if (backPress(pctl)) { G.paused = false; sfx('beep'); return; }   // ÉCHAP = reprendre
-  if (okPress(pctl)) {   // ENTRÉE (ou A) = valider
+  if (backPress(pctl)) { G.paused = false; sfx('beep'); return; }   // B (ou ÉCHAP) = annuler la pause
+  if (edge(pctl, 's')) {   // A = valider le choix
     sfx('select');
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
@@ -3774,41 +3877,107 @@ const unlockAudio = () => {
   if (OPT.music > 0 && !G.musicHold) BGM.play().catch(() => { bgmUnlocked = false; });
 };
 ['keydown', 'pointerdown', 'touchstart'].forEach(ev => addEventListener(ev, unlockAudio, { capture: true, passive: true }));
+['touchend', 'click', 'keyup'].forEach(ev => addEventListener(ev, () => initAudio(), { capture: true, passive: true }));   // iPhone : le son ne se débloque qu'au relâchement du doigt
 // La musique démarre avec le logo Super Rocket Games : lecture automatique tentée dès l'ouverture.
 // Si le navigateur la bloque (il exige une action du joueur), un écran « PRESS ANY KEY / TAP TO START » précède le logo.
 G.gate = false;
 // Chargement : images (portraits, décors, titre, logos) avant de lancer le jeu ; affiché au moins 1,2 s
 const LOAD_T0 = performance.now();
-function loadList() { return [...PORTRAITS, ...PORTRAITS_HURT, ...Object.values(STAGE_PIC), TITLE_IMG, SRG, LOGO]; }
-const loadProgress = () => { const L = loadList(), n = L.filter(im => im.complete).length, tk = Math.min(1, (performance.now() - LOAD_T0) / 1200); return Math.min(n / L.length, tk); };
+function loadList() { return [SRG, TITLE_IMG, LOGO]; }   // uniquement l'essentiel au démarrage
+// musique du titre : on attend qu'elle soit prête (au plus 3 s : certains navigateurs mobiles ne la chargent qu'à la lecture)
+const musicReady = () => BGM.readyState >= 3 || /iPhone|iPad|iPod/.test(navigator.userAgent) || performance.now() - LOAD_T0 > 3000;
+let loadOk = false;
+const loadProgress = () => {
+  if (loadOk) return 1;
+  const L = loadList(), n = L.filter(im => im.complete).length + (musicReady() ? 1 : 0), tk = Math.min(1, (performance.now() - LOAD_T0) / 400);
+  const p = Math.min(n / (L.length + 1), tk);
+  if (p >= 1) { loadOk = true; lazyStart(); }   // le reste se charge en arrière-plan
+  return p;
+};
 const loadDone = () => loadProgress() >= 1;
 G.musicHold = true;   // la musique démarre 1 s après l'apparition du logo
 // Écran de démarrage : choix du plein écran, conseil volume, bouton START (l'appui autorise aussi le son)
-G.boot = true; G.bcur = 1;
+G.boot = true;
 const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 const fsAvail = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled || (document.documentElement.webkitRequestFullscreen && !IPHONE));
+G.bcur = fsAvail() ? 0 : 1;   // sélecteur d'abord sur FULL SCREEN
+/* ---------- Installer l'application (raccourci écran d'accueil / bureau) ---------- */
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+addEventListener('appinstalled', () => { installEvt = null; G.installed = true; G.instHelp = false; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+const IOS = IPHONE || /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const ANDROID = /Android/i.test(navigator.userAgent);
+const isStandalone = () => !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches ||
+  (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement && !document.webkitFullscreenElement));
+const installAvail = () => !G.installed && !isStandalone();
+const INSTALL_LBL = () => isTouch ? 'ADD TO HOME SCREEN' : 'INSTALL ON DESKTOP';
+function doInstall() {
+  if (installEvt) {   // Chrome / Edge / Android : vraie fenêtre d'installation
+    const e = installEvt; installEvt = null;
+    try { e.prompt(); e.userChoice.then(r => { if (r && r.outcome === 'accepted') G.installed = true; }).catch(() => {}); }
+    catch (err) { G.instHelp = true; G.instOpen = G.frame; }
+  } else { G.instHelp = true; G.instOpen = G.frame; }   // iPhone / Safari / Firefox : mode d'emploi
+}
+function drawDlIcon(x, y, col) {   // icône « télécharger » (flèche vers le bas + plateau)
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 2); ctx.moveTo(x - 3.5, y - 1.5); ctx.lineTo(x, y + 2); ctx.lineTo(x + 3.5, y - 1.5);
+  ctx.moveTo(x - 6, y + 2); ctx.lineTo(x - 6, y + 5); ctx.lineTo(x + 6, y + 5); ctx.lineTo(x + 6, y + 2); ctx.stroke(); ctx.restore();
+}
+function drawShareIcon(x, y, col) {   // icône « partager » d'iOS (carré ouvert + flèche vers le haut)
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 3, y - 2); ctx.lineTo(x - 6, y - 2); ctx.lineTo(x - 6, y + 7); ctx.lineTo(x + 6, y + 7); ctx.lineTo(x + 6, y - 2); ctx.lineTo(x + 3, y - 2);
+  ctx.moveTo(x, y + 3); ctx.lineTo(x, y - 7); ctx.moveTo(x - 3, y - 4); ctx.lineTo(x, y - 7); ctx.lineTo(x + 3, y - 4); ctx.stroke(); ctx.restore();
+}
+function drawInstHelp() {   // mode d'emploi quand le navigateur n'a pas de fenêtre d'installation
+  R(0, 0, W, H, 'rgba(0,0,0,.7)');
+  const PW = 260, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
+  R(CX - PW / 2, 36, PW, 144, '#0e0816');
+  panel(36, 144, INSTALL_LBL(), true, PW);
+  const x0 = CX - PW / 2 + 22;
+  if (IOS) {
+    text('1. TAP THE SHARE BUTTON', x0, 74, 8, WH, 'left'); drawShareIcon(CX + PW / 2 - 30, 77, WH);
+    text('2. ADD TO HOME SCREEN', x0, 98, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 101, WH);
+    text('THEN OPEN THE GAME FROM', CX, 126, 8, DIM, 'center'); text('ITS ICON: FULL SCREEN', CX, 138, 8, DIM, 'center');
+  } else if (ANDROID || isTouch) {
+    text('1. OPEN THE BROWSER MENU', x0, 74, 8, WH, 'left');
+    ctx.fillStyle = WH; for (let i = 0; i < 3; i++) ctx.fillRect(CX + PW / 2 - 31, 73 + i * 4, 2, 2);
+    text('2. ADD TO HOME SCREEN', x0, 98, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 101, WH);
+    text('THEN OPEN THE GAME FROM', CX, 126, 8, DIM, 'center'); text('ITS ICON: FULL SCREEN', CX, 138, 8, DIM, 'center');
+  } else {
+    text('1. OPEN THE BROWSER MENU', x0, 74, 8, WH, 'left');
+    text('2. INSTALL SWEET FIGHTERS', x0, 92, 8, WH, 'left'); drawDlIcon(CX + PW / 2 - 30, 95, WH);
+    text('   (SAFARI: FILE > ADD TO DOCK)', x0, 106, 8, DIM, 'left');
+    text('WORKS WITH CHROME, EDGE', CX, 126, 8, DIM, 'center'); text('AND SAFARI', CX, 138, 8, DIM, 'center');
+  }
+  text(isTouch ? 'TAP TO CLOSE' : 'ENTER / ESC: CLOSE', CX, 162, 8, 'rgba(255,255,255,.35)', 'center');
+}
+const bootItems = () => { const o = []; if (fsAvail()) o.push(0); o.push(1); if (installAvail()) o.push(2); return o; };   // FULL SCREEN, START, puis (plus bas) INSTALL
+function bootMove(m) { const L = bootItems(); let i = L.indexOf(G.bcur); if (i < 0) i = L.length - 1; i = Math.max(0, Math.min(L.length - 1, i + m)); if (L[i] !== G.bcur) { G.bcur = L[i]; sfx('beep'); } }
+function bootOk() { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else if (G.bcur === 2 && installAvail()) { sfx('select'); doInstall(); } else bootStart(); }
 function bootStart() {
   if (!G.boot) return;
-  G.boot = false; G.t = 0;
+  G.boot = false; G.t = 0; G.volT = 0;   // puis message « monte le son », puis logo
   if (OPT.full && fsAvail()) enterFS(); else if (!OPT.full) exitFS();
   unlockAudio(); sfx('select');
 }
 function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
-const BOOT_FS_Y = 70, BOOT_START_Y = 164;
+const bootRowY = i => { const it = bootItems()[i]; return it === 2 ? 158 : 96 + i * 22; };   // INSTALL bien plus bas
 addEventListener('keydown', e => {
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && ['Enter', 'Escape', 'Space', 'Backspace'].includes(e.code)) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); e.preventDefault(); e.stopPropagation(); } return; }
   if (!G.boot || !loadDone()) return;
   const k = e.code;
-  if (k === 'ArrowUp' || k === 'ArrowDown') { G.bcur = fsAvail() ? 1 - G.bcur : 1; sfx('beep'); }
-  else if ((k === 'ArrowLeft' || k === 'ArrowRight') && G.bcur === 0) bootToggleFS();
-  else if (k === 'Enter' || k === 'Space' || k === KEYS.s || k === KEYS.p) { if (G.bcur === 0 && fsAvail()) bootToggleFS(); else bootStart(); }
+  if ((k === 'ArrowLeft' || k === 'ArrowRight') && G.bcur === 0) bootToggleFS();
+  else if (k === 'Enter' || k === 'Space' || k === KEYS.s || k === KEYS.p) { bootOk(); G.bootKey = G.frame; }
 }, true);
 // Sur mobile, le navigateur n'autorise le plein écran qu'au RELÂCHEMENT du doigt (pointerup / touchend), pas à l'appui
 addEventListener('pointerup', e => {
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 20) { G.instHelp = false; G.instClosed = G.frame; } return; }
   if (G.boot && loadDone()) {
     const r = cv.getBoundingClientRect();
     const p = ROT ? { x: (e.clientY - r.top) / r.height * W, y: (r.right - e.clientX) / r.width * H } : { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
-    if (fsAvail() && Math.abs(p.y - (BOOT_FS_Y + 3)) < 12 && Math.abs(p.x - CX) < 90) { G.bcur = 0; bootToggleFS(); }
-    else if (Math.abs(p.y - (BOOT_START_Y + 4)) < 14 && Math.abs(p.x - CX) < 60) bootStart();
+    const items = bootItems(), i = items.findIndex((it, k) => Math.abs(p.y - (bootRowY(k) + 4)) < 11);
+    if (i >= 0 && Math.abs(p.x - CX) < 110) { G.bcur = items[i]; bootOk(); }
     return;
   }
   syncFS();
@@ -3819,8 +3988,16 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) BGM.p
 function step() {
   updateMusic();
   G.frame++; G.st = (G.st || 0) + 1;
-  ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
-  ctlUpdate(p2ctl, confuse(readRemote(2), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
+  netSendState();
+  if (loadDone()) netStart();   // manettes smartphone : connexion possible dès le démarrage du jeu
+  const raw1 = readPlayer(), raw2 = readP2();
+  // Menus (écran titre, options, pause, choix du stage, fin de combat) : les deux joueurs connectés peuvent les manipuler
+  const menuShared = G.paused || !['intro', 'fight', 'ko', 'timeup', 'select'].includes(G.scene);
+  if (menuShared) for (const b in raw2) if (raw2[b]) raw1[b] = true;
+  ctlUpdate(pctl, confuse(raw1, G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
+  ctlUpdate(p2ctl, confuse(raw2, G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
+  if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && (edge(pctl, 's') || edge(pctl, 'back') || edge(pctl, 'start') || edge(pctl, 'p') || edge(pctl, 'k'))) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); } tap = null; return; }
+  if (G.instClosed != null && G.frame - G.instClosed < 3) { tap = null; return; }
 
   // Pause (bouton START) pendant le combat
   if (['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) {
@@ -3832,7 +4009,12 @@ function step() {
     case 'title': {
       // l'intro (logo Super Rocket Games) ne démarre qu'une fois le message "Rotate your phone" fermé
       if (G.tstate !== 1 && G.t < SPLASH && rotateShown()) { G.t = 0; break; }
-      if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone() && edge(pctl, 's')) bootStart(); break; }   // chargement puis écran de démarrage
+      if (G.tstate !== 1 && G.t < 2 && (G.boot || !loadDone())) { G.t = 0; if (G.boot && loadDone()) { const m = navStep(); if (m) bootMove(m); if ((edge(pctl, 's') || edge(pctl, 'start')) && G.bootKey !== G.frame && G.frame - (G.bootKey || -9) > 2) bootOk(); } break; }   // chargement puis écran de démarrage
+      if (G.volT != null && G.volT < VOL_N) {   // message « monte le son » avant le logo (passable)
+        G.volT++; G.t = 0;
+        if (G.volT > 15 && (BTNS.some(b => edge(pctl, b)) || edge(pctl, 'start') || tap)) G.volT = VOL_N;
+        tap = null; break;
+      }
       if (G.musicHold && (G.t >= 60 || G.tstate === 1)) { G.musicHold = false; BGM.currentTime = 0; }   // 1 s après l'apparition du logo
       G.t++;
       if (G.showMoves) { stepMoves(); break; }
@@ -3859,7 +4041,8 @@ function step() {
     case 'select': {
       G.t++;
       netStart();   // prépare les QR codes des manettes smartphone
-      const sc = G.selPhase && remoteOn(2) ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
+      if (NET.id && !QR[1] && typeof qrcode !== 'undefined') makeQRs();   // bibliothèque QR chargée après coup
+      const sc = G.selPhase && p2On() ? p2ctl : pctl;   // le joueur 2 choisit avec sa manette
       {
         let sl = G.sel || 0;
         if (edge(sc, 'l') && sl % 4 > 0) sl--;
@@ -4080,8 +4263,8 @@ function drawSpark(s) {
 }
 
 // ---------- Portraits et grille de sélection (8 cases) ----------
-const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
-const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); im.src = src + '?v=104'; return im; });
+const PORTRAITS = ['p_kaito.jpg', 'p_john.jpg', 'p_vesper.jpg', 'p_grog.jpg', 'p_zephyr.jpg', 'p_nyx.jpg', 'p_kael.jpg', 'p_vane.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
+const PORTRAITS_HURT = ['p_kaito_hurt.jpg', 'p_john_hurt.jpg', 'p_vesper_hurt.jpg', 'p_grog_hurt.jpg', 'p_zephyr_hurt.jpg', 'p_nyx_hurt.jpg', 'p_kael_hurt.jpg', 'p_vane_hurt.jpg'].map(src => { const im = new Image(); lazySrc(im, src + '?v=104'); return im; });
 const PORTRAIT_FACE = [1, -1, 1, 1, 1, 1, 1, 1];   // sens du regard de chaque image : Kaito regarde à droite, John à gauche
 // Portraits provisoires dessinés à partir du sprite (en attendant de vraies illustrations)
 function makePortrait(i, hurt) {
@@ -4334,7 +4517,7 @@ const MOVES = [
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'VESPER SPECIALS', lines: [
-    ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
+    ['A', 'HOLO FLASH'], ['', 'UP TO 3 CLONES, 3 HITS = PARALYZED'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'LORD VANE SPECIALS', lines: [
     ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
@@ -4395,24 +4578,24 @@ function panel(y0, h, title, small, w = 200) {
 }
 function drawOptions() {
   if (G.showKeys) { drawKeys(); return; }
-  const OB = OPT_BACK(), pc = OB === 9, PW = 236;
+  const OB = OPT_BACK(), pc = optPC(), PW = 236, RH = pc ? (OB > 9 ? 13 : 15) : (OB > 7 ? 17 : 19);
   panel(8, 200, 'OPTIONS', true, PW);
   const c = G.ocur, x0 = CX - PW / 2 + 22, vx = CX + PW / 2 - 40, bx = vx - 6;
-  const pos = i => OPT_ORDER.indexOf(i), col = i => c === pos(i) ? '#ffffff' : 'rgba(255,255,255,.55)';
-  const Y = i => 40 + pos(i) * (pc ? 15 : 19);   // lignes bien espacées
+  const pos = i => optOrder().indexOf(i), col = i => c === pos(i) ? '#ffd23a' : 'rgba(255,255,255,.55)';
+  const Y = i => 40 + pos(i) * RH;   // lignes bien espacées
   const box = (y, on, i) => { R(bx, y - 2, 12, 12, col(i)); R(bx + 2, y, 8, 8, '#0e0816'); if (on) R(bx + 3, y + 1, 6, 6, '#ffffff'); };
   const bars = (y, v) => {
     if (v === 0) { text('OFF', vx, y, 8, '#ffffff', 'center'); return; }
     for (let i = 0; i < 4; i++) R(vx - 16 + i * 9, y + 8 - (i + 1) * 2.5, 6, (i + 1) * 2.5, i < v ? '#ffffff' : 'rgba(255,255,255,.18)');
   };
-  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * (pc ? 15 : 19) - 4, PW - 20, 15, 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * (pc ? 15 : 19), 8, '#ffffff', 'right'); }   // ligne sélectionnée surlignée
+  if (c < OB) { R(CX - PW / 2 + 10, 40 + c * RH - 4, PW - 20, Math.min(15, RH), 'rgba(255,255,255,.08)'); text('>', x0 - 4, 40 + c * RH, 8, '#ffd23a', 'right'); }   // ligne sélectionnée surlignée
   text('FULL SCREEN', x0, Y(6), 8, col(6), 'left'); box(Y(6), OPT.full, 6);
   text('ZOOM IN GAME', x0, Y(0), 8, col(0), 'left'); box(Y(0), OPT.zoom, 0);
   text('FIGHTERS ENERGY', x0, Y(1), 8, col(1), 'left');
   for (let i = 0; i < 3; i++) drawStar(vx - 12 + i * 12, Y(1) + 4, 5.5, i < OPT.energy);
   text('DIFFICULTY', x0, Y(2), 8, col(2), 'left');
   const dsel = c === pos(2);
-  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, ['#ffffff', '#ffffff', '#ffffff', '#ffffff'][OPT.diff], 'center');
+  text((dsel ? '< ' : '') + DIFFS[OPT.diff] + (dsel ? ' >' : ''), vx, Y(2), 8, dsel ? '#ffd23a' : '#ffffff', 'center');
   text('BLOOD', x0, Y(3), 8, col(3), 'left'); box(Y(3), OPT.blood, 3);
   text('MUSIC VOLUME', x0, Y(4), 8, col(4), 'left'); bars(Y(4), OPT.music);
   text('SFX VOLUME', x0, Y(5), 8, col(5), 'left'); bars(Y(5), OPT.sfx);
@@ -4420,9 +4603,10 @@ function drawOptions() {
     text('KEYBOARD', x0, Y(7), 8, col(7), 'left'); text('SET >', vx, Y(7), 8, col(7), 'center');
     text('GAMEPAD', x0, Y(8), 8, col(8), 'left'); text(padOn() ? 'SET >' : 'NONE', vx, Y(8), 8, padOn() ? col(8) : 'rgba(255,255,255,.3)', 'center');
   }
+  if (pos(9) >= 0) { text(INSTALL_LBL(), x0, Y(9), 8, col(9), 'left'); drawDlIcon(vx, Y(9) + 3, col(9)); }
   R(CX - PW / 2 + 14, 172, PW - 28, 1, 'rgba(255,255,255,.15)');
-  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
-  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE   ESC: BACK', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
+  text((c === OB ? '> ' : '') + 'BACK' + (c === OB ? ' <' : ''), CX, 178, 8, c === OB ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
+  text(isTouch ? 'A / < >: CHANGE   B: BACK' : 'ENTER / < >: CHANGE', CX, 194, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawKeys() {   // écran de configuration des touches / boutons
   const pad = G.showKeys === 'pad', rows = bindRows(), N = rows.length + 2, c = G.kcur || 0;
@@ -4430,15 +4614,16 @@ function drawKeys() {   // écran de configuration des touches / boutons
   const x0 = CX - 84, step = pad ? 14 : 12, y0 = pad ? 48 : 42;
   rows.forEach(([a, nm], i) => {
     const y = y0 + i * step, sel = c === i, waiting = bindWait && bindWait.act === a;
-    if (sel) text('>', x0 - 4, y, 8, '#ffffff', 'right');
-    text(nm, x0, y, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'left');
-    const v = waiting ? ((G.frame >> 4) % 2 ? 'PRESS...' : '') : pad ? padName(PADB[a]) : keyName(KEYS[a]);
+    if (sel) text('>', x0 - 4, y, 8, '#ffd23a', 'right');
+    text(nm, x0, y, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'left');
+    const v = a === 'type' ? (sel ? '< ' : '') + (padType ? PAD_TYPES[padType] : 'AUTO (' + { xbox: 'XBOX', ps: 'PS', switch: 'SWITCH', joycon: 'JOY-CON' }[padKind()] + ')') + (sel ? ' >' : '')
+      : waiting ? ((G.frame >> 4) % 2 ? 'PRESS...' : '') : pad ? padName(PADB[a]) : keyName(KEYS[a]);
     text(v, CX + 62, y, 8, waiting ? '#ffffff' : '#ffffff', 'center');
   });
   const yR = y0 + rows.length * step + 6;
-  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
-  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
-  text(bindWait ? (pad ? 'PRESS A BUTTON' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? 'A: CHANGE   VIEW: BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
+  text((c === N - 2 ? '> ' : '') + 'RESET DEFAULTS' + (c === N - 2 ? ' <' : ''), CX, yR, 8, c === N - 2 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
+  text((c === N - 1 ? '> ' : '') + 'BACK' + (c === N - 1 ? ' <' : ''), CX, yR + 13, 8, c === N - 1 ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
+  text(bindWait ? (pad ? 'PRESS A BUTTON  (ESC: CANCEL)' : 'PRESS A KEY  (ESC: CANCEL)') : (pad ? padName(PADB.s) + ': CHANGE   ' + padName(PADB.back) + ': BACK' : 'ENTER: CHANGE   ESC: BACK'), CX, 196, 8, 'rgba(255,255,255,.35)', 'center');
 }
 function drawPause() {
   R(0, 0, W, H, 'rgba(0,0,0,.55)');
@@ -4447,8 +4632,10 @@ function drawPause() {
   panel(40, 136, 'PAUSE');
   PAUSE_ITEMS.forEach((t, i) => {
     const sel = G.pcur === i;
-    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffffff' : 'rgba(255,255,255,.55)', 'center');
+    text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   });
+  const kb = !isTouch && !padOn();
+  text(kb ? keyName(KEYS.s) + ': SELECT   ' + keyName(KEYS.start) + ': RESUME' : 'A: SELECT   START: RESUME   B: BACK', CX, 160, 8, 'rgba(255,255,255,.35)', 'center');
 }
 
 const LOGO = new Image();
@@ -4471,33 +4658,31 @@ function drawImg(img, cx, cy, w, al) {
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
   ctx.restore(); return true;
 }
-function drawBoot() {   // écran de démarrage : titre jaune, tout le reste en blanc
-  const fa = fsAvail(), c = fa ? G.bcur : 1, PW = 240, WH = '#ffffff', DIM = 'rgba(255,255,255,.55)';
-  R(CX - PW / 2, 14, PW, 190, 'rgba(14,8,22,.92)');
-  text('SWEET FIGHTERS', CX, 26, 16, '#ffd23a', 'center');
-  R(CX - PW / 2 + 16, 50, PW - 32, 1, 'rgba(255,255,255,.15)');
-  if (fa) {   // choix du plein écran
-    if (c === 0) R(CX - 92, BOOT_FS_Y - 5, 184, 16, 'rgba(255,255,255,.08)');
-    text((c === 0 ? '> ' : '  ') + 'FULL SCREEN', CX - 80, BOOT_FS_Y, 8, c === 0 ? WH : DIM, 'left');
-    const bx = CX + 62; R(bx, BOOT_FS_Y - 2, 12, 12, c === 0 ? WH : DIM); R(bx + 2, BOOT_FS_Y, 8, 8, '#0e0816'); if (OPT.full) R(bx + 3, BOOT_FS_Y + 1, 6, 6, WH);
-    text(OPT.full ? 'ON' : 'OFF', bx + 22, BOOT_FS_Y, 8, WH, 'left');
-    if (!isTouch) text('PRESS ESC TO EXIT FULL SCREEN', CX, BOOT_FS_Y + 16, 8, DIM, 'center');
-  } else if (IPHONE) {
-    text('FULL SCREEN ON IPHONE:', CX, BOOT_FS_Y - 4, 8, DIM, 'center');
-    text('SHARE > ADD TO HOME SCREEN', CX, BOOT_FS_Y + 8, 8, WH, 'center');
-  }
-  // haut-parleur + conseil volume
-  const sx = CX - 8, sy = 104;
-  R(sx - 8, sy + 3, 4, 6, WH); ctx.fillStyle = WH; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
-  ctx.strokeStyle = WH; ctx.lineWidth = 1.5;
-  for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
-  text('TURN THE VOLUME ON', CX, sy + 22, 8, WH, 'center');
-  text('FOR THE BEST EXPERIENCE', CX, sy + 33, 8, DIM, 'center');
-  // bouton START
-  const on = c === 1, pulse = on ? (G.frame >> 4) % 2 : 0;
-  R(CX - 46, BOOT_START_Y - 6, 92, 20, on ? (pulse ? WH : 'rgba(255,255,255,.7)') : DIM); R(CX - 44, BOOT_START_Y - 4, 88, 16, '#0e0816');
-  text('START', CX, BOOT_START_Y, 8, on ? WH : DIM, 'center');
-  text(isTouch ? 'TAP TO CHOOSE' : 'UP / DOWN + ENTER', CX, 189, 8, 'rgba(255,255,255,.35)', 'center');
+function drawBoot() {   // écran de démarrage : même style que le menu du titre (> CHOIX <)
+  const PW = 240, items = bootItems(), c = items.includes(G.bcur) ? G.bcur : 1;
+  R(CX - PW / 2, 34, PW, 150, 'rgba(14,8,22,.92)');
+  text('SWEET FIGHTERS', CX, 48, 16, '#ffd23a', 'center');
+  R(CX - PW / 2 + 16, 72, PW - 32, 1, 'rgba(255,255,255,.15)');
+  const lbl = it => it === 0 ? 'FULL SCREEN: ' + (OPT.full ? 'ON' : 'OFF') : it === 2 ? INSTALL_LBL() : 'START';
+  items.forEach((it, i) => {
+    const sel = c === it, y = bootRowY(i);
+    text((sel ? '> ' : '') + lbl(it) + (sel ? ' <' : ''), CX, y, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
+  });
+}
+const VOL_N = 130;   // message « monte le son » après START : fondu entrant, pause, fondu sortant
+function drawVolumeMsg() {
+  const t = G.volT, a = t < 25 ? t / 25 : t > VOL_N - 25 ? Math.max(0, (VOL_N - t) / 25) : 1, e = 1 - Math.pow(1 - Math.min(1, t / 25), 3);
+  const WH = `rgba(255,255,255,${a})`, sy = 82 + (1 - e) * 8;
+  ctx.save(); ctx.globalAlpha = a;
+  const sx = CX - 8, pul = 1 + Math.sin(t / 6) * .5;   // haut-parleur et ondes qui pulsent
+  R(sx - 8, sy + 3, 4, 6, '#ffffff'); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(sx - 4, sy + 3); ctx.lineTo(sx + 2, sy - 2); ctx.lineTo(sx + 2, sy + 14); ctx.lineTo(sx - 4, sy + 9); ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+  for (const r of [5, 9, 13]) { ctx.globalAlpha = a * Math.max(0, Math.min(1, pul - (r - 5) / 10)); ctx.beginPath(); ctx.arc(sx + 3, sy + 6, r, -.8, .8); ctx.stroke(); }
+  ctx.restore();
+  // texte qui se révèle lettre par lettre
+  const T1 = 'TURN THE VOLUME ON', T2 = 'FOR THE BEST EXPERIENCE', n = Math.floor(t * 1.2);
+  text(T1.slice(0, n), CX, sy + 30, 8, WH, 'center');
+  text(T2.slice(0, Math.max(0, n - 8)), CX, sy + 44, 8, `rgba(255,255,255,${a * .6})`, 'center');
 }
 function drawTitle() {
   const t = G.t;
@@ -4515,6 +4700,7 @@ function drawTitle() {
     }
     drawBoot(); return;
   }
+  if (G.volT != null && G.volT < VOL_N) { drawVolumeMsg(); return; }
   if (t < SPLASH) {
     const al = t < 20 ? t / 20 : t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 20);
     drawImg(SRG, CX, H / 2, Math.min(300, W - 40), al);
@@ -4535,7 +4721,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffffff' : 'rgba(255,255,255,.6)', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
     });
   }
   if (L > 30) {
@@ -4549,7 +4735,7 @@ function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
-  const two = remoteOn(2), L2 = two ? '2P' : 'CPU';
+  const two = p2On(), L2 = two ? '2P' : 'CPU';
   text(ph === 0 ? (two ? 'PLAYER 1: SELECT FIGHTER' : 'SELECT YOUR FIGHTER') : (two ? 'PLAYER 2: SELECT FIGHTER' : 'SELECT CPU FIGHTER'), CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
   drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
@@ -4618,7 +4804,7 @@ function drawOver() {
   if (G.perfect && G.t > 100) { const k = Math.min(1, (G.t - 100) / 8), sc = 1 + (1 - k) * 2; ctx.save(); ctx.globalAlpha = k; ctx.translate(CX, 158); ctx.scale(sc, sc); text('PERFECT!', 0, -8, 16, (G.frame >> 3) % 2 ? '#ffd23a' : '#ffffff', 'center'); ctx.restore(); }
   if (G.t > 30) ['RETRY', 'SELECT CHARACTER'].forEach((m, i) => {
     const sel = (G.ocurOver || 0) === i;
-    text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : '#d8c8a8', 'center');
+    text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 176 + i * 13, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
   });
 }
 
@@ -4639,6 +4825,7 @@ function render() {
   }
   ctx.restore();
   if (G.paused && grp === 'fight') drawPause();   // menu pause jamais secoué
+  if (G.instHelp) drawInstHelp();
   if (transT < TRANS_N) { drawTransition(transT / TRANS_N); transT++; }
 }
 // Transition entre écrans : un volet diagonal noir bordé d'une lame de lumière balaie l'ancien écran
