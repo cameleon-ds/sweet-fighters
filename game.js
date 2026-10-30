@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v188';
+const VERSION = 'v189';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3227,7 +3227,8 @@ function drawVaneFx() {
 }
 /* ---------- Kael : onde sonique, gants chargés, aura plasma ---------- */
 const SONIC_HIT = { dmg: 8, stun: 18, bstun: 12, push: 6.5, chip: 1, sfx: 'heavy' };
-const PWALL_HIT = { dmg: 14, knock: true, lift: 8.5, stun: 22, bstun: 16, push: 3, chip: 3, sfx: 'heavy' };
+const PWALL_HIT = { dmg: 14, knock: true, lift: 5, stun: 22, bstun: 16, push: 3, chip: 3, sfx: 'heavy', unblock: true };   // électrifié, tombe en arrière
+const ELEC_PAL = ['#ffffff', '#c8faff', '#5af0ff', '#1a78d0'];
 const SONIC_BIG = { dmg: 15, knock: true, stun: 22, bstun: 16, push: 8, chip: 3, sfx: 'heavy' };
 function updKael() {
   for (const q of G.sonics || []) {
@@ -3243,7 +3244,9 @@ function updKael() {
   if (G.sonics) G.sonics = G.sonics.filter(q => !q.dead);
   for (const w of G.pwalls || []) {   // mur de plasma : touche l'adversaire collé et arrête les projectiles
     w.t++; const o = G.f.find(f => f !== w.owner), half = w.big ? 26 : 20;
-    if (!w.done && o && w.t < 26 && hurtbox(o) && Math.abs(o.x - w.x) < half + 10) { w.done = true; applyHit(w.owner, o, w.big ? Object.assign({}, PWALL_HIT, { dmg: 20 }) : PWALL_HIT, w.x, o.y - 50, w.x - Math.sign(o.x - w.x || 1), true); }
+    if (!w.done && o && w.t < 40 && hurtbox(o) && Math.abs(o.x - w.x) < half + 10) {   // touche le champ électrique : électrifié et projeté en arrière
+      w.done = true; shock(w.owner, o, w.big ? Object.assign({}, PWALL_HIT, { dmg: 20 }) : PWALL_HIT, w.x, o.y - 50); o.burn = Math.max(o.burn || 0, 70); o.burnPal = ELEC_PAL; G.shake = Math.max(G.shake, 6);
+    }
     { const k = w.owner, xa = Math.min(w.x, k.x) - half - 6, xb = Math.max(w.x, k.x) + half + 6;   // annule toutes les boules de feu, clones, fioles et projectiles (entre Kael et le mur)
       killShots(k, xa, xb, -400, GROUND + 10); }
   }
