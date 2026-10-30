@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v154';
+const VERSION = 'v155';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1705,7 +1705,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=154', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=155', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {
@@ -1932,7 +1932,9 @@ function updFighter(f, o) {
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
           if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }
-          if (!G.holos.some(q => q.owner === f)) { setState(f, 'holo'); f.vx = 0; break; }
+          // Clone énergétique : 3 tirs d'affilée, puis 1 seconde d'attente
+          if (G.frame - (f.holoLast || -999) > 90) f.holoN = 0;   // pause assez longue : compteur remis à zéro
+          if (G.frame >= (f.holoCd || 0) && (f.holoN || 0) < 3) { setState(f, 'holo'); f.vx = 0; f.holoN = (f.holoN || 0) + 1; f.holoLast = G.frame; if (f.holoN >= 3) { f.holoCd = G.frame + 24 + 60; f.holoN = 0; } }
           break;
         }
         if (f.def.kit === 'vane') {   // Vane : Impact Météore / Téléportation Fantôme / Éclair du Vide
@@ -2764,7 +2766,8 @@ function updBlood() {
 function drawStains() { for (const s of G.stains || []) { R(s.x - s.w / 2, s.y, s.w, 1, '#6a0a0a'); if (s.w > 2) R(s.x - s.w / 2 + 1, s.y - 1, s.w - 2, 1, '#8a1010'); } }
 function drawBlood() { for (const d of G.blood || []) R(d.x, d.y, d.s + 1, d.s, d.s > 1 ? '#a01010' : '#c81818'); }
 /* ---------- Vesper : hologramme et mines ---------- */
-const HOLO_HIT = { dmg: 6, stun: 42, bstun: 12, push: 1.2, chip: 1, sfx: 'hit' };       // décharge paralysante
+const HOLO_HIT = { dmg: 6, stun: 16, bstun: 12, push: 1.2, chip: 1, sfx: 'hit' };       // décharge simple (pas de paralysie)
+const HOLO_PARA = { dmg: 7, stun: 80, bstun: 12, push: .6, chip: 1, sfx: 'hit' };      // 3e décharge d'affilée : paralysie
 const MINE_HIT = { dmg: 8, knock: true, stun: 20, bstun: 14, push: 5, chip: 0, sfx: 'heavy', unblock: true };
 function shock(att, o, data, x, y) {
   addSpark(x, y, 'parry'); G.flashT = Math.max(G.flashT, 6); G.boltX = x; G.boltY = y;
@@ -2780,7 +2783,16 @@ function updVesper() {
     const hb = hurtbox(o), ab = rawAtkBox(o);
     const touch = hb && Math.abs(o.x - q.x) < 16 && o.y > q.y - 70;
     const struck = ab && ab[0] < q.x + 12 && ab[2] > q.x - 12;   // l'adversaire frappe l'hologramme
-    if (touch || struck) { q.dead = true; if (hurtbox(o)) shock(q.owner, o, HOLO_HIT, q.x, q.y - 50); else addSpark(q.x, q.y - 50, 'parry'); }
+    if (touch || struck) {
+      q.dead = true;
+      if (!hurtbox(o)) { addSpark(q.x, q.y - 50, 'parry'); continue; }
+      const n = (o.holoHitT != null && G.frame - o.holoHitT < 180 ? (o.holoHits || 0) : 0) + 1;   // touches d'affilée (moins de 3 s d'écart)
+      shock(q.owner, o, n >= 3 ? HOLO_PARA : HOLO_HIT, q.x, q.y - 50);
+      if (o.state === 'hit' || o.state === 'fall') {
+        o.holoHitT = G.frame; o.holoHits = n >= 3 ? 0 : n;
+        if (n >= 3) { o.paraT = 80; addPopup(o.x, o.y - 104, 'PARALYZED!', '#c88aff'); G.shake = Math.max(G.shake, 4); }
+      } else o.holoHits = 0;   // décharge parée : la série repart à zéro
+    }
   }
   if (G.holos) G.holos = G.holos.filter(q => !q.dead);
   for (const m of G.mines || []) {
@@ -2791,6 +2803,11 @@ function updVesper() {
     if (!o.air && Math.abs(o.x - m.x) < 14 && hurtbox(o)) { m.dead = true; shock(m.owner, o, MINE_HIT, m.x, GROUND - 10); G.shake = 5; }
   }
   if (G.mines) G.mines = G.mines.filter(m => !m.dead);
+  for (const f of G.f) {   // échos derrière Vesper pendant le coup de pied plongeant
+    if (f.def.kit !== 'vesper') continue;
+    if (f.state === 'dive') { (f.echo = f.echo || []).push({ x: f.x, y: f.y, state: f.state, t: f.t, rotAng: f.rotAng, dir: f.dir, vx: f.vx, air: f.air, roll: f.roll }); if (f.echo.length > 7) f.echo.shift(); }
+    else if (f.echo && f.echo.length) f.echo.shift();
+  }
 }
 /* ---------- Grog : ondes de choc au sol ---------- */
 const QUAKE_HIT = { dmg: 9, knock: true, stun: 20, bstun: 14, push: 3, chip: 0, sfx: 'heavy', unblock: true };
@@ -2854,7 +2871,7 @@ function drawVaneBehind() {   // échos derrière Vane
     if (!f.echo || !f.echo.length) continue;
     f.echo.forEach((e, i) => {
       const a = (i + 1) / (f.echo.length + 1);
-      ctx.save(); ctx.globalAlpha = .55 * a; if (i % 2 === 0) ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, e, { flash: 0, tint: i % 2 ? 'rgba(10,0,20,.85)' : 'rgba(255,60,200,.85)' }), e.x, e.y); ctx.restore();
+      ctx.save(); ctx.globalAlpha = .55 * a; if (i % 2 === 0) ctx.globalCompositeOperation = 'lighter'; drawFighter(Object.assign({}, f, e, { flash: 0, tint: i % 2 ? 'rgba(10,0,20,.85)' : (f.def.kit === 'vesper' ? 'rgba(58,220,255,.85)' : 'rgba(255,60,200,.85)') }), e.x, e.y); ctx.restore();
     });
   }
 }
@@ -3419,11 +3436,11 @@ function drawGrogFx() {   // ondes électriques bleues de Grog
 function drawDiveTrail() {
   for (const f of G.f) {   // traînée néon du coup de pied plongeant
     if (f.state !== 'dive' || !f.trail || f.trail.length < 2) continue;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-    const T = f.trail, cols = [['rgba(58,240,255,.8)', 3], ['rgba(255,255,255,.9)', 1]];   // même style que l'arc de la Lame Zénith
-    for (const [c, w] of cols) for (let i = 1; i < T.length; i++) {
-      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.globalAlpha = Math.min(1, 1.6 * i / T.length);
-      ctx.beginPath(); ctx.moveTo(T[i - 1][0], T[i - 1][1]); ctx.lineTo(T[i][0], T[i][1]); ctx.stroke();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const T = f.trail.slice(-9);   // traînée électrique zigzag (même style que les éclairs de Grog)
+    for (let b = 0; b < 2; b++) {
+      const L = T.map(([x, y], i) => [x + (Math.random() - .5) * 7, y + (Math.random() - .5) * 7]);
+      ctx.globalAlpha = 1; elecArc(L, 'rgba(20,160,255,.6)', 3.5); elecArc(L, 'rgba(200,250,255,.95)', 1.1);
     }
     ctx.restore();
   }
@@ -3443,7 +3460,11 @@ function drawVesperFx() {
   }
   for (const f of G.f) if (f.state === 'dive' && f.t >= 3 && f.trail) {   // éclat néon au bout du pied
     const [x, y] = f.trail[f.trail.length - 1];
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .4; disc(x, y, 3, '#3af0ff'); ctx.globalAlpha = .9; disc(x, y, 1, '#ffffff'); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    const g = ctx.createRadialGradient(x, y, 1, x, y, 16); g.addColorStop(0, 'rgba(200,250,255,.8)'); g.addColorStop(.45, 'rgba(47,170,255,.35)'); g.addColorStop(1, 'rgba(20,88,196,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - 16, y - 16, 32, 32);   // halo électrique autour du pied
+    for (let b = 0; b < 3; b++) { const a = Math.random() * 6.28, r = 7 + Math.random() * 8, L = [[x, y]]; for (let s2 = 1; s2 <= 3; s2++) L.push([x + Math.cos(a) * r * s2 / 3 + (Math.random() - .5) * 4, y + Math.sin(a) * r * s2 / 3 + (Math.random() - .5) * 4]); elecArc(L, 'rgba(20,160,255,.6)', 2.5); elecArc(L, 'rgba(200,250,255,.95)', .9); }
+    ctx.restore();
   }
   for (const f of G.f) {   // traînée et croissant de lame pour Pas de l'Ombre / Lame Zénith
     if (f.state === 'shadow' && f.t < 12) { ctx.save(); ctx.globalAlpha = .3; drawFighter(Object.assign({}, f, { x: f.x + f.dir * 10 }), f.x + f.dir * 10, f.y); ctx.restore(); }
@@ -4452,7 +4473,7 @@ const MOVES = [
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
   { title: 'VESPER SPECIALS', lines: [
-    ['A', 'HOLO FLASH'], ['', 'A CLONE DASHES AND STUNS THE FOE'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
+    ['A', 'HOLO FLASH'], ['', 'UP TO 3 CLONES, 3 HITS = PARALYZED'], ['BACK + A', 'SHADOW STEP'], ['', 'DODGES BACK, LEAVES A MINE'],
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'LORD VANE SPECIALS', lines: [
     ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
