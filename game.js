@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v171';
+const VERSION = 'v172';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1365,7 +1365,11 @@ const SFX_FILES = { light: ['hit2', 'hit3'], heavy: ['hit1', 'hit4'], thud: ['hi
 const SFX_BUF = {}; let sfxLoading = false;
 function loadSfx() {
   if (sfxLoading || !AC) return; sfxLoading = true;
-  for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => fetch('sfx/' + nm + '.mp3?v=135').then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {}));
+  // ouvert en local (fichier sur l'ordinateur) : le navigateur interdit fetch() -> on charge les sons intégrés dans sfx-data.js
+  const local = location.protocol === 'file:';
+  const get = nm => local ? Promise.resolve(Uint8Array.from(atob(window.SFX_DATA[nm]), ch => ch.charCodeAt(0)).buffer) : fetch('sfx/' + nm + '.mp3?v=135').then(r => r.arrayBuffer());
+  const go = () => { for (const k in SFX_FILES) SFX_FILES[k].forEach((nm, i) => get(nm).then(b => AC.decodeAudioData(b)).then(buf => { (SFX_BUF[k] = SFX_BUF[k] || [])[i] = buf; }).catch(() => {})); };
+  if (local && !window.SFX_DATA) { const sc = document.createElement('script'); sc.src = 'sfx-data.js'; sc.onload = go; document.head.appendChild(sc); } else go();
 }
 const VOX = 1;   // hauteur des voix de l'annonceur (1 = voix d'origine)
 function playSample(k, vol = 1, rate = 1, exact = false, at = 0) {
