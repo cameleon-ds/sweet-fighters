@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v163';
+const VERSION = 'v164';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -73,7 +73,38 @@ function sDisc(x, y, r, col) {   // disque dessiné dans le sprite (basse résol
 }
 const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
+// Symboles PlayStation dessinés (la police n'a pas ✕ ○ □ △)
+const PS_GLYPH = { '\u2715': ['x', '#7ab4ff'], '\u25CB': ['o', '#ff6a7a'], '\u25A1': ['s', '#ff9ae0'], '\u25B3': ['t', '#5ae0a8'] };
+const PS_RE = /[\u2715\u25CB\u25A1\u25B3]/;
+function psGlyph(kind, x, y, sz, col) {   // x, y : coin haut gauche d'une case sz x sz
+  const c = sz / 2, r = sz * .38;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const path = () => {
+    ctx.beginPath();
+    if (kind === 'x') { ctx.moveTo(x + c - r, y + c - r); ctx.lineTo(x + c + r, y + c + r); ctx.moveTo(x + c + r, y + c - r); ctx.lineTo(x + c - r, y + c + r); }
+    else if (kind === 'o') ctx.arc(x + c, y + c, r, 0, Math.PI * 2);
+    else if (kind === 's') ctx.rect(x + c - r * .9, y + c - r * .9, r * 1.8, r * 1.8);
+    else { ctx.moveTo(x + c, y + c - r * 1.05); ctx.lineTo(x + c + r * 1.05, y + c + r * .8); ctx.lineTo(x + c - r * 1.05, y + c + r * .8); ctx.closePath(); }
+  };
+  path(); ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(2, sz * .32); ctx.stroke();   // contour noir
+  path(); ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, sz * .16); ctx.stroke();
+  ctx.restore();
+}
 function text(s, x, y, size = 8, col = '#fff', align = 'left', out = '#000') {
+  s = String(s);
+  if (PS_RE.test(s)) {   // texte mêlé de symboles PlayStation : on dessine morceau par morceau
+    ctx.font = size + 'px "Press Start 2P", monospace';
+    const parts = s.split(/([\u2715\u25CB\u25A1\u25B3])/).filter(t => t !== ''), gw = size * 1.15;
+    const wOf = t => PS_GLYPH[t] ? gw : ctx.measureText(t).width;
+    const tot = parts.reduce((a, t) => a + wOf(t), 0);
+    let cx = align === 'center' ? x - tot / 2 : align === 'right' ? x - tot : x;
+    for (const t of parts) {
+      if (PS_GLYPH[t]) { const a = ctx.globalAlpha, op = /rgba\(.*,\s*(\.?\d+)\)/.exec(col); if (op) ctx.globalAlpha = a * +op[1]; psGlyph(PS_GLYPH[t][0], cx + (gw - size) / 2, y, size, PS_GLYPH[t][1]); ctx.globalAlpha = a; }
+      else text(t, cx, y, size, col, 'left', out);
+      cx += wOf(t);
+    }
+    return;
+  }
   ctx.font = size + 'px "Press Start 2P", monospace';
   ctx.textAlign = align; ctx.textBaseline = 'top';
   const o = Math.max(1, Math.round(size / 8));
@@ -1497,7 +1528,7 @@ function bindMove(m) {   // annule l'attente et passe à la ligne précédente /
 }
 const PAD_NAMES = {
   xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'XBOX'],
-  ps: ['CROSS', 'CIRCLE', 'SQUARE', 'TRIANGLE', 'L1', 'R1', 'L2', 'R2', 'CREATE', 'OPTIONS', 'L3', 'R3', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'PS'],
+  ps: ['\u2715', '\u25CB', '\u25A1', '\u25B3', 'L1', 'R1', 'L2', 'R2', 'CREATE', 'OPTIONS', 'L3', 'R3', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'PS'],
   switch: ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '-', '+', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME', 'CAPTURE'],
   joycon: ['B', 'A', 'Y', 'X', 'SL', 'SR', 'ZL', 'ZR', '-', '+', 'STICK', 'STICK', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME', 'CAPTURE'] };
 const padName = n => (PAD_NAMES[padKind()] || PAD_NAMES.xbox)[n] || 'BTN ' + n;
