@@ -234,10 +234,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     // (au retour, elle ne se reconnecte pas seule : il faut appuyer sur CONNECT, pour ne pas voler la place d'une autre manette)
     let hiddenAt = 0;
     document.addEventListener('pointerdown', () => { lastAct = Date.now(); }, true);
-    setInterval(() => { if (!parked && Date.now() - lastAct > 60000) park('idle'); }, 2000);
+    let lastTick = Date.now();
+    const idleCheck = () => {
+      const now = Date.now(), slept = now - lastTick > 15000;   // gros trou entre deux vérifications = téléphone en veille / appli suspendue
+      lastTick = now;
+      if (!parked && (slept || now - lastAct > 60000)) park('idle');   // -> PAUSED + bouton CONNECT
+    };
+    setInterval(idleCheck, 2000);
+    ['pageshow', 'focus', 'resume'].forEach(ev => addEventListener(ev, idleCheck));
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); clearTimeout(hidT); hidT = setTimeout(() => { if (document.visibilityState !== 'visible' && !parked) park('idle'); }, 60000); return; }
-      clearTimeout(hidT); wake();
+      clearTimeout(hidT); wake(); idleCheck(); if (parked) return;
       if (!parked && hiddenAt && Date.now() - hiddenAt > 60000) { park('idle'); return; }   // onglet resté en arrière-plan (téléphone : minuteries gelées)
       if (!parked && Date.now() - lastAct > 60000) { park('idle'); return; }
       if (parked) return;   // en pause : on attend l'appui sur CONNECT
