@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v173';
+const VERSION = 'v174';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2320,12 +2320,16 @@ function updFighter(f, o) {
       if (f.t === 8) { G.flasks.push({ owner: f, x: f.x + f.dir * 18, y: f.y - 62, vx: f.dir * 3.4, vy: -3.6, t: 0 }); sfx('whoosh'); }
       if (f.t >= 24) setState(f, 'idle');
       break;
-    case 'nyxglide': {   // Nyx plane : flotte doucement, se déplace à gauche / à droite
+    case 'nyxglide': {   // Nyx plane : flotte, se déplace dans les 4 directions (même hors de l'écran en haut), lâche une fiole à la fin
       if (!h.s) f.glideHold = false;
-      const lim = f.glideHold ? 120 : 60;
-      f.vy = -GRAV + Math.sin(f.t * .18) * .35 + (f.y < GROUND - 38 ? Math.min(1.6, (GROUND - 38 - f.y) * .08) : 0);   // léger flottement haut / bas, à hauteur visible
+      const lim = f.glideHold ? 120 : 60;   // A maintenu : jusqu'à 2 s ; simple appui : 1 s
+      const lift = f.y > GROUND - 112 ? -Math.min(2.2, (f.y - (GROUND - 112)) * .12) : 0;   // monte assez haut pour passer au-dessus d'un adversaire ou d'une boule de feu
+      f.vy = -GRAV + Math.sin(f.t * .18) * .35 + (h.u ? -2.2 : h.d ? 2.2 : lift);
       f.vx = h.r ? 2.2 : h.l ? -2.2 : f.vx * .8;
-      if (f.t >= lim) { setState(f, 'jump'); f.airAtk = true; f.vy = 0; }   // fin du vol plané : retombe
+      if (f.t >= lim) {   // fin du vol plané : lâche une fiole et retombe
+        G.flasks.push({ owner: f, x: f.x + f.dir * 8, y: f.y - 40, vx: f.dir * 1.4, vy: .5, t: 0 }); sfx('whoosh');
+        setState(f, 'jump'); f.airAtk = true; f.vy = 0;
+      }
       break;
     }
     case 'airflask':   // en l'air : fiole lancée tout droit en diagonale vers le sol
@@ -4693,7 +4697,7 @@ const MOVES = [
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'] ] },
   { title: 'NYX SPECIALS', lines: [
     ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', '2 S MIST, REVERSES MOVES, STOPS SHOTS'],
-    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A TO GLIDE (UP TO 2 S)'] ] },
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A: GLIDE 2 S, DROPS A FLASK'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
