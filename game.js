@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v175';
+const VERSION = 'v176';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4111,7 +4111,7 @@ function bootStart() {
   unlockAudio(); sfx('select');
 }
 function bootToggleFS() { OPT.full = !OPT.full; saveOpt(); sfx('beep'); if (OPT.full) enterFS(); else exitFS(); }
-const bootRowY = i => { const it = bootItems()[i]; return it === 2 ? 158 : 96 + i * 22; };   // INSTALL bien plus bas
+const bootRowY = i => { const it = bootItems()[i]; return it === 2 ? 118 : 54 + i * 22; };   // INSTALL bien plus bas
 addEventListener('keydown', e => {
   if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && ['Enter', 'Escape', 'Space', 'Backspace'].includes(e.code)) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); e.preventDefault(); e.stopPropagation(); } return; }
   if (!G.boot || !loadDone()) return;
@@ -4825,9 +4825,10 @@ function drawImg(img, cx, cy, w, al) {
 }
 function drawBoot() {   // écran de démarrage : même style que le menu du titre (> CHOIX <)
   const PW = 240, items = bootItems(), c = items.includes(G.bcur) ? G.bcur : 1;
-  R(CX - PW / 2, 34, PW, 150, 'rgba(14,8,22,.92)');
-  text('SWEET FIGHTERS', CX, 48, 16, '#ffd23a', 'center');
-  R(CX - PW / 2 + 16, 72, PW - 32, 1, 'rgba(255,255,255,.15)');
+  R(0, 0, W, H, '#000');   // fond noir, sans cadre
+  text('SWEET FIGHTERS', CX, 164, 16, '#7a7a7a', 'center');   // titre en bas, en gris
+  text('POWERED BY SUPER ROCKET GAMES', CX, 186, 8, '#5a5a5a', 'center');
+  text('ALL RIGHTS RESERVED 2026', CX, 197, 8, '#4a4a4a', 'center');
   const lbl = it => it === 0 ? 'FULL SCREEN: ' + (OPT.full ? 'ON' : 'OFF') : it === 2 ? INSTALL_LBL() : 'START';
   items.forEach((it, i) => {
     const sel = c === it, y = bootRowY(i);
