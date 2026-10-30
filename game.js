@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v179';
+const VERSION = 'v180';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -616,6 +616,7 @@ const POSES = {
   upper2:  [3,-58, 1,-50, 0,-34, 8,-56, 12,-66, -4,-44, -2,-38, 9,-30, 6,-20, 2,-26, -4,-18],
   hit:     [-4,-53, -4,-45, -2,-28, 2,-40, 6,-46, -8,-38, -4,-44, 6,-14, 10,0, -9,-13, -13,0],
   block:   [0,-52, -1,-44, -2,-26, 7,-40, 6,-52, 5,-42, 9,-52, 8,-13, 12,0, -8,-12, -14,0],
+  scissor: [-2,-58, -2,-50, 0,-34, 8,-47, 15,-52, -8,-45, -15,-49, 14,-30, 31,-28, -7,-25, -19,-33],   // Kael : ciseau (jambe avant tendue, jambe arrière pliée)
   jkick:   [-2,-58, -2,-50, 0,-34, 6,-44, 10,-50, -6,-42, -2,-48, 14,-26, 30,-18, 2,-28, -6,-24],
   jpunch:  [5,-56, 3,-48, 0,-33, 14,-42, 26,-34, -4,-42, 0,-48, 10,-28, 6,-18, 2,-27, -5,-20],
   crouch:  [5,-36, 3,-29, 0,-14, 10,-24, 14,-31, 5,-22, 10,-28, 12,-10, 14,0, -8,-6, -16,0],
@@ -755,8 +756,8 @@ function footP(q, dir, skin) {
 function drawFighter(f, x = f.x, y = f.y) {
   const d = f.def, P = POSES[poseOf(f)];
   let swE = null, swH = null;
-  const spinning = (f.state === 'kspin' && f.t >= 2 && f.t < 16) || (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54) || (f.state === 'tornado' && f.t >= 3 && f.vy < 0);
-  const dir = spinning && (f.state === 'kspin' ? ((f.t / 2 | 0) & 1) : ((f.t >> 2) & 1)) ? -f.dir : f.dir;   // Kael : rotation très rapide
+  const spinning = (f.state === 'tatsu' && f.t >= 4) || (f.state === 'gtatsu' && f.t >= 6 && f.t < 54) || (f.state === 'tornado' && f.t >= 3 && f.vy < 0);
+  const dir = spinning && ((f.t >> 2) & 1) ? -f.dir : f.dir;
   // Regard vers la droite : vue de face 3/4 · regard vers la gauche : vue de dos 3/4
   const upRise = f.state === 'uppercut' && (f.apexT == null || f.t - f.apexT < 4);
   const backView = f.state === 'rupper' || (upRise && f.t >= 3);
@@ -1799,7 +1800,7 @@ function drawQRs() {
 
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
 function confuse(held, f) {   // brume de Nyx : gauche/droite et haut/bas inversés (les coups spéciaux restent possibles)
-  if (!f || !(f.confT > 0) || G.scene !== 'fight' || held.s) return held;
+  if (!f || !(f.confT > 0) || G.scene !== 'fight' || G.paused || held.s) return held;   // le menu pause n'est jamais inversé
   const o = Object.assign({}, held), sw = (a, b) => { const t = o[a]; o[a] = o[b]; o[b] = t; };
   sw('l', 'r'); sw('u', 'd'); return o;
 }
@@ -1904,7 +1905,7 @@ function poseOf(f) {
     case 'airflask': return f.t < 4 ? 'jump' : 'jpunch';
     case 'nyxglide': return 'jump';
     case 'kbarrage': return f.t >= 30 ? 'punch0' : (f.t % 6) < 3 ? 'punch1' : 'fpunch1';
-    case 'kspin': return f.t < 2 ? 'jump' : 'tatsu';
+    case 'kspin': return f.t < 2 ? 'jump' : 'scissor';
     case 'nyxspin': return f.t < 2 ? 'jump' : 'jkick';
     case 'flipk': return f.t < 4 ? 'crouch' : 'jkick';
     case 'nslide': return f.t < 3 || f.t >= 26 ? 'crouch' : 'ckick';
@@ -2350,6 +2351,7 @@ function updFighter(f, o) {
       break;
     case 'kspin':   // tourne sur place en l'air, très vite
       f.vx = 0; f.vy = f.t < 18 ? -GRAV : f.vy;
+      f.rotAng = f.t >= 2 && f.t < 16 ? f.dir * Math.min(1, (f.t - 2) / 14) * Math.PI * 4 : null;   // 2 tours sur lui-même, très vite
       if (f.t >= 2 && f.t < 16) { reflectNear(f, 48, f.y - 54, 44); if (f.t % 4 === 2) sfx('whoosh'); }
       if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; }
       break;
