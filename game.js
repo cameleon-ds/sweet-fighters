@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v185';
+const VERSION = 'v186';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -617,6 +617,7 @@ const POSES = {
   hit:     [-4,-53, -4,-45, -2,-28, 2,-40, 6,-46, -8,-38, -4,-44, 6,-14, 10,0, -9,-13, -13,0],
   block:   [0,-52, -1,-44, -2,-26, 7,-40, 6,-52, 5,-42, 9,-52, 8,-13, 12,0, -8,-12, -14,0],
   scissor: [-2,-58, -2,-50, 0,-34, 8,-47, 15,-52, -8,-45, -15,-49, 14,-30, 31,-28, -7,-25, -19,-33],   // Kael : ciseau (jambe avant tendue, jambe arrière pliée)
+  fjump:   [8,-54, 6,-46, 0,-30, 18,-46, 31,-47, -6,-42, -12,-37, 11,-22, 5,-12, -10,-25, -23,-19],   // Axel : poing tendu, jambe arrière tendue, jambe avant pliée
   slide:   [-21,-12, -14,-11, 0,-7, -10,-16, -4,-20, -17,-5, -24,-1, 13,-8, 31,-6, 8,-3, 17,0],   // glissade : allongé sur le dos, jambe avant tendue au ras du sol
   tuckG:   [2,-24, 1,-18, 0,-8, 8,-16, 10,-22, 4,-14, 8,-20, 9,-12, 5,-4, 4,-9, -1,-2],             // Grog : boule au ras du sol (roulades)
   jkick:   [-2,-58, -2,-50, 0,-34, 6,-44, 10,-50, -6,-42, -2,-48, 14,-26, 30,-18, 2,-28, -6,-24],
@@ -1821,7 +1822,7 @@ const backPress = c => edge(c, 'k') || edge(c, 'back');
 
 /* ---------------- Données d'attaque ---------------- */
 const ATK = {
-  punch:    { dur: 18, act: [4, 10], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
+  punch:    { dur: 12, act: [2, 7], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
   fpunch:   { dur: 22, act: [5, 12], box: [18, -80, 52, -58], dmg: 9,  stun: 17, bstun: 11, push: 3.2, sfx: 'hit' },
   fkick:    { dur: 30, act: [9, 16], box: [26, -70, 72, -44], dmg: 11, stun: 19, bstun: 13, push: 3.6, sfx: 'heavy' },
   kick:     { dur: 26, act: [7, 14], box: [20, -68, 62, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
@@ -1832,7 +1833,7 @@ const ATK = {
   rupper:   { dur: 30, act: [4, 13], box: [8, -110, 50, -40], dmg: 9, knock: true, bstun: 12, push: 2.0, sfx: 'heavy' },
   flame:    { dur: 26, act: [6, 12], box: [14, -80, 54, -48], dmg: 10, stun: 18, bstun: 12, push: 3.0, sfx: 'heavy' },
   gtatsu:   { act: [6, 54], box: [-40, -76, 46, -40], dmg: 4, stun: 16, bstun: 10, push: 0.8, sfx: 'hit' },
-  dive:     { act: [3, 60], box: [8, -30, 38, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },
+  dive:     { act: [3, 60], box: [8, -30, 38, 2], high: true, knock: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },
   tatsu:    { act: [4, 90], box: [-42, -70, 45, -39], dmg: 12, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },
   wallslash:{ dur: 34, act: [9, 17], box: [6, -96, 48, 0], dmg: 14, knock: true, stun: 22, bstun: 16, push: 3.2, sfx: 'heavy' },
   tpstrike: { dur: 22, act: [4, 12], box: [8, -60, 50, -28], dmg: 11, knock: true, unblock: true, stun: 20, bstun: 14, push: 3, sfx: 'heavy' },
@@ -1843,13 +1844,14 @@ const ATK = {
   tornado:  { act: [3, 26], box: [-24, -104, 30, -8], dmg: 13, knock: true, lift: 7.5, bstun: 16, push: 1.5, sfx: 'heavy' },
   gust:     { dur: 26, act: [7, 12], box: [10, -70, 46, -30], dmg: 6, stun: 14, bstun: 10, push: 1.6, sfx: 'hit' },
   gpound:   { act: [7, 99], box: [-18, -40, 18, 4], high: true, dmg: 15, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
+  fjump:    { act: [5, 60], box: [8, -66, 48, -34], dmg: 11, stun: 34, bstun: 12, push: 1.4, sfx: 'heavy' },   // Axel : saut loin vers l'avant, poing en feu
   crush:    { act: [6, 99], box: [-30, -104, 42, -8], dmg: 12, knock: true, lift: 6, bstun: 14, push: 2.2, sfx: 'heavy', sym: true },   // Grog : la roulade frappe dès le début et fait tomber
   crushD:   { act: [0, 99], box: [-10, -46, 28, 4], high: true, dmg: 16, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
   zenith:   { dur: 60, act: [3, 20], box: [-16, -96, 30, -12], dmg: 12, knock: true, stun: 20, bstun: 14, push: 2.2, sfx: 'heavy' },
   uppercut: { act: [5, 19], box: [0, -115, 31, -36], dmg: 14, knock: true, bstun: 16, push: 2.0, sfx: 'heavy' },
   kbarrage: { act: [1, 30], box: [12, -80, 50, -54], dmg: 4, stun: 16, bstun: 8, push: .35, sfx: 'hit' },             // Kael : rafale de 5 poings électriques
   kspin:    { act: [2, 90], box: [-44, -74, 46, -36], dmg: 11, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Kael : coup de pied rotatif 360° aérien
-  flipk:    { act: [5, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 6, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
+  flipk:    { act: [5, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 12, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
   nyxspin:  { act: [2, 18], box: [-40, -78, 42, -30], dmg: 10, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Nyx : coup de pied 360° arrière en plein vol
   nslide:   { dur: 32, act: [3, 22], box: [8, -18, 46, 0], dmg: 8, knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
   grogroll: { act: [3, 39], box: [-6, -34, 34, 0], dmg: 5, stun: 14, low: true, bstun: 10, push: .6, sfx: 'hit' },        // Grog : roulades au sol x3
@@ -1857,7 +1859,7 @@ const ATK = {
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['crush', 'grogroll', 'aflip', 'nyxspin', 'kbarrage', 'kspin', 'flipk', 'nslide', 'gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['fjump', 'crush', 'grogroll', 'aflip', 'nyxspin', 'kbarrage', 'kspin', 'flipk', 'nslide', 'gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1916,8 +1918,9 @@ function poseOf(f) {
     case 'nslide': return f.t < 3 || f.t >= 26 ? 'crouch' : 'slide';
     case 'grogroll': return f.t < 3 || f.t >= 39 ? 'crouch' : 'tuckG';
     case 'aflip': return 'jkick';
+    case 'fjump': return f.t < 4 ? 'sho0' : 'fjump';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
-    case 'punch': return f.t < 4 || f.t >= 10 ? 'punch0' : 'punch1';
+    case 'punch': return f.t < 2 || f.t >= 8 ? 'punch0' : 'punch1';   // coup de poing très rapide
     case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
     case 'fpunch': if (f.def.sword) return f.t < 4 ? 'upper1' : f.t < 9 ? 'fpunch1' : f.t < 16 ? 'punch1' : 'fpunch0';
       return f.t < 5 ? 'fpunch0' : f.t < 13 ? 'fpunch1' : 'fpunch0';
@@ -2003,7 +2006,7 @@ function killShots(g, x0, x1, y0, y1) {
   return n;
 }
 // Nyx en glissade : les projectiles passent au-dessus
-const underShot = o => (o.state === 'nslide' && o.t >= 2 && o.t < 26) || (o.state === 'grogroll' && o.t >= 3 && o.t < 39);
+const underShot = o => (o.state === 'fjump' && o.t >= 4) || (o.state === 'nslide' && o.t >= 2 && o.t < 26) || (o.state === 'grogroll' && o.t >= 3 && o.t < 39);
 // Kael (coup de pied rotatif) : renvoie boules de feu, clones, fioles et objets du décor lancés sur lui
 function reflectNear(g, R, yc, yr) {
   const mir = (q, vk, qy) => {
@@ -2101,7 +2104,8 @@ function updFighter(f, o) {
           if (shotOK(f)) { shotUse(f); setState(f, 'quake'); break; }
           break;
         }
-        if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }
+        if (h.u && f.def.fireUpper && !(G.frame - (f.fjHitT || -999) < 45)) { setState(f, 'fjump'); f.vx = 0; f.upQ = false; break; }   // Axel : saut-poing en feu vers l'avant
+        if (h.u) { setState(f, 'uppercut'); f.vx = 0; f.invuln = 11; f.apexT = null; break; }   // (Axel : après un saut-poing réussi, shoryuken en feu)
         if (back) { setState(f, 'flipk'); f.vx = 0; f.flipN = 1; f.flipHits = 0; f.flipQ = false; f.flipFin = false; f.flipS = FLIP_S; break; }   // arrière + A : salto avant coup de pied (x3, puis 4e en feu)
         if (shotOK(f)) { shotUse(f); setState(f, 'special'); f.vx = 0; f.fired = false; f.chargeT = 0; f.charged = false; break; }
       }
@@ -2154,7 +2158,7 @@ function updFighter(f, o) {
     case 'punch': case 'kick': case 'fkick': case 'cpunch': case 'rupper': case 'flame':
       // combo : dès que le coup touche, on peut enchaîner immédiatement le suivant
       if (f.fireDash > 0) {   // 4e coup en feu : élan rapide vers l'avant, coup actif pendant tout l'élan
-        f.fireDash--; f.vx = 7.5 * f.dir;
+        f.fireDash--; f.vx = 7.5 * f.dir; reflectNear(f, 46, f.y - 56, 40);   // l'élan en feu renvoie les boules de feu
         const a0 = ATK[f.state].act[0]; if (f.t > a0) f.t = a0;
         if (f.hasHit) f.fireDash = 0;
         if (!f.fireDash) f.vx = 0;
@@ -2191,16 +2195,12 @@ function updFighter(f, o) {
       if (f.t === 5) { f.air = true; sfx('upper'); }
       if (f.def.fireUpper) {   // John : part loin en avant puis monte en courbe, poing enflammé
         if (f.t === 3) f.fireState = 'uppercut';
-        // Axel : s'abaisse, puis part en courbe exponentielle vers l'avant puis vers le haut ; au sommet, roulade avant
-        if (f.t < 5) { f.vx = 0; f.air = false; }
-        if (f.t >= 5 && f.t <= 14) { f.vx = 6.2 * f.dir; f.vy = [-.5, -.8, -1.2, -1.7, -2.4, -3.3, -4.4, -5.6, -6.8, -7.6][f.t - 5]; if (f.t === 5) f.y -= 2; }
-        else if (f.t === 15) { f.vy = -7.6; f.vx = 2.6 * f.dir; }
-        else if (f.t > 15 && f.vy < 0) f.vx *= .9;
-        if (f.t >= 5) { const vy2 = f.vy + GRAV; f.rotAng = f.dir * Math.min(.9, Math.atan2(Math.abs(f.vx), Math.max(.1, -vy2))); }   // corps penché dans le sens de la trajectoire
-        if (f.t >= 4) { const [hp] = grogArm(f, 4, 4); (f.ftrail = f.ftrail || []).push({ x: hp[0], y: hp[1], bx: f.x, by: f.y, t: f.t, rotAng: f.rotAng }); if (f.ftrail.length > 12) f.ftrail.shift(); }   // traînée de feu du poing
-        if (f.t > 15 && f.vy >= 0) {   // sommet : redescend en roulade avant, coup de pied ou poing simple possible
-          const a0 = f.rotAng || 0; setState(f, 'jump'); f.air = true; f.roll = 1; f.t = 3; f.rollT = 20; f.rollA0 = a0; f.vx = 1.6 * f.dir; f.airAtk = false; f.airNoS = true;
-        }
+        // Axel : shoryuken en feu comme Hiro, mais monte moins haut
+        if (f.t >= 5 && f.t <= 10) { f.vx = 4.4 * f.dir; f.vy = [-0.8, -1.3, -2, -3, -4.2, -5.6][f.t - 5]; }
+        else if (f.t === 11) { f.vy = -6.0; f.vx = 2.2 * f.dir; }
+        else if (f.t > 11 && f.vy < 0) f.vx *= .86;
+        if (f.t > 11 && f.vy >= 0 && f.apexT == null) f.apexT = f.t;
+        if (f.t >= 4) { const [hp] = grogArm(f, 4, 4); (f.ftrail = f.ftrail || []).push({ x: hp[0], y: hp[1], bx: f.x, by: f.y, t: f.t, st: f.state, rotAng: f.rotAng }); if (f.ftrail.length > 12) f.ftrail.shift(); }   // traînée de feu du poing
         break;
       }
       if (f.t >= 5 && f.t <= 10) { f.vx = 4.2 * f.dir; f.vy = [-0.8, -1.4, -2.2, -3.3, -4.8, -6.6][f.t - 5]; }
@@ -2396,8 +2396,17 @@ function updFighter(f, o) {
       break;
     case 'kspin': {   // roulade avant très rapide dans la continuité du saut, redescend lentement, renvoie les projectiles
       if (f.vy > 0) f.vy = Math.min(1.6, f.vy - GRAV * .65);
+      f.vx = h.r ? 2.4 : h.l ? -2.4 : f.vx * .92;   // dirigeable à gauche / à droite
       f.rotAng = f.dir * f.t * (Math.PI * 2 / 7);
       reflectNear(f, 48, f.y - 54, 44); if (f.t % 7 === 1) sfx('whoosh');
+      break;
+    }
+    case 'fjump': {   // Axel : saut en arc, pas haut mais loin, poing en feu
+      if (f.t < 4) { f.vx = 0; break; }
+      if (f.t === 4) { f.air = true; f.vy = -4.6; f.vx = 5.6 * f.dir; f.y -= 1; f.fireState = 'fjump'; sfx('upper'); sfx('fb'); }
+      if (f.hasHit) f.vx *= .85;
+      if (f.hasHit && h.u && take(c, 's')) f.upQ = true;   // haut + A pendant le saut : shoryuken en feu à l'atterrissage
+      const [hp] = grogArm(f, 4, 4); (f.ftrail = f.ftrail || []).push({ x: hp[0], y: hp[1], bx: f.x, by: f.y, t: f.t, st: f.state, rotAng: f.rotAng }); if (f.ftrail.length > 12) f.ftrail.shift();
       break;
     }
     case 'aflip': {   // 3 saltos avant coup de pied en l'air
@@ -2428,7 +2437,7 @@ function updFighter(f, o) {
       break;
     }
     case 'nyxspin':   // rotation sur elle-même vers l'arrière (coup de pied), puis redescend en sautant vers l'arrière
-      f.vx = 0; f.vy = -GRAV;
+      f.vx = h.r ? 2.4 : h.l ? -2.4 : 0; f.vy = -GRAV + (h.u ? -2 : h.d ? 2 : 0);   // dirigeable dans toutes les directions
       f.rotAng = f.dir * Math.min(1, f.t / 16) * Math.PI * 2;   // rotation comme son saut en avant
       if (f.t === 8) sfx('whoosh');
       if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; f.roll = -1; f.t = 3; f.vx = -2.4 * f.dir; f.vy = -3.2; sfx('jump'); }
@@ -2500,6 +2509,7 @@ function updFighter(f, o) {
       f.y = GROUND; f.vy = 0; f.air = false;
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
+      else if (f.state === 'fjump') { if (f.upQ) { f.upQ = false; setState(f, 'uppercut'); f.invuln = 11; f.apexT = null; f.t = 4; f.fireState = 'uppercut'; } else { setState(f, 'land'); f.landT = 8; } }
       else if (f.state === 'tatsu' || f.state === 'kspin' || f.state === 'aflip') { f.ftrail2 = null; setState(f, 'land'); f.landT = f.state === 'kspin' ? 6 : 10; }
       else if (f.state === 'flipk') {   // retombe sur ses pieds : salto suivant, 4e coup en feu, ou fin
         const n = f.flipN, q2 = f.flipQ, hits = f.flipHits, fin = f.flipFin; f.rotAng = null; f.ftrail2 = null;
@@ -2547,7 +2557,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['aflip', 'nyxspin', 'kspin', 'flipk', 'jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
+  if (['fjump', 'aflip', 'nyxspin', 'kspin', 'flipk', 'jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
   let [x0, y0, x1, y1] = a.box;
   if (f.def.float && VANE_NORMALS.includes(f.state)) { x0 += 26; x1 += 26; y0 -= floatOff(f); y1 -= floatOff(f); }   // c'est le double, plus loin devant, qui frappe
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
@@ -3647,12 +3657,12 @@ function grogArm(f, i0, i1) {   // position monde d'un point de squelette
 function drawFireTrail() {   // John : le poing enflammé laisse une traînée de feu en écho
   for (const f of G.f) {
     if (!f.ftrail || !f.ftrail.length) continue;
-    if (f.state !== 'uppercut') { f.ftrail.shift(); if (!f.ftrail.length) continue; }
+    if (f.state !== 'uppercut' && f.state !== 'fjump') { f.ftrail.shift(); if (!f.ftrail.length) continue; }
     const pal = f.def.fb, T = f.ftrail;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     T.forEach((p, i) => {
       const k = (i + 1) / T.length, r = 4 + k * 9;
-      if (i % 3 === 0 && i < T.length - 2) { ctx.save(); ctx.globalAlpha = .22 * k; drawFighter(Object.assign({}, f, { state: 'uppercut', t: p.t, flash: 0, tint: pal[2] }), p.bx, p.by); ctx.restore(); }   // écho orangé du corps
+      if (i % 3 === 0 && i < T.length - 2) { ctx.save(); ctx.globalAlpha = .22 * k; drawFighter(Object.assign({}, f, { state: p.st || 'uppercut', t: p.t, flash: 0, tint: pal[2] }), p.bx, p.by); ctx.restore(); }   // écho orangé du corps
       const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r * 1.8); g.addColorStop(0, pal[1] + 'dd'); g.addColorStop(.45, pal[2] + '99'); g.addColorStop(1, pal[3] + '00');
       ctx.globalAlpha = k; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x + (Math.random() - .5) * 2, p.y - k * 2, r * 1.8, 0, Math.PI * 2); ctx.fill();
     });
@@ -3871,6 +3881,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     if (finisher) { att.run = 0; att.restT = 0; }
     else if (att.run >= 3) { att.restT = 30; att.run = 0; }
   }
+  if (att.state === 'fjump' && !projectile) { att.fjHitT = G.frame; def.burn = Math.max(def.burn || 0, 40); def.burnPal = att.def.fb; }   // saut-poing : ne fait pas tomber, haut + A enchaîne le shoryuken
   if (att.state === 'kbarrage' && !projectile) {   // 5e poing de la rafale : fait tomber
     att.barN = (att.barN || 0) + 1;
     if (att.barN >= 5) { data = Object.assign({}, data, { knock: true, dmg: 9 }); G.flashT = Math.max(G.flashT, 6); G.boltX = sx; G.boltY = sy; addPopup(def.x, def.y - 100, 'THUNDER RUSH!', '#5af0ff'); }
@@ -4505,7 +4516,7 @@ function stepFight() {
   for (const fb of G.fbs) {
     if (!fb.alive) continue;
     const def = fb.owner === a ? b : a;
-    const hb = hurtbox(def);
+    const hb = underShot(def) ? null : hurtbox(def);   // glissade / saut-poing d'Axel : la boule passe
     if (overlap([fb.x - 12 * fb.sc, fb.y - 11 * fb.sc, fb.x + 12 * fb.sc, fb.y + 11 * fb.sc], hb)) {
       fb.alive = false;
       applyHit(fb.owner, def, fb.big ? FB_BIG : FB_HIT, fb.x + fb.dir * 4, fb.y, fb.x - fb.vx * 10, true);
@@ -4516,7 +4527,8 @@ function stepFight() {
 
   // Coups au corps à corps
   for (const [att, def] of [[a, b], [b, a]]) {
-    const ab = atkBox(att), hb = hurtbox(def);
+    if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;   // le saut-poing d'Axel gagne contre le shoryuken
+    const ab = atkBox(att), hb = hurtbox(def) || (att.state === 'fjump' && def.state === 'uppercut' && !def.ko ? [def.x - 14, def.y - 84, def.x + 14, def.y] : null);
     if (overlap(ab, hb)) {
       att.hasHit = true;
       const sx = (Math.max(ab[0], hb[0]) + Math.min(ab[2], hb[2])) / 2;
@@ -4871,7 +4883,7 @@ const MOVES = [
     ['BACK', 'BLOCK  -  DOWN+BACK: LOW BLOCK'], ['FWD + Y', 'LONG PUNCH'], ['FWD + B', 'LONG KICK'],
     ['DOWN + Y', 'RISING UPPERCUT'], ['DOWN + B x3', 'LOW KICKS (3RD KNOCKS DOWN)'] ] },
   { title: 'SPECIALS & COUNTER', lines: [
-    ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'UPPERCUT'],
+    ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'UPPERCUT (AXEL: FIRE LEAP)'], ['AXEL: LEAP HITS > UP + A', 'FIRE UPPERCUT'],
     ['BACK + A x3', 'FLIP KICKS (3 HITS = FIRE FLIP)'], ['AIR + A', '3 AIR FLIP KICKS'], ['DOWN + A', 'SLIDE KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['YYBB BBYY YYBA', '4TH HIT: FIRE DASH (EVEN FROM FAR)'], ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
