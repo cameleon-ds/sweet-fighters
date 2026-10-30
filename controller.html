@@ -53,8 +53,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 #fig.lose .pic{border-color:#7a2a2a;box-shadow:none}
 #fig.lose img{filter:saturate(.6)}
 @keyframes pop{0%{transform:scale(2.4);opacity:0}100%{transform:scale(1);opacity:1}}
-#connect{position:absolute;left:50%;top:calc(var(--h)*.42);transform:translate(-50%,-50%);z-index:5;display:none;padding:16px 26px;border-radius:16px;border:3px solid #ffd23a;background:rgba(14,8,22,.85);color:#ffd23a;font-size:14px;box-shadow:0 0 22px rgba(255,210,58,.45);animation:glow 1.6s ease-in-out infinite}
-#connect.on{transform:translate(-50%,-50%) scale(.94);background:rgba(255,210,58,.25)}
+#connect{position:absolute;left:50%;top:calc(var(--h)*.42);transform:translate(-50%,-50%);z-index:5;display:none;gap:14px;white-space:nowrap}
+#connect .cb{display:inline-block;padding:13px 16px;border-radius:14px;border:3px solid;background:rgba(14,8,22,.85);font-size:10px;line-height:1.7;text-align:center;animation:glow 1.6s ease-in-out infinite}
+#connect .cb small{display:block;font-size:7px;opacity:.8}
+#connect .c1{border-color:#5ac8ff;color:#5ac8ff;box-shadow:0 0 18px rgba(90,200,255,.45)}
+#connect .c2{border-color:#ff7a6a;color:#ff7a6a;box-shadow:0 0 18px rgba(255,122,106,.45)}
+#connect .cb.on{transform:scale(.94);background:rgba(255,255,255,.18)}
+#disc{position:absolute;left:calc(10px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));z-index:4;display:none;padding:7px 10px;border-radius:12px;border:2px solid rgba(255,90,74,.6);background:rgba(0,0,0,.45);font-size:7px;color:#ff8a7a}
+#disc.on{background:rgba(255,90,74,.3)}
 @keyframes glow{50%{box-shadow:0 0 6px rgba(255,210,58,.2)}}
 #cnote{position:absolute;left:50%;top:calc(var(--h)*.42 + 40px);transform:translateX(-50%);z-index:5;display:none;font-size:8px;color:#fff;white-space:nowrap;text-shadow:0 1px 0 #000,0 0 6px rgba(0,0,0,.8);pointer-events:none}
 #scan{position:absolute;inset:0;z-index:8;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.85)}
@@ -77,7 +83,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 <div id="bg"></div>
 <div id="top"><div id="who">PLAYER 1</div><div id="st">CONNECTING...</div></div>
 <div id="fig"><div class="pic"><img alt=""></div><div class="nm"></div><div class="hp"><i></i></div><div class="res"></div></div>
-<div id="connect">CONNECT</div>
+<div id="connect"><div class="cb c1" data-p="1">CONNECT<small>PLAYER 1</small></div><div class="cb c2" data-p="2">CONNECT<small>PLAYER 2</small></div></div>
+<div id="disc">DISCONNECT</div>
 <div id="scan"><div class="win"><video muted playsinline></video><i class="frame"></i></div><div id="scanMsg"></div><div id="scanClose">CANCEL</div></div>
 <div id="cnote">USE SAME WI-FI</div>
 <div id="scanBtn">SCAN QR CODE</div>
@@ -145,19 +152,31 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     let lastMsg = 0, retryT = null, tries = 0, parked = null, hidT = null, lastAct = Date.now();
     // Mise en veille : manette remplacée par une autre page (même joueur) ou page cachée depuis plus d'1 minute
     // Bouton CONNECT au milieu : seule la page où l'on appuie se connecte, les autres pages sont déconnectées
-    const cbtn = document.getElementById('connect'), cnote = document.getElementById('cnote'), sbtn = document.getElementById('scanBtn');
+    const cbtn = document.getElementById('connect'), dbtn = document.getElementById('disc'), cnote = document.getElementById('cnote'), sbtn = document.getElementById('scanBtn');
     const park = why => {
       parked = why; ok = false; clearTimeout(retryT); retryT = null;
       try { if (conn) conn.close(); } catch (_) {} try { if (peer) peer.destroy(); } catch (_) {} peer = null; conn = null;
-      setSt(why === 'replaced' ? 'CONNECTED ON ANOTHER SCREEN' : why === 'idle' ? 'PAUSED' : 'PRESS CONNECT', why === 'start' ? '' : 'bad');
-      cbtn.style.display = 'block'; cnote.style.display = 'block'; sbtn.style.display = 'block'; fig.style.display = 'none';
+      setSt(why === 'replaced' ? 'CONNECTED ON ANOTHER SCREEN' : why === 'idle' ? 'PAUSED' : 'CHOOSE A PLAYER', why === 'start' ? '' : 'bad');
+      cbtn.style.display = 'flex'; dbtn.style.display = 'none'; cnote.style.display = 'block'; sbtn.style.display = 'block'; fig.style.display = 'none';
     };
-    const unpark = () => { if (!parked) return; parked = null; tries = 0; lastAct = Date.now(); cbtn.style.display = 'none'; cnote.style.display = 'none'; sbtn.style.display = 'none'; setSt('CONNECTING...'); newPeer(); };
-    cbtn.addEventListener('pointerdown', e => { cbtn.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
+    const unpark = () => { if (!parked) return; parked = null; tries = 0; lastAct = Date.now(); cbtn.style.display = 'none'; cnote.style.display = 'none'; sbtn.style.display = 'none'; dbtn.style.display = 'block'; setSt('CONNECTING...'); newPeer(); };
+    // Deux boutons : CONNECT PLAYER 1 / CONNECT PLAYER 2 ; en haut à gauche DISCONNECT (pour changer de joueur)
+    let wantP = null;
+    const setPlayer = n => { P = n; who.textContent = 'PLAYER ' + P; who.className = 'p' + P; if (host) try { localStorage.setItem('sfctl', JSON.stringify({ h: host, p: String(P) })); } catch (_) {} };
+    cbtn.querySelectorAll('.cb').forEach(b => {
+      b.addEventListener('pointerdown', e => { b.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
+      b.addEventListener('pointercancel', () => b.classList.remove('on'));
+      b.addEventListener('pointerup', e => {
+        b.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20);
+        wantP = +b.dataset.p; setPlayer(wantP);
+        if (host) unpark(); else openScan();   // jeu connu : connexion directe ; sinon scanner le QR code
+      });
+    });
+    dbtn.addEventListener('pointerdown', e => { dbtn.classList.add('on'); e.stopPropagation(); e.preventDefault(); });
+    dbtn.addEventListener('pointerup', e => { dbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); park('start'); setSt('CHOOSE A PLAYER'); });
     // CONNECT : page ouverte par un scan -> connexion directe ; appli de l'écran d'accueil -> on scanne le QR code du jeu avec la caméra
-    cbtn.addEventListener('pointerup', e => { cbtn.classList.remove('on'); e.stopPropagation(); if (navigator.vibrate) navigator.vibrate(20); if (host) unpark(); else openScan(); });   // CONNECT : se connecte au dernier jeu (scanné ou mémorisé) ; sinon ouvre le scanner
     sbtn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
-    sbtn.addEventListener('pointerup', e => { e.stopPropagation(); openScan(); });   // nouveau jeu / autre PC : scanner le QR code
+    sbtn.addEventListener('pointerup', e => { e.stopPropagation(); wantP = null; openScan(); });   // nouveau jeu / autre PC : scanner le QR code
     const scanBox = document.getElementById('scan'), video = scanBox.querySelector('video'), scanMsg = document.getElementById('scanMsg');
     let stream = null, scanning = false, detector = null;
     const closeScan = () => { scanning = false; scanBox.style.display = 'none'; try { stream && stream.getTracks().forEach(t => t.stop()); } catch (_) {} stream = null; };
@@ -165,7 +184,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
     const gotCode = txt => {
       let u; try { u = new URL(txt, location.href); } catch (_) { return false; }
       const h = u.searchParams.get('h'); if (!h) return false;
-      host = h; P = u.searchParams.get('p') === '2' ? 2 : 1;
+      host = h; P = wantP || (u.searchParams.get('p') === '2' ? 2 : 1); wantP = null;
       try { localStorage.setItem('sfctl', JSON.stringify({ h: host, p: String(P) })); } catch (_) {}
       who.textContent = 'PLAYER ' + P; who.className = 'p' + P;
       if (navigator.vibrate) navigator.vibrate([30, 30, 30]);
@@ -197,7 +216,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
       tick();
     }
     document.getElementById('scanClose').addEventListener('pointerup', e => { e.stopPropagation(); closeScan(); });
-    cbtn.addEventListener('pointercancel', () => cbtn.classList.remove('on'));
     const newPeer = () => {
       try { if (peer) peer.destroy(); } catch (_) {}
       if (parked) return;
