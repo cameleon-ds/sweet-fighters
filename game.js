@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v158';
+const VERSION = 'v159';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3797,13 +3797,13 @@ function stepOptions() {
   }
 }
 function stepPause() {
-  if (edge(pctl, 'start') && !G.showOpts && !G.showMoves && padOn() && !keys.has('start')) { G.paused = false; sfx('beep'); return; }   // bouton MENU de la manette = reprendre
+  if (!G.showOpts && !G.showMoves && (edge(pctl, 'start') || edge(p2ctl, 'start'))) { G.paused = false; sfx('beep'); return; }   // START (manette) / ENTRÉE (clavier) = reprendre le combat directement
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
   const pc = Math.max(0, Math.min(n - 1, G.pcur + m)); if (pc !== G.pcur) { G.pcur = pc; sfx('beep'); }
-  if (backPress(pctl)) { G.paused = false; sfx('beep'); return; }   // ÉCHAP = reprendre
-  if (okPress(pctl)) {   // ENTRÉE (ou A) = valider
+  if (backPress(pctl)) { G.paused = false; sfx('beep'); return; }   // B (ou ÉCHAP) = annuler la pause
+  if (edge(pctl, 's')) {   // A = valider le choix
     sfx('select');
     if (G.pcur === 0) G.paused = false;
     else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
@@ -4600,6 +4600,8 @@ function drawPause() {
     const sel = G.pcur === i;
     text((sel ? '> ' : '') + t + (sel ? ' <' : ''), CX, 80 + i * 20, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.55)', 'center');
   });
+  const kb = !isTouch && !padOn();
+  text(kb ? keyName(KEYS.s) + ': SELECT   ' + keyName(KEYS.start) + ': RESUME' : 'A: SELECT   START: RESUME   B: BACK', CX, 160, 8, 'rgba(255,255,255,.35)', 'center');
 }
 
 const LOGO = new Image();
