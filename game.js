@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v159';
+const VERSION = 'v160';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3961,8 +3961,13 @@ function step() {
   updateMusic();
   G.frame++; G.st = (G.st || 0) + 1;
   netSendState();
-  ctlUpdate(pctl, confuse(readPlayer(), G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
-  ctlUpdate(p2ctl, confuse(readP2(), G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
+  if (loadDone()) netStart();   // manettes smartphone : connexion possible dès le démarrage du jeu
+  const raw1 = readPlayer(), raw2 = readP2();
+  // Menus (écran titre, options, pause, choix du stage, fin de combat) : les deux joueurs connectés peuvent les manipuler
+  const menuShared = G.paused || !['intro', 'fight', 'ko', 'timeup', 'select'].includes(G.scene);
+  if (menuShared) for (const b in raw2) if (raw2[b]) raw1[b] = true;
+  ctlUpdate(pctl, confuse(raw1, G.f && G.f[0] && G.f[0].ctl === pctl ? G.f[0] : null));
+  ctlUpdate(p2ctl, confuse(raw2, G.f && G.f[1] && G.f[1].ctl === p2ctl ? G.f[1] : null));
   if (G.instHelp) { if (G.frame - (G.instOpen || 0) > 10 && (edge(pctl, 's') || edge(pctl, 'back') || edge(pctl, 'start') || edge(pctl, 'p') || edge(pctl, 'k'))) { G.instHelp = false; G.instClosed = G.frame; sfx('beep'); } tap = null; return; }
   if (G.instClosed != null && G.frame - G.instClosed < 3) { tap = null; return; }
 
@@ -4685,6 +4690,7 @@ function drawTitle() {
   if (G.tstate !== 1) {
     if (L > 40 && (G.frame >> 5) % 2 === 0) text('PRESS ANY BUTTON', CX, 176, 8, '#ffffff', 'center');
   } else {
+    drawQRs();   // les manettes smartphone peuvent se connecter dès l'écran titre
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
       text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 162 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
