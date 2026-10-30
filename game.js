@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v150';
+const VERSION = 'v151';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1683,7 +1683,7 @@ function netStart() {
   }, 1000);
 }
 const QR = { 1: null, 2: null };
-function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=150', location.href).href; }
+function controllerURL(p) { return new URL('controller.html?h=' + NET.id + '&p=' + p + '&v=151', location.href).href; }
 function makeQRs() {
   if (typeof qrcode === 'undefined' || !NET.id) return;
   for (const p of [1, 2]) {

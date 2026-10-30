@@ -6,7 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
-<title>Sweet Fighters - Controller</title>
+<title>SF-Controller</title>
+<meta name="apple-mobile-web-app-title" content="SF-Controller">
+<meta name="application-name" content="SF-Controller">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="ctl-icon-180.png">
+<link rel="icon" type="image/png" href="ctl-icon-192.png">
+<link rel="manifest" href="controller-manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;font-family:'Press Start 2P',monospace;color:#fff}
@@ -32,6 +38,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
 .bb{left:calc(var(--b)*.95);top:calc(var(--b)*1.9);border-color:#ff5050}
 #start{position:absolute;left:50%;bottom:calc(calc(var(--h)*.05) + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:3;padding:9px 16px;border-radius:14px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);font-size:9px;color:rgba(255,255,255,.85)}
 #start.on{background:rgba(255,255,255,.3)}
+#inst{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:4;display:none;align-items:center;gap:6px;padding:7px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:7px;color:rgba(255,255,255,.9)}
+#inst svg{width:14px;height:14px}
+#help{position:absolute;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
+#help div{background:#0e0816;border-radius:10px;padding:18px 22px;max-width:80%;text-align:center;font-size:8px;line-height:2;color:#fff}
+#help b{color:#ffd23a;font-weight:normal;display:block;margin-bottom:8px}
+#help svg{width:14px;height:14px;vertical-align:-3px}
 </style>
 </head>
 <body>
@@ -46,12 +58,18 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   <div class="b ba" data-b="s">A<small>SPECIAL</small></div>
 </div></div>
 <div id="start" data-b="start">START</div>
+<div id="inst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3"/></svg>INSTALL</div>
+<div id="help"><div><b>ADD SF-CONTROLLER</b><span id="helpTxt"></span><br><br><span style="opacity:.5">TAP TO CLOSE</span></div></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <script>
 'use strict';
 (() => {
-  const q = new URLSearchParams(location.search), host = q.get('h'), P = q.get('p') === '2' ? 2 : 1;
+  // l'identifiant du jeu est mémorisé : l'appli installée sur l'écran d'accueil se reconnecte seule
+  const q = new URLSearchParams(location.search);
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('sfctl') || '{}'); } catch (e) {}
+  const host = q.get('h') || saved.h || null, P = (q.get('p') || saved.p) === '2' ? 2 : 1;
+  if (host) try { localStorage.setItem('sfctl', JSON.stringify({ h: host, p: String(P) })); } catch (e) {}
   const who = document.getElementById('who'), st = document.getElementById('st');
   who.textContent = 'PLAYER ' + P; who.className = 'p' + P;
   function wake() { try { if (navigator.wakeLock && !wake.lock) navigator.wakeLock.request('screen').then(l => { wake.lock = l; l.addEventListener('release', () => { wake.lock = null; }); }).catch(() => {}); } catch (e) {} }
@@ -126,8 +144,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   addEventListener('resize', layout); addEventListener('orientationchange', () => setTimeout(layout, 100)); layout();
   // Android : plein écran + verrouillage en paysage au premier toucher (ignoré si le navigateur refuse)
   let locked = false;
-  document.addEventListener('pointerup', () => {
-    if (locked) return; locked = true;
+  document.addEventListener('pointerup', e => {
+    if (locked || (e.target.closest && e.target.closest('#inst,#help'))) return; locked = true;
     const d = document.documentElement, fs = d.requestFullscreen || d.webkitRequestFullscreen;
     try { const p = fs && fs.call(d); const lock = () => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} };
       if (p && p.then) p.then(lock).catch(() => {}); else lock(); } catch (e) {}
@@ -169,6 +187,25 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none
   sb.addEventListener('pointerdown', e => { btn.start = true; sb.classList.add('on'); change(); e.preventDefault(); });
   const send0 = () => { btn.start = false; sb.classList.remove('on'); change(); };
   sb.addEventListener('pointerup', send0); sb.addEventListener('pointercancel', send0); sb.addEventListener('pointerleave', send0);
+
+  // Installer la manette sur l'écran d'accueil (SF-Controller)
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  const inst = document.getElementById('inst'), help = document.getElementById('help');
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement;
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let ev = null;
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); ev = e; });
+  addEventListener('appinstalled', () => { inst.style.display = 'none'; });
+  if (!standalone) inst.style.display = 'flex';
+  const SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8H5v13h14V8h-3M12 15V3M8 7l4-4 4 4"/></svg>';
+  inst.addEventListener('pointerup', e => {
+    e.stopPropagation(); locked = true;   // pas de plein écran sur ce toucher
+    if (ev) { ev.prompt(); ev = null; return; }
+    document.getElementById('helpTxt').innerHTML = IOS ? '1. TAP SHARE ' + SHARE + '<br>2. ADD TO HOME SCREEN' : '1. OPEN THE BROWSER MENU<br>2. ADD TO HOME SCREEN';
+    help.style.display = 'flex';
+  });
+  inst.addEventListener('pointerdown', e => e.stopPropagation());
+  help.addEventListener('pointerup', () => { help.style.display = 'none'; });
 
   // garder l'écran allumé
   document.addEventListener('pointerdown', wake);   // l'écran reste allumé (redemandé à chaque retour sur la page)
