@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v187';
+const VERSION = 'v188';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2382,7 +2382,7 @@ function updFighter(f, o) {
     case 'plasmawall':   // bras levé, vu de face : mur électrique du sol jusqu'en haut de l'écran
       f.vx = 0;
       if (f.t < 8) killShots(f, f.x - 30, f.x + 30, f.y - 110, f.y + 6);   // déjà protégé pendant qu'il lève le bras
-      if (f.t === 8) { G.pwalls.push({ owner: f, x: f.x + f.dir * 26, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; G.shake = Math.max(G.shake, 4); G.flashT = Math.max(G.flashT, 4); sfx('parry'); sfx('heavy'); }
+      if (f.t === 8) { G.pwalls.push({ owner: f, x: f.x + f.dir * 42, t: 0, big: f.kcharge > 0 }); if (f.kcharge > 0) f.kcharge = 0; G.shake = Math.max(G.shake, 4); G.flashT = Math.max(G.flashT, 4); sfx('parry'); sfx('heavy'); }
       if (f.t >= 40) setState(f, 'idle');
       break;
     case 'kbarrage':   // 5 coups de poing électriques très rapides en avançant ; si les 5 touchent, le 5e fait tomber
