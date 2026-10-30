@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v183';
+const VERSION = 'v184';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1911,7 +1911,7 @@ function poseOf(f) {
     case 'nyxglide': return 'jump';
     case 'kbarrage': return f.t >= 30 ? 'punch0' : (f.t % 6) < 3 ? 'punch1' : 'fpunch1';
     case 'kspin': return f.t < 2 ? 'jump' : 'tuck';   // roulade en boule, comme Grog (haut + A)
-    case 'nyxspin': return f.t < 2 ? 'jump' : 'jkick';
+    case 'nyxspin': return 'tuck';   // même roulade que son saut avant
     case 'flipk': return f.t < 4 ? 'crouch' : 'jkick';
     case 'nslide': return f.t < 3 || f.t >= 26 ? 'crouch' : 'slide';
     case 'grogroll': return f.t < 3 || f.t >= 39 ? 'crouch' : 'tuckG';
@@ -2429,7 +2429,7 @@ function updFighter(f, o) {
     }
     case 'nyxspin':   // rotation sur elle-même vers l'arrière (coup de pied), puis redescend en sautant vers l'arrière
       f.vx = 0; f.vy = -GRAV;
-      f.rotAng = -f.dir * Math.min(1, f.t / 16) * Math.PI * 2;
+      f.rotAng = f.dir * Math.min(1, f.t / 16) * Math.PI * 2;   // rotation comme son saut en avant
       if (f.t === 8) sfx('whoosh');
       if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; f.roll = -1; f.t = 3; f.vx = -2.4 * f.dir; f.vy = -3.2; sfx('jump'); }
       break;
@@ -3297,6 +3297,12 @@ function drawKaelFx() {
       g.addColorStop(0, 'rgba(168,244,255,.55)'); g.addColorStop(.5, 'rgba(47,140,255,.3)'); g.addColorStop(1, 'rgba(20,60,196,0)');
       ctx.fillStyle = g; ctx.fillRect(cx - 62, cy - 62, 124, 124);
       for (let b = 0; b < 4; b++) { const a0 = Math.random() * 6.28, L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx + Math.cos(a0 + s2 * .5) * (14 + s2 * 6), cy + Math.sin(a0 + s2 * .5) * (18 + s2 * 6)]); elecArc(L, b % 2 ? 'rgba(168,244,255,.9)' : 'rgba(47,180,255,.9)', 1.3); }
+    }
+    if (f.state === 'nyxspin') {   // Nyx : même glow et mêmes éclairs que Grog (haut + A), en rose
+      const cx = f.x, cy = f.y - 40, g = ctx.createRadialGradient(cx, cy, 3, cx, cy, 60);
+      g.addColorStop(0, 'rgba(255,190,240,.55)'); g.addColorStop(.5, 'rgba(240,70,180,.3)'); g.addColorStop(1, 'rgba(160,20,140,0)');
+      ctx.fillStyle = g; ctx.fillRect(cx - 62, cy - 62, 124, 124);
+      for (let b = 0; b < 4; b++) { const a0 = Math.random() * 6.28, L = []; for (let s2 = 0; s2 <= 4; s2++) L.push([cx + Math.cos(a0 + s2 * .5) * (14 + s2 * 6), cy + Math.sin(a0 + s2 * .5) * (18 + s2 * 6)]); elecArc(L, b % 2 ? 'rgba(255,200,245,.9)' : 'rgba(255,80,200,.9)', 1.3); }
     }
     if (f.state === 'kbarrage' && f.t < 30 && f.handW) {   // rafale : éclairs devant le poing
       const [hx2, hy2] = f.handW;
