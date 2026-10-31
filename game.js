@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v194';
+const VERSION = 'v195';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2070,7 +2070,7 @@ function updFighter(f, o) {
         if (h.d) { setState(f, f.def.kit === 'grog' ? 'grogroll' : 'nslide'); f.vx = 0; sfx('whoosh'); break; }   // bas + A : glissade au sol (Grog : roulades)
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
-          if (back) { setState(f, 'shadow'); f.invuln = 14; G.mines = G.mines.filter(m => m.owner !== f); G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }
+          if (back) { setState(f, 'shadow'); f.invuln = 14; { const mine = G.mines.filter(m => m.owner === f && !m.dead); if (mine.length >= 3) G.mines = G.mines.filter(m => m !== mine[0]); } G.mines.push({ owner: f, x: f.x, t: 0 }); sfx('tele'); break; }   // jusqu'à 3 mines au sol
           // Clone énergétique : 3 tirs d'affilée, puis 1 seconde d'attente
           if (shotOK(f)) { shotUse(f); setState(f, 'holo'); f.vx = 0; }
           break;
