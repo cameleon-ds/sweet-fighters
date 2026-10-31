@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v206';
+const VERSION = 'v207';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1854,8 +1854,8 @@ const ATK = {
   tornado:  { act: [3, 26], box: [-24, -104, 30, -8], dmg: 13, knock: true, lift: 7.5, bstun: 16, push: 1.5, sfx: 'heavy' },
   gust:     { dur: 26, act: [7, 12], box: [10, -70, 46, -30], dmg: 6, stun: 14, bstun: 10, push: 1.6, sfx: 'hit' },
   gpound:   { act: [7, 99], box: [-18, -40, 18, 4], high: true, dmg: 15, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
-  vtripP:   { act: [1, 24], box: [14, -76, 46, -56], dmg: 4, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de poing très rapides (Y maintenu puis lâché)
-  vtripK:   { act: [1, 24], box: [18, -68, 60, -44], dmg: 5, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de pied très rapides (B maintenu puis lâché)
+  vtripP:   { act: [1, 40], box: [14, -76, 46, -56], dmg: 4, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de poing très rapides (Y maintenu puis lâché)
+  vtripK:   { act: [1, 40], box: [18, -68, 60, -44], dmg: 5, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de pied très rapides (B maintenu puis lâché)
   vdive:    { act: [2, 80], box: [8, -30, 40, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },   // Vane : coup de pied en diagonale vers le bas (saut + bas + A)
   hslide:   { act: [15, 60], box: [2, -100, 32, -30], dmg: 8, stun: 18, bstun: 10, push: 1.6, sfx: 'hit' },   // Hiro : glissade basse puis mini shoryuken (ne fait pas tomber)
   fjump:    { act: [5, 60], box: [8, -66, 48, -34], dmg: 11, stun: 34, bstun: 12, push: 1.4, sfx: 'heavy' },   // Axel : saut loin vers l'avant, poing en feu
@@ -1932,8 +1932,8 @@ function poseOf(f) {
     case 'grogroll': return f.t < 3 || f.t >= 39 ? 'crouch' : 'tuckG';
     case 'aflip': return 'jkick';
     case 'fjump': return f.t < 4 ? 'sho0' : 'fjump';
-    case 'vtripP': return f.t >= 24 ? 'punch0' : (f.t % 8) < 4 ? 'punch1' : 'punch0';
-    case 'vtripK': return f.t >= 24 ? 'kick0' : (f.t % 8) < 4 ? 'kick1' : 'kick0';
+    case 'vtripP': return f.t >= 40 ? 'punch0' : (f.t % 8) < 2 ? 'punch0' : ((f.t >> 3) & 1) ? 'fpunch1' : 'punch1';   // poing gauche / droit en alternance
+    case 'vtripK': return f.t >= 40 ? 'kick0' : (f.t % 8) < 2 ? 'kick0' : ((f.t >> 3) & 1) ? 'fkick1' : 'kick1';    // pied gauche / droit en alternance
     case 'vdive': return 'dive';
     case 'hslide': return f.t < 3 ? 'crouch' : f.t < 15 ? 'sho0' : 'rup2';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
@@ -2444,10 +2444,10 @@ function updFighter(f, o) {
       reflectNear(f, 48, f.y - 54, 44); if (f.t % 7 === 1) sfx('whoosh');
       break;
     }
-    case 'vtripP': case 'vtripK':   // Vane : 3 coups très rapides, le 3e fait tomber
-      f.vx = 0;
-      if (f.t < 24 && f.t % 8 === 0) { f.hasHit = false; sfx('whoosh'); }
-      if (f.t >= 30) setState(f, 'idle');
+    case 'vtripP': case 'vtripK':   // Vane : 5 coups très rapides en avançant, le 5e fait tomber
+      f.vx = f.t < 40 ? 1.8 * f.dir : 0;
+      if (f.t < 40 && f.t % 8 === 0) { f.hasHit = false; sfx('whoosh'); }
+      if (f.t >= 46) setState(f, 'idle');
       break;
     case 'vdive':   // Vane : coup de pied plongeant en diagonale, casse les boules de feu (pas les grosses)
       if (f.t < 2) { f.vx *= .5; f.vy = Math.min(f.vy, 0) * .5; break; }
@@ -3982,7 +3982,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     if (finisher) { att.run = 0; att.restT = 0; }
     else if (att.run >= 3) { att.restT = 30; att.run = 0; }
   }
-  if ((att.state === 'vtripP' || att.state === 'vtripK') && !projectile) { att.vtN = (att.vtN || 0) + 1; if (att.vtN >= 3) data = Object.assign({}, data, { knock: true, dmg: 8 }); }   // 3e coup : chute
+  if ((att.state === 'vtripP' || att.state === 'vtripK') && !projectile) { att.vtN = (att.vtN || 0) + 1; if (att.vtN >= 5) data = Object.assign({}, data, { knock: true, dmg: 8 }); }   // 3e coup : chute
   if (att.state === 'fjump' && !projectile) { att.fjHitT = G.frame; def.burn = Math.max(def.burn || 0, 40); def.burnPal = att.def.fb; }   // saut-poing : ne fait pas tomber, haut + A enchaîne le shoryuken
   if (att.state === 'kbarrage' && !projectile) {   // 5e poing de la rafale : fait tomber
     att.barN = (att.barN || 0) + 1;
@@ -4224,7 +4224,7 @@ const TUT_SP = {
   hiro: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'LOW SLIDE + MINI UPPER', st_('hslide')], ['UP + A AGAIN', 'SHORYUKEN', st_('uppercut')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
   axel: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'FIRE LEAP', st_('fjump')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
   vesper: [['A', 'HOLO FLASH', st_('holo')], ['BACK + A', 'SHADOW STEP', st_('shadow')], ['UP + A', 'ZENITH BLADE', st_('zenith')], ['JUMP, THEN A', 'NEON DIVE', st_('dive')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
-  vane: [['A', 'VOID FLARE', st_('voidcast')], ['BACK + A', 'PHANTOM TELEPORT', st_('pteleport')], ['UP + A', 'METEOR IMPACT', st_('meteor')], ['JUMP, THEN A', 'VOID BOMB', st_('airvoid')], ['JUMP, THEN DOWN + A', 'DIVE KICK', st_('vdive')], ['HOLD Y, THEN RELEASE', '3 FAST PUNCHES', st_('vtripP')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
+  vane: [['A', 'VOID FLARE', st_('voidcast')], ['BACK + A', 'PHANTOM TELEPORT', st_('pteleport')], ['UP + A', 'METEOR IMPACT', st_('meteor')], ['JUMP, THEN A', 'VOID BOMB', st_('airvoid')], ['JUMP, THEN DOWN + A', 'DIVE KICK', st_('vdive')], ['HOLD Y, THEN RELEASE', '5 FAST PUNCHES', st_('vtripP')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
   kael: [['A', 'SONIC WAVE', st_('sonic')], ['BACK + A', 'FLASH STEP', st_('flashstep')], ['THEN Y', 'THUNDER RUSH', st_('kbarrage')], ['UP + A', 'PLASMA WALL', st_('plasmawall')], ['JUMP, THEN A', 'VOLT SPIN', st_('kspin')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
   nyx: [['A', 'MAGMA FLASK', st_('flask')], ['BACK + A', 'TOXIC MIST', st_('smokeback')], ['BACK + A AGAIN', 'SMOKE TELEPORT', st_('nyxtele')], ['UP + A', 'ALCHEMIC GEYSER', st_('geyser')], ['DOWN + A', 'SHADOW SLIDE', st_('nslide')], ['JUMP, THEN A', 'WITCH GLIDE', st_('nyxglide')], ['WHILE GLIDING, A', 'SPIN TO THE GROUND', st_('nyxspin')]],
   zephyr: [['A', 'GALE BLADE', st_('gust')], ['FWD + Y', 'HEAVEN CUT', st_('wallslash')], ['BACK + A', 'STORM PASSAGE', st_('sink')], ['UP + A', 'RISING TORNADO', st_('tornado')], ['JUMP, THEN A', 'SKY PLUNGE', f => f.state === 'hover' || f.state === 'plunge'], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
@@ -4252,7 +4252,7 @@ function tutStep() {   // appelé à chaque image du combat
     if (T.step === 0 && a.state === 'throw') { tutNext(); }   // contre (X) puis contre-attaque (Y / B)
     else if (T.step === 1 && T.clashSeen && !G.clash) { tutNext(); T.next = 4; }   // bras de fer terminé
   } else if (T.phase === 4 && !T.started) {   // combat libre : on repart d'un vrai round
-    T.started = true; T.showFight = 200; startRound();
+    T.started = true; T.showFight = 200; OPT.diff = 1; saveOpt(); startRound();   // difficulté remise sur NORMAL
   }
 }
 function tutAI(f, o) {   // le double : immobile, puis il attaque (phase 3), puis il contre (phase 3, étape 2)
@@ -5173,7 +5173,7 @@ const MOVES = [
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'LORD VANE SPECIALS', lines: [
     ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
-    ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'], ['AIR + DOWN + A', 'DIVE KICK, BREAKS SMALL SHOTS'], ['HOLD Y, RELEASE', '3 FAST PUNCHES, 3RD KNOCKS DOWN'], ['HOLD B, RELEASE', '3 FAST KICKS, 3RD KNOCKS DOWN'] ] },
+    ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'], ['AIR + DOWN + A', 'DIVE KICK, BREAKS SMALL SHOTS'], ['HOLD Y, RELEASE', '5 FAST PUNCHES, 5TH KNOCKS DOWN'], ['HOLD B, RELEASE', '5 FAST KICKS, 5TH KNOCKS DOWN'] ] },
   { title: 'KAEL SPECIALS', lines: [
     ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, CHARGES THE FISTS'], ['CHARGED > Y', 'THUNDER RUSH'], ['', '5 FAST PUNCHES, 5TH KNOCKS DOWN'],
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'], ['JUMP + A', 'VOLT SPIN'], ['', '360 SPIN KICK, REFLECTS SHOTS'] ] },
@@ -5403,6 +5403,12 @@ function drawSelect() {
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
   const BS = 74, y0 = 20;
   const e1 = ent(0), e2 = ent(1), ev = ent(3, 3, 8);   // les deux grands portraits glissent depuis les bords, puis le VS frappe
+  if (G.mode === 'tutorial') {   // TUTORIAL : seulement le portrait du joueur, au centre, sans VS
+    ctx.save(); ctx.globalAlpha = e1;
+    drawPortrait(p1, CX - BS / 2, y0, BS, '#5ac8ff', 1);
+    text(p1 == null ? '???' : DEFS[p1].name, CX, y0 + BS + 4, 8, '#ffffff', 'center');
+    ctx.restore();
+  } else {
   ctx.save(); ctx.globalAlpha = e1; ctx.translate(-(1 - e1) * 120, 0);
   drawPortrait(p1, CX - 22 - BS, y0, BS, '#5ac8ff', 1);
   text('1P', CX - 22 - BS, y0 + BS + 4, 8, '#5ac8ff', 'left');
@@ -5413,6 +5419,7 @@ function drawSelect() {
   text(p2 == null ? '???' : DEFS[p2].name + (p2 === G.p1 ? ' 2P' : ''), CX + 22, y0 + BS + 4, 8, '#ffffff', 'left');
   ctx.restore();
   if (ev > 0) { const sc = 1 + (1 - ev) * 2.5; ctx.save(); ctx.globalAlpha = ev; ctx.translate(CX, y0 + BS / 2); ctx.scale(sc, sc); ctx.translate(-CX, -(y0 + BS / 2)); text('VS', CX, y0 + BS / 2 - 8, 16, '#ff4a2a', 'center'); ctx.restore(); }
+  }
   // grille 4 x 2 : tous regardent à droite
   const S = 34, gap = 4, gx = CX - (4 * S + 3 * gap) / 2, gy = 120;
   for (let i = 0; i < 8; i++) {
