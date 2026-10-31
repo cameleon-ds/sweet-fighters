@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v215';
+const VERSION = 'v216';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2866,7 +2866,7 @@ function updProps() {
         if (canX && (o.ctl.buf.x > 0 || (o.state === 'parry' && o.t <= 12)) && d < 60) {
           take(o.ctl, 'x'); setState(o, 'parry'); o.vx = 0;
           G.darkT = 14; G.flashT = 12; G.boltX = p.x; G.boltY = p.y; G.slowAll = 30; G.shake = 3;
-          addPopup(o.x, o.y - 100, 'REFLECT!', '#7af0ff'); sfx('counter');   // objet du décor contré
+          addPopup(o.x, o.y - 100, 'REFLECT!', '#7af0ff'); sfx('counter'); if (G.tut && o === G.f[0]) G.tut.refl = true;   // objet du décor contré
           const back = F.owner; aimProp(p, o, back); p.fly.deflected = false; p.fly.lastBy = o;
           continue;
         }
@@ -4264,7 +4264,7 @@ function tutStep() {   // appelé à chaque image du combat
   const T = G.tut; if (!T || !G.fighting) return;
   const [a, b] = G.f; T.t++;
   if (T.ok > 0) {
-    T.ok--; if (T.ok === 0 && T.next) { T.phase = T.next; T.step = 0; T.next = 0; a.lastFin = null; }
+    T.ok--; if (T.ok === 0 && T.next) { T.phase = T.next; T.step = 0; T.next = 0; a.lastFin = null; if (T.phase === 6) G.props = makeProps(); }
     if (T.phase === 2 && !T.next) { const it = tutSpecials(a.def)[T.step]; if (it && it[2](a)) { tutNext(); if (T.step >= tutSpecials(a.def).length) T.next = 5; } }   // enchaînement rapide (haut + A à nouveau...) : compté même pendant « GOOD! »
     return;
   }
@@ -4279,7 +4279,11 @@ function tutStep() {   // appelé à chaque image du combat
     if (it && a.lastFin === it[0]) { a.lastFin = null; tutNext(); if (T.step >= TUT_COMBO.length) T.next = 3; }
   } else if (T.phase === 3) {
     if (T.step === 0 && a.state === 'throw') { tutNext(); }   // contre (X) puis contre-attaque (Y / B)
-    else if (T.step === 1 && T.clashSeen && !G.clash) { tutNext(); T.next = 4; }   // bras de fer terminé
+    else if (T.step === 1 && T.clashSeen && !G.clash) { tutNext(); T.next = 6; }   // bras de fer terminé
+  } else if (T.phase === 6) {   // les objets du décor : les lancer, puis renvoyer celui de l'adversaire
+    if (!(G.props || []).some(q => q.alive)) G.props = makeProps();
+    if (T.step === 0 && (a.state === 'pthrow' || (G.props || []).some(q => q.fly && q.fly.owner === a))) { tutNext(); T.refl = false; }
+    else if (T.step === 1 && T.refl) { tutNext(); T.next = 4; }
   } else if (T.phase === 4 && !T.started) {   // combat libre : on repart d'un vrai round
     T.started = true; T.showFight = 200; OPT.diff = 1; saveOpt(); startRound();   // difficulté remise sur NORMAL
   }
@@ -4289,7 +4293,12 @@ function tutAI(f, o) {   // le double : immobile, puis il attaque (phase 3), pui
   if (a.press) { held[a.press] = true; if (--a.pressFrames <= 0) a.press = null; }
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l';
   if (G.fighting && (T.phase === 2 || T.phase === 5) && dist > 150 && NEUTRAL.includes(f.state)) held[fwd] = true;   // reste à portée pour les coups spéciaux
-  if (!G.fighting || T.phase < 3 || T.phase === 5 || T.ok > 0) return held;
+  if (G.fighting && T.phase === 6 && T.step === 1 && !T.ok && NEUTRAL.includes(f.state)) {   // va chercher un objet et le lance sur le joueur
+    const pr = (G.props || []).filter(q => q.alive && !q.held && !q.fly).sort((p1, p2) => Math.abs(p1.x - f.x) - Math.abs(p2.x - f.x))[0];
+    if (pr) { if (Math.abs(pr.x - f.x) < 20) { if (--a.cd <= 0) { a.cd = 40; press(a, 'x'); } } else held[pr.x > f.x ? 'r' : 'l'] = true; }
+    return held;
+  }
+  if (!G.fighting || T.phase < 3 || T.phase === 5 || T.phase === 6 || T.ok > 0) return held;
   if (!NEUTRAL.includes(f.state)) return held;
   if (T.step === 0) {   // s'approche et donne des coups de poing : au joueur de contrer
     if (dist > 50) held[fwd] = true;
@@ -4301,10 +4310,12 @@ function drawTut() {
   const T = G.tut; if (!T) return;
   let L1 = '', L2 = '', head = '';
   if (T.phase === 4) { if (!(T.showFight > 0)) return; T.showFight--; head = 'TUTORIAL COMPLETE'; L1 = 'NOW YOU KNOW ALL THE BASICS. FIGHT!'; L2 = 'PAUSE: CHANGE THE DIFFICULTY IN OPTIONS'; }
-  else if (T.ok > 0) { head = 'GOOD!'; L1 = T.next === 2 ? 'NEXT: SPECIAL MOVES' : T.next === 5 ? 'NEXT: COMBOS' : T.next === 3 ? 'NEXT: THE COUNTER' : T.next === 4 ? 'WELL DONE!' : ''; }
+  else if (T.ok > 0) { head = 'GOOD!'; L1 = T.next === 2 ? 'NEXT: SPECIAL MOVES' : T.next === 5 ? 'NEXT: COMBOS' : T.next === 3 ? 'NEXT: THE COUNTER' : T.next === 6 ? 'NEXT: OBJECTS' : T.next === 4 ? 'WELL DONE!' : ''; }
   else if (T.phase === 1) { head = 'STEP 1: THE BUTTONS'; L1 = tutLab(TUT_BTN[T.step][1]); }
   else if (T.phase === 2) { const it = tutSpecials(G.f[0].def)[T.step]; head = 'STEP 2: SPECIAL MOVES'; L1 = it ? tutLab(it[0]) + ': ' + it[1] : ''; }
   else if (T.phase === 5) { const it = TUT_COMBO[T.step]; head = 'STEP 3: COMBOS'; L1 = it ? tutLab('PRESS ' + it[1] + ' QUICKLY') : ''; L2 = 'THE 4TH HIT DASHES FORWARD IN FIRE!'; }
+  else if (T.phase === 6 && T.step === 0) { head = 'STEP 5: OBJECTS'; L1 = tutLab('WALK TO AN OBJECT AND PRESS X'); L2 = 'TO THROW IT AT THE FOE!'; }
+  else if (T.phase === 6) { head = 'STEP 5: OBJECTS'; L1 = 'THE FOE THROWS AN OBJECT AT YOU:'; L2 = tutLab('PRESS X AS IT ARRIVES TO SEND IT BACK!'); }
   else if (T.phase === 3 && T.step === 0) { head = 'STEP 4: THE COUNTER'; L1 = tutLab('WHEN THE FOE ATTACKS, PRESS X TO COUNTER'); L2 = tutLab('THEN PRESS Y OR B TO STRIKE BACK'); }
   else if (T.phase === 3) { head = 'STEP 4: THE COUNTER'; L1 = 'HIT THE FOE: HE WILL COUNTER YOU.'; L2 = tutLab('COUNTER HIM BACK FAST WITH X!'); }
   if (T.clashWait) { head = 'CLASH!'; L1 = 'MASH ANY BUTTON AS FAST AS YOU CAN!'; L2 = (G.frame >> 4) % 2 ? 'PRESS A BUTTON TO START' : ''; }
