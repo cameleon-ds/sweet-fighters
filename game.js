@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v200';
+const VERSION = 'v201';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2302,7 +2302,7 @@ function updFighter(f, o) {
       if (f.dizzy) {
         // marteler les boutons pour sortir plus vite de l'étourdissement
         let n = 0;
-        if (f.cpu) { if (Math.random() < [.05, .12, .22][Math.min(2, OPT.diff)]) n = 1; }
+        if (f.cpu) { if (Math.random() < [.04, .12, .22, .35][DL()]) n = 1; }
         else for (const b of [...BTNS, 'l', 'r', 'u', 'd']) if (edge(c, b)) n++;
         if (n) { f.t += 9 * n; f.mash += n; f.mashShow = 40; }
         if (f.mashShow > 0) f.mashShow--;
@@ -2810,7 +2810,7 @@ function updProps() {
       // renvoi : X au bon moment quand l'objet arrive
       if (d < 70 && !F.deflected) {
         const canX = NEUTRAL.includes(o.state) || o.state === 'parry';
-        if (o.cpu && !F.aiTried && d < 55) { F.aiTried = true; if (Math.random() < [.1, .25, .45][Math.min(2, OPT.diff)]) o.ctl.buf.x = 8; }
+        if (o.cpu && !F.aiTried && d < 55) { F.aiTried = true; if (Math.random() < [.05, .25, .45, .85][DL()]) o.ctl.buf.x = 8; }
         if (canX && (o.ctl.buf.x > 0 || (o.state === 'parry' && o.t <= 12)) && d < 60) {
           take(o.ctl, 'x'); setState(o, 'parry'); o.vx = 0;
           G.darkT = 14; G.flashT = 12; G.boltX = p.x; G.boltY = p.y; G.slowAll = 30; G.shake = 3;
@@ -3883,7 +3883,7 @@ function stepClash() {
   const C = G.clash; C.t++; G.darkT = 50;
   C.f.forEach((f, i) => {
     f.t = Math.min(f.t, 8);   // reste figé en garde, au ralenti
-    if (f.cpu) { if (Math.random() < [.075, .11, .155][Math.min(2, OPT.diff)]) C.g[i] += 6; }
+    if (f.cpu) { if (Math.random() < [.06, .11, .155, .22][DL()]) C.g[i] += 6; }
     else for (const b of BTNS) if (edge(f.ctl, b)) { C.g[i] += 6; break; }
   });
   if (G.flashT > 0) G.flashT--;
@@ -3993,9 +3993,77 @@ function addSpark(x, y, type, pal) { G.sparks.push({ x, y, t: 0, type, pal }); }
 /* ---------------- IA du CPU ---------------- */
 function press(a, b, up) { a.press = b; a.pressU = !!up; a.pressFrames = 2; }
 function lowAttack(a, b) { a.hold = { d: true }; a.holdT = 10; press(a, b); }
+// ---- CPU EXTRÊME ----
+function incomingShot(f, o) {   // projectile adverse qui arrive sur f
+  const L = [...(G.fbs || []).filter(q => q.alive), ...(G.sonics || []), ...(G.blades || []), ...(G.voids || []).filter(q => !q.charging), ...(G.flasks || []), ...(G.holos || [])];
+  let best = null;
+  for (const q of L) { if (q.dead || q.owner === f) continue; const v = q.vx != null ? q.vx : q.dir || 0, d = f.x - q.x; if (Math.sign(v) !== Math.sign(d) || Math.abs(d) > 150) continue; if (!best || Math.abs(d) < Math.abs(f.x - best.x)) best = q; }
+  return best;
+}
+function xBrain(f, o, a, dist, fwd, back, neutral) {
+  const kit = f.def.kit, sp = (hold, up) => { a.hold = hold || {}; a.holdT = 4; press(a, 's', up); };
+  if (G.fighting && !a.xStart) { a.xStart = true; a.cd = 0; a.hold = { [fwd]: true }; a.holdT = 12; }   // FIGHT : part tout de suite à l'attaque
+  // en l'air : spécial aérien dès que c'est utile
+  if (f.state === 'jump' && !f.airAtk && !a.press && dist < 140 && f.vy > -4 && Math.random() < .35) { press(a, 's'); return true; }
+  if (f.state === 'nyxglide' && !a.press && dist < 70) { press(a, 's'); return true; }
+  if (f.state === 'nyxglide') { a.hold = { [fwd]: true }; a.holdT = 2; }
+  // enchaînements : file de touches (YYBB...)
+  if (a.seq && a.seq.length && !a.press && (neutral || (['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && f.t > 4))) { press(a, a.seq.shift()); return true; }
+  if (!neutral || a.press) return false;
+  // contre réussi : prise
+  if (f.counterT > 0 && o.slowT > 0 && dist < 80) { press(a, Math.random() < .5 ? 'p' : 'k'); return true; }
+  // projectile qui arrive : la bonne parade selon le personnage
+  const q = incomingShot(f, o);
+  if (q) {
+    const d = Math.abs(f.x - q.x);
+    if (kit === 'kael' && d < 120 && G.frame >= (f.kCd || 0)) { sp({}, true); return true; }                 // mur de plasma : annule tout
+    if (kit === 'grog' && f.rampT > 0 && d < 70 && !q.big) { press(a, 's'); return true; }                 // dôme : renvoie
+    if (kit === 'nyx' && d < 110 && d > 40) { sp({ d: true }); return true; }                              // glissade dessous
+    if (f.def.twinFb && d < 110 && d > 40) { sp({}, true); return true; }                                   // Hiro : glissade basse
+    if (kit === 'zephyr' && d < 100) { sp({ [back]: true }); return true; }                                // passe sous terre
+    if (kit === 'vane' && d < 110) { sp({ [back]: true }); return true; }                                  // téléportation
+    if (d < 34) { press(a, 'x'); return true; }                                                             // contre au dernier moment
+    if (d < 90 && Math.random() < .5) { a.hold = { u: true, [fwd]: true }; a.holdT = 6; return true; }     // saute par-dessus
+    return true;   // attend le bon moment
+  }
+  // l'adversaire prépare un coup : contre (X) juste avant l'impact, garde basse contre les coups bas
+  const at = ATK[o.state];
+  if (at && !o.hasHit && dist < 100 && o.t <= at.act[0] + 1) {
+    if (at.low) { a.hold = { [back]: true, d: true }; a.holdT = 18; return true; }
+    if (Math.random() < .8) { press(a, 'x'); return true; }
+    a.hold = { [back]: true }; a.holdT = 16; return true;
+  }
+  // adversaire en l'air qui arrive : anti-aérien (haut + A)
+  if (o.air && dist < 100 && o.vy > -3.5) { sp({}, true); return true; }
+  if (--a.cd > 0) return true;
+  a.cd = 6 + (Math.random() * 8 | 0);
+  const r = Math.random();
+  if (dist > 150) {
+    if (r < .45 && shotOK(f)) press(a, 's');                                            // tir
+    else if (r < .65) { a.hold = { u: true, [fwd]: true }; a.holdT = 6; }              // saut vers l'adversaire (spécial aérien ensuite)
+    else if (kit === 'nyx' && G.smokes.some(c => c.owner === f)) sp({ [back]: true }); // téléportation
+    else { a.hold = { [fwd]: true }; a.holdT = 18; }
+  } else if (dist > 70) {
+    if (r < .22 && shotOK(f)) press(a, 's');
+    else if (r < .38) sp({ d: true });                                                   // glissade / roulades
+    else if (r < .52) sp({}, true);                                                      // haut + A
+    else if (r < .64) sp({ [back]: true });                                              // arrière + A (spécial du personnage)
+    else if (r < .78) { a.hold = { u: true, [fwd]: true }; a.holdT = 6; }
+    else { a.hold = { [fwd]: true }; a.holdT = 10; }
+  } else {
+    if (r < .4) a.seq = (Math.random() < .5 ? ['p', 'p', 'k', 'k'] : Math.random() < .5 ? ['k', 'k', 'p', 'p'] : ['p', 'p', 'k', 's']);   // enchaînement à 4 coups
+    else if (r < .52) { a.hold = { d: true }; a.holdT = 6; press(a, 'k'); }
+    else if (r < .64) sp({}, true);
+    else if (r < .74) sp({ [back]: true });
+    else if (r < .84) sp({ d: true });
+    else if (dist < 36 && !o.air) press(a, 'x');                                          // prise
+    else press(a, 'p');
+  }
+  return true;
+}
 function aiInput(f, o) {
   if (OPT.diff === 3) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
-  const dk = [.45, 1, 1.7][OPT.diff], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
+  const dk = [.3, 1, 1.7, 3][DL()], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l', back = dx > 0 ? 'l' : 'r';
   if (a.holdT > 0) { a.holdT--; Object.assign(held, a.hold); }
@@ -4005,9 +4073,10 @@ function aiInput(f, o) {
   }
   if (!G.fighting) return held;
   // contré : tente de contrer le contre (X) selon la difficulté
-  if (f.slowT > 38 && o.counterT > 0) { if (!a.clashTried) { a.clashTried = true; if (Math.random() < [.15, .35, .6][Math.min(2, OPT.diff)]) press(a, 'x'); } }
+  if (f.slowT > 38 && o.counterT > 0) { if (!a.clashTried) { a.clashTried = true; if (Math.random() < [.08, .35, .6, .9][DL()]) press(a, 'x'); } }
   else if (!f.slowT) a.clashTried = false;
   const neutral = NEUTRAL.includes(f.state);
+  if (OPT.diff === 4 && xBrain(f, o, a, dist, fwd, back, neutral)) return held;   // EXTRÊME : agressif, utilise tous les spéciaux, connaît les parades
   if (f.state === 'jump' && !f.airAtk && !a.press) {
     if (dist < 120 && f.vy > -3 && rnd() < .06) press(a, 's');
     else if (dist < 70 && rnd() < .12) press(a, 'k');
@@ -4034,7 +4103,7 @@ function aiInput(f, o) {
   if (neutral && o.state === 'tatsu' && dist < 110 && rnd() < .08) { a.hold = { [back]: true }; a.holdT = 30; }
 
   if (--a.cd <= 0 && neutral && !a.press) {
-    a.cd = (10 + (Math.random() * 20 | 0)) * [1.6, 1, .6][Math.min(2, OPT.diff)];
+    a.cd = (10 + (Math.random() * 20 | 0)) * [2.3, 1, .6, .3][DL()];
     const r = Math.random();
     if (dist > 150) {
       if (r < .35 && shotOK(f)) press(a, 's');
@@ -4089,7 +4158,7 @@ function startRound() {
   const [a, b] = G.f;
   [[a, SW / 2 - 80, 1], [b, SW / 2 + 80, -1]].forEach(([f, x, d]) => {
     G.clash = null;
-    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, nyxBurnT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [], rampT: 0 });
+    Object.assign(f, { dizzy: false, dizzyEnd: -9999, x, y: GROUND, vx: 0, vy: 0, dir: d, hp: 100, lag: 100, air: false, ko: false, fb: null, invuln: 0, flash: 0, counterT: 0, jumpQ: 0, slowT: 0, burn: 0, combo: '', run: 0, restT: 0, confT: 0, nyxBurnT: 0, sinkK: 0, kcharge: 0, ghosts: [], fadeK: 0, paraT: 0, echo: [], rampT: 0, ai: { cd: 30, hold: {}, holdT: 0, press: null, pressU: false, pressFrames: 0, reacted: false } });   // le CPU repart de zéro à chaque round
     setState(f, 'idle');
     f.ai.holdT = 0; f.ai.press = null; f.ai.cd = 40;
   });
@@ -4107,12 +4176,14 @@ function endRound(winner) {
 
 /* ---------------- Boucle principale ---------------- */
 // ---------- Options (enregistrées dans le navigateur) ----------
+const DL = () => OPT.diff === 4 ? 3 : Math.min(2, OPT.diff);   // niveau du CPU : 0 facile, 1 normal, 2 difficile, 3 extrême
 const OPT = { zoom: true, energy: 1, diff: 1, blood: true, music: 3, sfx: 4 };   // musique 75 %, bruitages 100 %
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('sf2opt2') || '{}')); } catch (e) {}
 if (OPT.full == null) OPT.full = isTouch;   // plein écran par défaut sur mobile   // nouvelle clé : zoom et sang activés par défaut
 const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT)); } catch (e) {} };
 // Énergie des combattants : 1 étoile = dégâts normaux, 2 et 3 étoiles = plus résistants
-const DIFFS = ['EASY', 'NORMAL', 'HARD', 'TRAINING'];
+const DIFFS = ['EASY', 'NORMAL', 'HARD', 'TRAINING', 'EXTREME'];
+const DIFF_ORDER = [0, 1, 2, 4, 3];   // EASY > NORMAL > HARD > EXTREME > TRAINING
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
 const TITLE_ITEMS = ['ARCADE MODE', 'V.S. BATTLE', 'VIEW COMMANDS', 'OPTIONS'];
 /* ---------------- ARCADE MODE ---------------- */
@@ -4249,7 +4320,7 @@ function stepOptions() {
   }
   if (L === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
   if (L === 2 && (l || r || ok)) {
-    OPT.diff = l ? (OPT.diff + 3) % 4 : (OPT.diff + 1) % 4;   // en boucle : TRAINING avant EASY et après HARD
+    { const k = DIFF_ORDER.indexOf(OPT.diff), n = DIFF_ORDER.length; OPT.diff = DIFF_ORDER[(k + (l ? n - 1 : 1)) % n]; }   // en boucle : EASY, NORMAL, HARD, EXTREME, TRAINING
     saveOpt(); sfx('select');
   }
   if (L === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
