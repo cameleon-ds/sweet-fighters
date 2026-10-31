@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v197';
+const VERSION = 'v198';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2012,7 +2012,7 @@ function killShots(g, x0, x1, y0, y1) {
 // états où le combattant n'est pas en train de faire un coup spécial
 const CALM_ST = ['idle', 'walk', 'block', 'crouch', 'cblock', 'punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'rupper', 'jpunch', 'jkick', 'jump', 'land', 'hit', 'fall', 'down', 'getup', 'held', 'throw', 'parry', 'stunned', 'win'];
 const NORMAL_ATK = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'rupper', 'jpunch', 'jkick'];
-const underShot = o => (o.state === 'hslide' && o.t >= 2 && o.t < 15) || (o.state === 'nslide' && o.t >= 2 && o.t < 26) || (o.state === 'grogroll' && o.t >= 3 && o.t < 39);
+const underShot = o => (o.state === 'hslide' && o.t >= 2 && o.t < 15) || (o.def.twinFb && o.state === 'uppercut') || (o.state === 'nslide' && o.t >= 2 && o.t < 26) || (o.state === 'grogroll' && o.t >= 3 && o.t < 39);
 // Kael (coup de pied rotatif) : renvoie boules de feu, clones, fioles et objets du décor lancés sur lui
 function reflectNear(g, R, yc, yr) {
   const mir = (q, vk, qy) => {
@@ -2423,6 +2423,7 @@ function updFighter(f, o) {
       if (f.t < 15) f.vx = 6 * f.dir;
       if (f.t === 15) { f.air = true; f.vy = -3.4; f.vx = 1.4 * f.dir; f.y -= 1; sfx('upper'); }
       if (h.u && take(c, 's')) f.upQ = true;   // haut + A à nouveau : shoryuken à l'atterrissage
+      if (f.upQ && f.hasHit) { f.upQ = false; setState(f, 'uppercut'); f.invuln = 11; f.apexT = null; f.t = 4; f.hsT = G.frame; }   // 1er coup reçu (même en garde) : enchaîne tout de suite le shoryuken
       break;
     }
     case 'fjump': {   // Axel : saut en arc, pas haut mais loin, poing en feu
@@ -4605,7 +4606,8 @@ function stepFight() {
   for (const [att, def] of [[a, b], [b, a]]) {
     if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;
     if ((att.state === 'rupper' || att.state === 'cpunch') && (def.state === 'kspin' || def.state === 'nyxspin')) continue;   // bas + Y ne contre pas ces rotations
-    if (def.state === 'crushD') continue;   // descente diagonale de Grog : seules les boules de feu / projectiles peuvent la casser   // la roulade de Kael gagne contre bas + Y   // le saut-poing d'Axel gagne contre le shoryuken
+    if (def.state === 'crushD') continue;
+    if (NORMAL_ATK.includes(att.state) && (def.state === 'hslide' || (def.def.twinFb && def.state === 'uppercut'))) continue;   // Hiro : ses deux shoryukens gagnent contre les coups normaux   // descente diagonale de Grog : seules les boules de feu / projectiles peuvent la casser   // la roulade de Kael gagne contre bas + Y   // le saut-poing d'Axel gagne contre le shoryuken
     const ab = atkBox(att), hb = hurtbox(def) || (att.state === 'fjump' && def.state === 'uppercut' && !def.ko ? [def.x - 14, def.y - 84, def.x + 14, def.y] : null);
     if (overlap(ab, hb)) {
       att.hasHit = true;
