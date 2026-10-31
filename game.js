@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v213';
+const VERSION = 'v214';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1851,7 +1851,7 @@ const ATK = {
   punch:    { dur: 12, act: [2, 7], box: [14, -76, 43, -59], dmg: 7,  stun: 15, bstun: 10, push: 2.6, sfx: 'hit' },
   fpunch:   { dur: 22, act: [5, 12], box: [18, -80, 52, -58], dmg: 9,  stun: 17, bstun: 11, push: 3.2, sfx: 'hit' },
   fkick:    { dur: 30, act: [9, 16], box: [26, -70, 72, -44], dmg: 11, stun: 19, bstun: 13, push: 3.6, sfx: 'heavy' },
-  kick:     { dur: 26, act: [7, 14], box: [20, -68, 62, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
+  kick:     { dur: 16, act: [3, 9], box: [20, -68, 62, -44], dmg: 9,  stun: 17, bstun: 12, push: 3.0, sfx: 'hit' },
   jpunch:   { act: [3, 16], box: [11, -59, 38, -34], high: true, dmg: 8,  stun: 16, bstun: 10, push: 2.0, sfx: 'hit' },
   jkick:    { act: [3, 18], box: [8, -42, 43, -11],  high: true, dmg: 10, stun: 18, bstun: 12, push: 2.4, sfx: 'hit' },
   cpunch:   { dur: 16, act: [3, 8],  box: [14, -50, 42, -35], dmg: 6,  stun: 13, bstun: 9,  push: 2.2, sfx: 'hit' },
@@ -1954,7 +1954,7 @@ function poseOf(f) {
     case 'hslide': return f.t < 3 ? 'crouch' : f.t < 15 ? 'sho0' : 'rup2';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 2 || f.t >= 8 ? 'punch0' : 'punch1';   // coup de poing très rapide
-    case 'kick': return f.t < 7 || f.t >= 14 ? 'kick0' : 'kick1';
+    case 'kick': return f.t < 3 || f.t >= 10 ? 'kick0' : 'kick1';   // coup de pied rapide
     case 'fpunch': if (f.def.sword) return f.t < 4 ? 'upper1' : f.t < 9 ? 'fpunch1' : f.t < 16 ? 'punch1' : 'fpunch0';
       return f.t < 5 ? 'fpunch0' : f.t < 13 ? 'fpunch1' : 'fpunch0';
     case 'fkick': return f.t < 9 || f.t >= 17 ? 'fkick0' : 'fkick1';
@@ -2217,6 +2217,7 @@ function updFighter(f, o) {
         break;
       }
       if (f.hasHit && live && ['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && tryCombo(f, o, c, fwd)) break;
+      if (live && ['punch', 'kick', 'fpunch', 'fkick'].includes(f.state) && f.t >= ATK[f.state].act[1] - 1 && tryCombo(f, o, c, fwd)) break;   // enchaînement facilité : le coup suivant part dès la fin de la frappe, même sans toucher
       if (f.t >= ATK[f.state].dur) setState(f, h.d ? 'crouch' : 'idle');
       break;
     case 'gtatsu': {
@@ -2684,7 +2685,7 @@ function markFire(f, o, kind) {
 }
 function tryCombo(f, o, c, fwd) {
   // le bouton appuyé en premier passe en premier
-  const order = ['s', 'p', 'k'].filter(b => c.buf[b] > 0 && (b !== 's' || comboReady(f, o))).sort((x, y) => (c.ord || {})[x] - (c.ord || {})[y]);
+  const order = ['s', 'p', 'k'].filter(b => c.buf[b] > 0 && (b !== 's' || comboReady(f, o) || seqReady(f))).sort((x, y) => (c.ord || {})[x] - (c.ord || {})[y]);
   const b = order[0]; if (!b) return false;
   take(c, b);
   if (b === 's') { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); return true; }
