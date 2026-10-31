@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v202';
+const VERSION = 'v203';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2079,6 +2079,7 @@ function updFighter(f, o) {
       if (f.def.kit === 'grog' && f.counterT > 0 && o.slowT > 0 && Math.abs(o.x - f.x) < 80 && take(c, 's')) { doThrow(f, o, 'rocket'); f.invuln = 90; addPopup(f.x, f.y - 120, 'ROCKET!', '#5ad0ff'); break; }   // contre + A : fusée électrique
       if ((comboReady(f, o) || seqReady(f)) && take(c, 's')) { setState(f, 'flame'); f.vx = 0; markFire(f, o, 's'); break; }
       if (take(c, 's')) {
+        if (h.d && f.def.kit === 'grog' && G.frame < (f.rollCd || 0)) break;   // Grog : petite pause avant de pouvoir refaire ses roulades
         if (h.d) { setState(f, f.def.kit === 'grog' ? 'grogroll' : 'nslide'); f.vx = 0; sfx('whoosh'); break; }   // bas + A : glissade au sol (Grog : roulades)
         if (f.def.kit === 'vesper') {   // Vesper : Lame Zénith / Pas de l'Ombre / Éclair Holographique
           if (h.u) { setState(f, 'zenith'); f.vx = 0; f.invuln = 8; break; }
@@ -2455,7 +2456,7 @@ function updFighter(f, o) {
       f.vx = f.t < 3 ? 0 : f.t < 39 ? 4.4 * f.dir : 0;
       f.rotAng = f.t >= 3 && f.t < 39 ? f.dir * (f.t - 3) / 12 * Math.PI * 2 : null;
       if (f.t >= 3 && f.t < 39 && (f.t - 3) % 12 === 0) { f.hasHit = false; sfx('whoosh'); }
-      if (f.t >= 46) setState(f, 'idle');
+      if (f.t >= 46) { f.rollCd = G.frame + 36; setState(f, 'idle'); }   // 0,6 s avant la prochaine roulade
       break;
     }
     case 'flipk': {   // petit saut avant + coup de pied tournoyant (salto avant complet) ; le 4e tourne en arrière, en feu
