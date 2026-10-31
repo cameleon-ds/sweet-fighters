@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v196';
+const VERSION = 'v197';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1879,7 +1879,7 @@ function makeFighter(def, id, x, dir, cpu) {
   };
 }
 
-const chargeMax = f => f.hp <= 80 ? 60 : 120;
+const chargeMax = f => { const T = f.def.twinFb ? 72 : f.def.fireUpper ? 90 : 120; return f.hp <= 80 ? T / 2 : T; };   // charge max : Hiro 1,2 s, Axel 1,5 s (moitié à 80 % d'énergie ou moins)
 function setState(f, s) { if (f.chSnd && s !== f.state) vaneChargeStop(f); if (s !== 'pteleport' && s !== 'nyxtele') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } if (s !== 'jump') { f.rollT = 0; f.rollA0 = 0; f.airNoS = false; } f.fireDash = 0; f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
@@ -4961,7 +4961,7 @@ const MOVES = [
     ['BACK', 'BLOCK  -  DOWN+BACK: LOW BLOCK'], ['FWD + Y', 'LONG PUNCH'], ['FWD + B', 'LONG KICK'],
     ['DOWN + Y', 'RISING UPPERCUT'], ['DOWN + B x3', 'LOW KICKS (3RD KNOCKS DOWN)'] ] },
   { title: 'SPECIALS & COUNTER', lines: [
-    ['A', 'FIREBALL'], ['HOLD A 2S', 'MAX FIREBALL (1S AT 80% HP)'], ['UP + A', 'HIRO: LOW SLIDE + MINI UPPER'], ['', 'UP + A AGAIN: SHORYUKEN'], ['UP + A ', 'AXEL: FIRE LEAP'], ['AXEL: LEAP HITS > UP + A', 'FIRE UPPERCUT'],
+    ['A', 'FIREBALL'], ['HOLD A', 'MAX FIREBALL: HIRO 1.2S, AXEL 1.5S'], ['', '(HALF TIME AT 80% HP OR LESS)'], ['UP + A', 'HIRO: LOW SLIDE + MINI UPPER'], ['', 'UP + A AGAIN: SHORYUKEN'], ['UP + A ', 'AXEL: FIRE LEAP'], ['AXEL: LEAP HITS > UP + A', 'FIRE UPPERCUT'],
     ['BACK + A x3', 'FLIP KICKS (3 HITS = FIRE FLIP)'], ['AIR + A', '3 AIR FLIP KICKS'], ['DOWN + A', 'SLIDE KICK'], ['X', 'COUNTER (JUST BEFORE A HIT)'],
     ['COUNTER > Y', 'OVERHEAD SLAM'], ['COUNTER > B', 'ROLLING THROW'],
     ['YYBB BBYY YYBA', '4TH HIT: FIRE DASH (EVEN FROM FAR)'], ['COUNTERED > X', 'CLASH: MASH TO WIN'], ['X NEAR AN OBJECT', 'THROW IT AT THE FOE'], ['X AS IT ARRIVES', 'REFLECT A THROWN OBJECT'], ['DIZZY', 'MASH ANY BUTTON'] ] },
