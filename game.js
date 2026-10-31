@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v205';
+const VERSION = 'v206';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -3902,6 +3902,7 @@ function addPopup(x, y, txt, col) { G.popups.push({ x, y, txt, col, t: 0 }); }
 const CLASH_HIT = { dmg: 14, knock: true, stun: 24, bstun: 20, push: 5.5, chip: 0, sfx: 'heavy' };
 function startClash(f, o) {
   G.clash = { f: [f, o], g: [0, 0], t: 0 };
+  if (G.tut && G.tut.phase === 3) { G.tut.clashWait = true; G.tut.clashSeen = true; }
   [f, o].forEach(x => { setState(x, 'parry'); x.vx = 0; x.slowT = 0; x.counterT = 0; x.mashShow = 0; });
   G.darkT = 50; G.flashT = 12; G.boltX = (f.x + o.x) / 2; G.boltY = f.y - 60; G.shake = 4;
   addPopup((f.x + o.x) / 2, f.y - 108, 'CLASH! MASH!', '#ffd23a'); sfx('parry');
@@ -3995,7 +3996,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
   }
-  def.hp = Math.max(0, def.hp - dmgK(Math.round(data.dmg * (def.def.tough || 1) * (projectile ? 1 : att.def.power || 1)))); def.lagT = 32;
+  def.hp = Math.max(G.tut && G.tut.phase < 4 ? 30 : 0, def.hp - dmgK(Math.round(data.dmg * (def.def.tough || 1) * (projectile ? 1 : att.def.power || 1)))); def.lagT = 32;
   spawnBlood(sx, sy, away, data.dmg);
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
@@ -4090,6 +4091,7 @@ function xBrain(f, o, a, dist, fwd, back, neutral) {
   return true;
 }
 function aiInput(f, o) {
+  if (G.tut && G.tut.phase < 4) return tutAI(f, o);   // TUTORIAL : le double est scripté
   if (OPT.diff === 3) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
   const dk = [.3, 1, 1.7, 3][DL()], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
@@ -4175,7 +4177,7 @@ function startMatch(p1, p2, stage) {
   if (p2 == null) p2 = G.p2 != null ? G.p2 : 1 - p1;
   G.p1 = p1; G.p2 = p2;
   G.stage = stage || G.stage || 'dojo'; BG = BGS[G.stage] || BGS.dojo;
-  const vs2 = G.mode !== 'arcade' && p2On();   // en ARCADE, l'adversaire est toujours le CPU   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
+  const vs2 = G.mode !== 'arcade' && G.mode !== 'tutorial' && p2On();   // en ARCADE, l'adversaire est toujours le CPU   // 2e manette (smartphone ou manette du PC) : joueur 2 humain au lieu du CPU
   G.f = [makeFighter(fighterDef(p1), 0, SW / 2 - 80, 1, false), makeFighter(fighterDef(p2, p2 === p1), 1, SW / 2 + 80, -1, !vs2)];
   if (vs2) G.f[1].ctl = p2ctl;
   G.f[0].ctl = pctl;
@@ -4213,7 +4215,74 @@ const saveOpt = () => { try { localStorage.setItem('sf2opt2', JSON.stringify(OPT
 const DIFFS = ['EASY', 'NORMAL', 'HARD', 'TRAINING', 'EXTREME'];
 const DIFF_ORDER = [0, 1, 2, 4, 3];   // EASY > NORMAL > HARD > EXTREME > TRAINING
 const dmgK = d => Math.max(1, Math.round(d * [1, .7, .5][OPT.energy - 1] * 10) / 10);
-const TITLE_ITEMS = ['ARCADE MODE', 'V.S. BATTLE', 'VIEW COMMANDS', 'OPTIONS'];
+const TITLE_ITEMS = ['ARCADE MODE', 'V.S. BATTLE', 'TUTORIAL', 'VIEW COMMANDS', 'OPTIONS'];
+/* ---------------- TUTORIAL ---------------- */
+// contre son double (2e couleur), dans le dojo, sans musique : 1) les boutons 2) les coups spéciaux 3) le contre et le bras de fer 4) combat libre
+const TUT_BTN = [['p', 'PRESS Y TO PUNCH'], ['k', 'PRESS B TO KICK'], ['s', 'PRESS A FOR A SPECIAL MOVE'], ['x', 'PRESS X TO COUNTER']];
+const st_ = n => f => f.state === n;
+const TUT_SP = {
+  hiro: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'LOW SLIDE + MINI UPPER', st_('hslide')], ['UP + A AGAIN', 'SHORYUKEN', st_('uppercut')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
+  axel: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'FIRE LEAP', st_('fjump')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
+  vesper: [['A', 'HOLO FLASH', st_('holo')], ['BACK + A', 'SHADOW STEP', st_('shadow')], ['UP + A', 'ZENITH BLADE', st_('zenith')], ['JUMP, THEN A', 'NEON DIVE', st_('dive')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
+  vane: [['A', 'VOID FLARE', st_('voidcast')], ['BACK + A', 'PHANTOM TELEPORT', st_('pteleport')], ['UP + A', 'METEOR IMPACT', st_('meteor')], ['JUMP, THEN A', 'VOID BOMB', st_('airvoid')], ['JUMP, THEN DOWN + A', 'DIVE KICK', st_('vdive')], ['HOLD Y, THEN RELEASE', '3 FAST PUNCHES', st_('vtripP')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
+  kael: [['A', 'SONIC WAVE', st_('sonic')], ['BACK + A', 'FLASH STEP', st_('flashstep')], ['THEN Y', 'THUNDER RUSH', st_('kbarrage')], ['UP + A', 'PLASMA WALL', st_('plasmawall')], ['JUMP, THEN A', 'VOLT SPIN', st_('kspin')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
+  nyx: [['A', 'MAGMA FLASK', st_('flask')], ['BACK + A', 'TOXIC MIST', st_('smokeback')], ['BACK + A AGAIN', 'SMOKE TELEPORT', st_('nyxtele')], ['UP + A', 'ALCHEMIC GEYSER', st_('geyser')], ['DOWN + A', 'SHADOW SLIDE', st_('nslide')], ['JUMP, THEN A', 'WITCH GLIDE', st_('nyxglide')], ['WHILE GLIDING, A', 'SPIN TO THE GROUND', st_('nyxspin')]],
+  zephyr: [['A', 'GALE BLADE', st_('gust')], ['FWD + Y', 'HEAVEN CUT', st_('wallslash')], ['BACK + A', 'STORM PASSAGE', st_('sink')], ['UP + A', 'RISING TORNADO', st_('tornado')], ['JUMP, THEN A', 'SKY PLUNGE', f => f.state === 'hover' || f.state === 'plunge'], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
+  grog: [['A', 'SEISMIC IMPACT', st_('quake')], ['BACK + A', 'IRON RAMPART', st_('rampart')], ['THEN A AGAIN', 'DOME BLAST', st_('rburst')], ['UP + A', 'CELESTIAL CRUSH', st_('crush')], ['JUMP, THEN A', 'GROUND POUND', st_('gpound')], ['DOWN + A', 'ROLLING ATTACK', st_('grogroll')]],
+};
+const tutSpecials = d => TUT_SP[d.kit] || (d.twinFb ? TUT_SP.hiro : TUT_SP.axel);
+const tutLab = t => t.replace(/\b([YBAX])\b/g, (m0, b) => btnLabel(b));
+function tutStart() { G.tut = { phase: 1, step: 0, ok: 0, t: 0 }; G.mode = 'tutorial'; startMatch(G.p1, G.p1, 'dojo'); }
+function tutNext() { const T = G.tut; T.step++; T.ok = 50; T.t = 0; sfx('select'); G.f.forEach(f => { f.hp = 100; f.lag = 100; }); }
+function tutStep() {   // appelé à chaque image du combat
+  const T = G.tut; if (!T || !G.fighting) return;
+  const [a, b] = G.f; T.t++;
+  if (T.ok > 0) {
+    T.ok--; if (T.ok === 0 && T.next) { T.phase = T.next; T.step = 0; T.next = 0; }
+    if (T.phase === 2 && !T.next) { const it = tutSpecials(a.def)[T.step]; if (it && it[2](a)) { tutNext(); if (T.step >= tutSpecials(a.def).length) T.next = 3; } }   // enchaînement rapide (haut + A à nouveau...) : compté même pendant « GOOD! »
+    return;
+  }
+  if (T.phase === 1) {
+    const [btn] = TUT_BTN[T.step];
+    if (edge(pctl, btn)) { tutNext(); if (T.step >= TUT_BTN.length) T.next = 2; }
+  } else if (T.phase === 2) {
+    const L = tutSpecials(a.def), it = L[T.step];
+    if (it && it[2](a)) { tutNext(); if (T.step >= L.length) T.next = 3; }
+  } else if (T.phase === 3) {
+    if (T.step === 0 && a.state === 'throw') { tutNext(); }   // contre (X) puis contre-attaque (Y / B)
+    else if (T.step === 1 && T.clashSeen && !G.clash) { tutNext(); T.next = 4; }   // bras de fer terminé
+  } else if (T.phase === 4 && !T.started) {   // combat libre : on repart d'un vrai round
+    T.started = true; T.showFight = 200; startRound();
+  }
+}
+function tutAI(f, o) {   // le double : immobile, puis il attaque (phase 3), puis il contre (phase 3, étape 2)
+  const T = G.tut, a = f.ai, held = {};
+  if (a.press) { held[a.press] = true; if (--a.pressFrames <= 0) a.press = null; }
+  if (!G.fighting || T.phase < 3 || T.ok > 0) return held;
+  const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l';
+  if (!NEUTRAL.includes(f.state)) return held;
+  if (T.step === 0) {   // s'approche et donne des coups de poing : au joueur de contrer
+    if (dist > 50) held[fwd] = true;
+    else if (--a.cd <= 0) { a.cd = 70; press(a, 'p'); }
+  } else if (['punch', 'kick', 'fpunch', 'fkick'].includes(o.state) && o.t < 3 && dist < 100) press(a, 'x');   // contre le coup du joueur
+  return held;
+}
+function drawTut() {
+  const T = G.tut; if (!T) return;
+  let L1 = '', L2 = '', head = '';
+  if (T.phase === 4) { if (!(T.showFight > 0)) return; T.showFight--; head = 'TUTORIAL COMPLETE'; L1 = 'NOW YOU KNOW ALL THE BASICS. FIGHT!'; L2 = 'PAUSE: CHANGE THE DIFFICULTY IN OPTIONS'; }
+  else if (T.ok > 0) { head = 'GOOD!'; L1 = T.next === 2 ? 'NEXT: SPECIAL MOVES' : T.next === 3 ? 'NEXT: THE COUNTER' : T.next === 4 ? 'WELL DONE!' : ''; }
+  else if (T.phase === 1) { head = 'STEP 1: THE BUTTONS'; L1 = tutLab(TUT_BTN[T.step][1]); }
+  else if (T.phase === 2) { const it = tutSpecials(G.f[0].def)[T.step]; head = 'STEP 2: SPECIAL MOVES'; L1 = it ? tutLab(it[0]) + ': ' + it[1] : ''; }
+  else if (T.phase === 3 && T.step === 0) { head = 'STEP 3: THE COUNTER'; L1 = tutLab('WHEN THE FOE ATTACKS, PRESS X TO COUNTER'); L2 = tutLab('THEN PRESS Y OR B TO STRIKE BACK'); }
+  else if (T.phase === 3) { head = 'STEP 3: THE COUNTER'; L1 = 'HIT THE FOE: HE WILL COUNTER YOU.'; L2 = tutLab('COUNTER HIM BACK FAST WITH X!'); }
+  if (T.clashWait) { head = 'CLASH!'; L1 = 'MASH ANY BUTTON AS FAST AS YOU CAN!'; L2 = (G.frame >> 4) % 2 ? 'PRESS A BUTTON TO START' : ''; }
+  const bw = Math.min(W - 16, 340), bx = CX - bw / 2, by = 46, bh = L2 ? 40 : 30;
+  R(bx, by, bw, bh, 'rgba(8,4,16,.82)'); R(bx, by, bw, 1, '#5a3a2a'); R(bx, by + bh - 1, bw, 1, '#5a3a2a');
+  text(head, CX, by + 5, 8, '#ffd23a', 'center');
+  if (L1) text(L1, CX, by + 17, 8, '#ffffff', 'center');
+  if (L2) text(L2, CX, by + 28, 8, '#7af0ff', 'center');
+}
 /* ---------------- ARCADE MODE ---------------- */
 // Tous les personnages dans l'ordre (y compris son double), Lord Vane en dernier
 function arcadeStart() {
@@ -4269,7 +4338,7 @@ function drawEnding() {
   ctx.restore();
   if (E.out) R(0, 0, W, H, `rgba(0,0,0,${Math.min(1, E.out / 40)})`);   // fondu de sortie
 }
-function goTitle() { G.arc = null; G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
+function goTitle() { G.arc = null; G.tut = null; G.scene = 'title'; G.t = SPLASH + 100; G.tmenu = 30; G.tstate = 1; G.tcur = 0; G.showMoves = false; G.showOpts = false; G.paused = false; }
 // Menus : un cran par appui ; stick maintenu = descend/monte ligne par ligne
 const navHold = { u: 0, d: 0 };
 function nav(b) {
@@ -4422,7 +4491,8 @@ function updateMusic() {
   } else bgmMul = Math.min(1, bgmMul + 1 / 60);
   let musF = 1;
   if (G.scene === 'ending') musF = G.t < 50 ? Math.max(0, 1 - G.t / 40) : G.end && G.end.out ? Math.max(0, 1 - G.end.out / 40) : 1;
-  if (G.musIn > 0) { G.musIn--; musF = 1 - G.musIn / 70; }   // retour à l'écran titre : fondu entrant
+  if (G.musIn > 0) { G.musIn--; musF = 1 - G.musIn / 70; }
+  if (G.tut && ['intro', 'fight', 'ko', 'timeup'].includes(G.scene)) musF = 0;   // TUTORIAL : pas de musique   // retour à l'écran titre : fondu entrant
   const vol = Math.max(0, Math.min(1, OPT.music / 4 * MUSIC_MAX * (G.paused ? .4 : 1) * bgmMul * musF));
   if (bgmGain) bgmGain.gain.value = vol; else BGM.volume = vol;   // réglage appliqué en temps réel
   if (bgmGain && AC && AC.state !== 'running' && bgmUnlocked && !document.hidden) AC.resume().catch(() => {});
@@ -4588,12 +4658,12 @@ function step() {
         G.tmenu = (G.tmenu || 0) + 1;
         const tc = Math.max(0, Math.min(TITLE_ITEMS.length - 1, (G.tcur || 0) + navStep()));
         if (tc !== (G.tcur || 0)) { G.tcur = tc; sfx('beep'); }
-        if (tap) { const i = Math.floor((tap.y - 149) / 11); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
+        if (tap) { const i = Math.floor((tap.y - 143) / 10); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
-          if ((G.tcur || 0) <= 1) { G.mode = G.tcur ? 'vs' : 'arcade'; G.arc = null; G.scene = 'select'; G.selPhase = 0; G.t = 0; }   // ARCADE MODE / V.S. BATTLE
-          else if (G.tcur === 2) { G.showMoves = true; G.mscroll = 0; }
+          if ((G.tcur || 0) <= 2) { G.mode = ['arcade', 'vs', 'tutorial'][G.tcur || 0]; G.arc = null; G.tut = null; G.scene = 'select'; G.selPhase = 0; G.t = 0; }   // ARCADE MODE / V.S. BATTLE / TUTORIAL
+          else if (G.tcur === 3) { G.showMoves = true; G.mscroll = 0; }
           else { G.showOpts = true; G.ocur = 0; }
         }
       }
@@ -4616,6 +4686,7 @@ function step() {
         const c = ROSTER[G.sel || 0];
         if (c == null) sfx('block');
         else if (!G.selPhase && G.mode === 'arcade') { G.p1 = c; sfx('select'); arcadeStart(); }   // ARCADE : on enchaîne les combats
+        else if (!G.selPhase && G.mode === 'tutorial') { G.p1 = c; sfx('select'); tutStart(); }   // TUTORIAL : contre son double
         else if (!G.selPhase) { G.p1 = c; G.selPhase = 1; sfx('select'); }                 // 1) mon personnage
         else { G.p2 = c; G.selPhase = 0; G.scene = 'stage'; G.t = 0; sfx('select'); }    // 2) le CPU
       }
@@ -4677,6 +4748,7 @@ function stepFight() {
   if (a.cpu && !G.noAI) ctlUpdate(a.ctl, confuse(aiInput(a, b), a));
   if (b.cpu && !G.noAI) ctlUpdate(b.ctl, confuse(aiInput(b, a), b));
 
+  if (G.tut) tutStep();
   if (G.hurt) G.f.forEach((f, i) => { if (f.hp < 100) G.hurt[i] = true; });
   if (G.quakeT > 0) { G.quakeT--; G.shake = Math.max(G.shake, 3 + G.quakeT * .15); }   // vibration prolongée
   if (G.shake > 0) G.shake *= .8;
@@ -4687,7 +4759,10 @@ function stepFight() {
 
   // ralenti : un combattant sous l'effet du contre n'avance qu'une image sur trois
   // Contre contre contre : les deux au ralenti, chacun remplit sa jauge en martelant
-  if (G.clash) { stepClash(); return; }
+  if (G.clash) {
+    if (G.tut && G.tut.clashWait) { if (BTNS.some(b2 => edge(pctl, b2)) || edge(pctl, 'start')) { G.tut.clashWait = false; sfx('select'); } return; }   // arrêt sur image : explication du bras de fer
+    stepClash(); return;
+  }
   for (const [f, o] of [[a, b], [b, a]]) {
     if (f.slowT > 35 && o.counterT > 0 && G.fighting && take(f.ctl, 'x')) { startClash(f, o); return; }
   }
@@ -4773,7 +4848,7 @@ function stepFight() {
   G.sparks = G.sparks.filter(s => s.t < 12);
 
   if (G.scene === 'fight') {
-    if (OPT.diff !== 3 && ++G.tick >= 45) { G.tick = 0; G.timer = Math.max(0, G.timer - 1); }   // entraînement : temps infini
+    if (OPT.diff !== 3 && !(G.tut && G.tut.phase < 4) && ++G.tick >= 45) { G.tick = 0; G.timer = Math.max(0, G.timer - 1); }   // entraînement : temps infini
     if (a.hp <= 0 || b.hp <= 0) {
       const loser = a.hp <= 0 ? a : b;
       loser.ko = true;
@@ -5060,6 +5135,7 @@ function drawFight() {
   ctx.restore();
   if (G.flashT > 9) R(0, 0, W, H, 'rgba(220,245,255,.25)');   // très bref flash d'écran
   drawHUD();
+  drawTut();
 
   if (G.scene === 'intro') {
     if (G.t < 84) bigMsg('ROUND ' + G.round, 16, '#ffd23a');
@@ -5306,7 +5382,7 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 152 + i * 11, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 146 + i * 10, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
     });
   }
   if (L > 30) {
@@ -5320,8 +5396,8 @@ function drawSelect() {
   R(0, 0, W, H, '#000'); drawCover(TITLE_IMG, 1);
   R(0, 0, W, H, 'rgba(8,4,14,.72)');
   const ph = G.selPhase || 0, sel = G.sel || 0, hov = ROSTER[sel];
-  const arc = G.mode === 'arcade', two = !arc && p2On(), L2 = two ? '2P' : 'CPU';
-  if (arc) text('ARCADE MODE: SELECT YOUR FIGHTER', CX, 6, 8, '#5ac8ff', 'center'); else
+  const arc = G.mode === 'arcade' || G.mode === 'tutorial', two = !arc && p2On(), L2 = two ? '2P' : 'CPU';
+  if (arc) text((G.mode === 'tutorial' ? 'TUTORIAL' : 'ARCADE MODE') + ': SELECT YOUR FIGHTER', CX, 6, 8, '#5ac8ff', 'center'); else
   text(ph === 0 ? (two ? 'PLAYER 1: SELECT FIGHTER' : 'SELECT YOUR FIGHTER') : (two ? 'PLAYER 2: SELECT FIGHTER' : 'SELECT CPU FIGHTER'), CX, 6, 8, ph === 0 ? '#5ac8ff' : '#ff7a6a', 'center');
   drawQRs();
   const p1 = ph === 0 ? hov : G.p1, p2 = ph === 1 ? hov : null;
