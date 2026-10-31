@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v190';
+const VERSION = 'v191';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2002,6 +2002,7 @@ function killShots(g, x0, x1, y0, y1) {
   for (const q of G.voids || []) hit(q, q.y);
   for (const q of G.flasks || []) hit(q, q.y);
   for (const q of G.holos || []) hit(q, q.y - 50);
+  for (const q of G.waves || []) if (!q.ring && !q.small) hit(q, GROUND - 16);   // ondes au sol de Grog
   if (n) { G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); G.freeze = Math.max(G.freeze || 0, 3); sfx('parry'); }
   return n;
 }
@@ -2101,6 +2102,11 @@ function updFighter(f, o) {
           f.vx = 0;
           if (h.u) { setState(f, 'crush'); break; }
           if (back) { setState(f, 'rampart'); f.rampT = 180; sfx('block'); sfx('parry'); break; }   // bras électrisés pendant 3 s
+          if (f.rampT > 0) {   // électricité active + A : explosion du dôme (renvoie les boules de feu)
+            f.rampT = 0; setState(f, 'rburst'); G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); G.boltX = f.x; G.boltY = f.y - 50; sfx('parry'); sfx('heavy');
+            G.waves.push({ owner: f, x: f.x, dir: f.dir, t: 0, life: 22, small: true, ring: true, dome: true, done: true });
+            break;
+          }
           if (shotOK(f)) { shotUse(f); setState(f, 'quake'); break; }
           break;
         }
@@ -3244,6 +3250,12 @@ function updKael() {
   if (G.sonics) G.sonics = G.sonics.filter(q => !q.dead);
   for (const w of G.pwalls || []) {   // mur de plasma : touche l'adversaire collé et arrête les projectiles
     w.t++; const o = G.f.find(f => f !== w.owner), half = w.big ? 26 : 20;
+    if (!w.done && o && w.t < 40 && o.state === 'rburst' && o.t <= 20 && Math.abs(o.x - w.x) < half + 60) {   // mur de plasma contre dôme de Grog : les deux s'annulent, personne n'est touché, les deux reculent
+      w.done = true; w.t = Math.max(w.t, 32);
+      for (const d of G.waves || []) if (d.owner === o && d.dome) d.dead = true;
+      (G.clashFx = G.clashFx || []).push({ x: (w.x + o.x) / 2, y: o.y - 50, t: 0 }); G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); G.freeze = Math.max(G.freeze || 0, 6); sfx('parry'); sfx('heavy');
+      for (const x of [w.owner, o]) { setState(x, 'block'); x.bstun = 18; x.vx = (x.x < (w.owner === x ? o.x : w.owner.x) ? -1 : 1) * 4.5; }
+    }
     if (!w.done && o && w.t < 40 && hurtbox(o) && Math.abs(o.x - w.x) < half + 10) {   // touche le champ électrique : électrifié et projeté en arrière
       w.done = true; shock(w.owner, o, w.big ? Object.assign({}, PWALL_HIT, { dmg: 20 }) : PWALL_HIT, w.x, o.y - 50); o.burn = Math.max(o.burn || 0, 70); o.burnPal = ELEC_PAL; G.shake = Math.max(G.shake, 6);
     }
@@ -3623,8 +3635,8 @@ function drawClashFx() {
 }
 function updGrog() {
   for (const g of G.f) {   // Rempart : renvoie les projectiles comme un miroir
-    if (g.def.kit !== 'grog' || !(g.state === 'rampart' || g.rampT > 0) || g.air || g.state === 'gpound') continue;   // en l'air (saut, chute) : ne renvoie rien
-    const mir = (q, vk) => { if (q.owner === g || q.dead || q.alive === false) return; const v = vk ? q[vk] : q.dir; if (Math.sign(v) !== Math.sign(g.x - q.x) || Math.abs(q.x - g.x) > 36) return;
+    if (g.def.kit !== 'grog' || g.state !== 'rburst' || g.t > 18) continue;   // seule l'explosion du dôme renvoie les boules de feu
+    const mir = (q, vk) => { if (q.owner === g || q.dead || q.alive === false) return; const v = vk ? q[vk] : q.dir; if (Math.sign(v) !== Math.sign(g.x - q.x) || Math.abs(q.x - g.x) > 70) return;
       if (q.owner && q.owner.fb === q) q.owner.fb = null;
       q.owner = g; q.dir = -(q.dir || Math.sign(v)); if (vk) q[vk] = -q[vk]; if ('x0' in q) q.x0 = q.x; q.x = g.x + q.dir * 38; q.t = 0;
       addSpark(q.x, q.y || g.y - 50, 'parry'); sfx('parry'); G.flashT = Math.max(G.flashT, 4); G.freeze = Math.max(G.freeze || 0, 4);
@@ -4182,7 +4194,7 @@ function stepPause() {
     else if (edge(pctl, 's') || edge(pctl, 'start')) { sfx('select'); if (G.pconf === 0) { G.pconf = null; goTitle(); } else G.pconf = null; }
     return;
   }
-  if (!G.showOpts && !G.showMoves && (edge(pctl, 'start') || edge(p2ctl, 'start'))) { G.paused = false; sfx('beep'); return; }   // START (manette) / ENTRÉE (clavier) = reprendre le combat directement
+  if (!G.showKeys && (edge(pctl, 'start') || edge(p2ctl, 'start'))) { G.paused = false; G.showOpts = false; G.showMoves = false; sfx('beep'); return; }   // START = reprendre le combat, même depuis OPTIONS / MOVE LIST (seul A change une option)   // START (manette) / ENTRÉE (clavier) = reprendre le combat directement
   if (G.showMoves) { stepMoves(); return; }
   if (G.showOpts) { stepOptions(); return; }
   const n = PAUSE_ITEMS.length, m = navStep();
@@ -4530,7 +4542,8 @@ function stepFight() {
 
   // Coups au corps à corps
   for (const [att, def] of [[a, b], [b, a]]) {
-    if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;   // le saut-poing d'Axel gagne contre le shoryuken
+    if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;
+    if ((att.state === 'rupper' || att.state === 'cpunch') && def.state === 'kspin') continue;   // la roulade de Kael gagne contre bas + Y   // le saut-poing d'Axel gagne contre le shoryuken
     const ab = atkBox(att), hb = hurtbox(def) || (att.state === 'fjump' && def.state === 'uppercut' && !def.ko ? [def.x - 14, def.y - 84, def.x + 14, def.y] : null);
     if (overlap(ab, hb)) {
       att.hasHit = true;
@@ -4906,7 +4919,7 @@ const MOVES = [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
   { title: 'GROG SPECIALS', lines: [
-    ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ABSORBS A HIT, PUSHES BACK'],
+    ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ABSORBS A HIT, PUSHES BACK'], ['RAMPART > A', 'DOME BLAST, REFLECTS SHOTS'],
     ['UP + A', 'CELESTIAL CRUSH'], ['', 'HUGE LEAP, FISTS-FIRST DIVE'], ['DOWN + A', 'ROLLING ATTACK'], ['', '3 FAST ROLLS ON THE GROUND'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
