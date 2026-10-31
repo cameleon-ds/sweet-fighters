@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v211';
+const VERSION = 'v212';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -756,6 +756,13 @@ function shoeDown(q, dir, dark) {   // basket pointe vers le bas (Axel en plein 
   sR(x0, y + 4, 4, 3, dark ? '#b8b8b0' : '#f4f4ee');                         // bout blanc vers le bas
   sR(x0 + (dir > 0 ? 3 : 0), y + 1, 1, 6, dark ? '#a8a8a0' : '#e8e8e0');    // semelle sur le côté
 }
+function shoeTilt(q, dir, dark) {   // basket pointe vers le bas, inclinée vers l'arrière (jambe avant pliée du saut-poing d'Axel)
+  for (let i = 0; i < 7; i++) {
+    const xx = Math.round(q[0] - 2 - dir * i * .75), yy = Math.round(q[1]) - 4 + i;
+    sR(xx, yy, 4, 1, i >= 4 ? (dark ? '#b8b8b0' : '#f4f4ee') : (dark ? '#0a0a0e' : '#16161c'));   // tige noire puis bout blanc
+    sR(xx + (dir > 0 ? 3 : 0), yy, 1, 1, dark ? '#a8a8a0' : '#e8e8e0');                               // semelle
+  }
+}
 function footP(q, dir, skin) {
   const x0 = Math.round(q[0]) - (dir > 0 ? 1 : 3), y = Math.round(q[1]);
   sR(x0 + (dir > 0 ? 0 : 2), y - 3, 3, 1, skin[1]);          // cheville
@@ -943,7 +950,8 @@ function drawFighter(f, x = f.x, y = f.y) {
       const x0 = Math.round(ft[0]) - (dir > 0 ? 3 : 5);
       sR(x0, Math.round(ft[1]) - 4, 8, 3, near ? B[1] : B[0]); sR(x0 + (dir > 0 ? 4 : 0), Math.round(ft[1]) - 4, 4, 1, near ? B[2] : B[1]);
       sR(x0, Math.round(ft[1]) - 1, 8, 1, '#08080a');
-    } else if (d.shoes && d.fireUpper && f.air && (f.state === 'fjump' || f.state === 'uppercut')) shoeDown(ft, dir, !near);   // pieds tendus vers le bas
+    } else if (d.shoes && d.fireUpper && f.air && f.state === 'fjump') shoeTilt(ft, dir, !near);   // saut-poing : les deux pieds inclinés vers l'arrière
+    else if (d.shoes && d.fireUpper && f.air && (f.state === 'fjump' || f.state === 'uppercut')) shoeDown(ft, dir, !near);   // pieds tendus vers le bas
     else if (d.shoes) shoeP(ft, dir, !near, d.shoe); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
