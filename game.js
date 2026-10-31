@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v214';
+const VERSION = 'v215';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2264,8 +2264,8 @@ function updFighter(f, o) {
       break;
     case 'jump':
       if (!f.airAtk && live) {
-        if (take(c, 'p')) { setState(f, 'jpunch'); f.airAtk = true; sfx('whoosh'); }
-        else if (take(c, 'k')) { setState(f, 'jkick'); f.airAtk = true; sfx('whoosh'); }
+        if (take(c, 'p')) { setState(f, 'jpunch'); f.airAtk = true; f.airN = 1; sfx('whoosh'); markFire(f, o, 'p'); }
+        else if (take(c, 'k')) { setState(f, 'jkick'); f.airAtk = true; f.airN = 1; sfx('whoosh'); markFire(f, o, 'k'); }
         else if (f.airNoS) { if (c.buf.s > 0) take(c, 's'); }   // roulade de retour : coups simples seulement
         else if (f.def.kit === 'vane' && h.d && take(c, 's')) {   // en l'air + bas + A : coup de pied en diagonale vers le bas
           setState(f, 'vdive'); f.airAtk = true; f.bounced = false; sfx('upper');
@@ -2454,6 +2454,14 @@ function updFighter(f, o) {
       if (f.t < 30 && f.t % 6 === 0) { f.hasHit = false; sfx('whoosh'); }
       if (f.t >= 40) { f.kcharge = 0; setState(f, 'idle'); }
       break;
+    case 'jpunch': case 'jkick': {   // en l'air : enchaînements rapides (B, B, Y, Y...), le 4e part en feu vers l'avant
+      if (f.fireDash > 0) { f.fireDash--; f.vx = 6 * f.dir; f.vy = -GRAV; const a0 = ATK[f.state].act[0]; if (f.t > a0) f.t = a0; if (f.hasHit) f.fireDash = 0; break; }
+      if (live && (f.t >= 7 || f.hasHit) && (f.airN || 1) < 4) {
+        const b = c.buf.p > 0 && c.buf.k > 0 ? ((c.ord || {}).p < (c.ord || {}).k ? 'p' : 'k') : c.buf.p > 0 ? 'p' : c.buf.k > 0 ? 'k' : null;
+        if (b) { take(c, b); setState(f, b === 'p' ? 'jpunch' : 'jkick'); f.t = 3; f.airN = (f.airN || 1) + 1; f.vy = Math.min(f.vy, 1); sfx('whoosh'); markFire(f, o, b); }
+      }
+      break;
+    }
     case 'kspin': {   // roulade avant très rapide dans la continuité du saut, redescend lentement, renvoie les projectiles
       if (f.vy > 0) f.vy = Math.min(1.6, f.vy - GRAV * .65);
       f.vx = h.r ? 2.4 : h.l ? -2.4 : f.vx * .92;   // dirigeable à gauche / à droite
