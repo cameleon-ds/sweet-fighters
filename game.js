@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v212';
+const VERSION = 'v213';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2680,7 +2680,7 @@ function markFire(f, o, kind) {
   const fin = FINISHERS.includes(seq) || (live && FINISHERS.includes((f.combo || '') + kind));
   f.iseq = fin ? '' : seq.slice(-3);
   f.fireState = fin ? f.state : null; f.fireDash = fin ? 18 : 0;
-  if (fin) { sfx('fb'); sfx('upper'); }
+  if (fin) { sfx('fb'); sfx('upper'); f.lastFin = FINISHERS.includes(seq) ? seq : (f.combo || '') + kind; }
 }
 function tryCombo(f, o, c, fwd) {
   // le bouton appuyé en premier passe en premier
@@ -4012,7 +4012,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     att.spinN = def.state === 'hit' ? (att.spinN || 0) + 1 : 1;
     if (att.spinN >= 4) { data = Object.assign({}, data, { knock: true, dmg: 7 }); att.spinN = 0; }
   }
-  def.hp = Math.max(G.tut && G.tut.phase < 4 ? 30 : 0, def.hp - dmgK(Math.round(data.dmg * (def.def.tough || 1) * (projectile ? 1 : att.def.power || 1)))); def.lagT = 32;
+  def.hp = Math.max(G.tut && G.tut.phase !== 4 ? 30 : 0, def.hp - dmgK(Math.round(data.dmg * (def.def.tough || 1) * (projectile ? 1 : att.def.power || 1)))); def.lagT = 32;
   spawnBlood(sx, sy, away, data.dmg);
   def.flash = 3;
   if (def.air || data.knock || def.hp <= 0) {
@@ -4107,7 +4107,7 @@ function xBrain(f, o, a, dist, fwd, back, neutral) {
   return true;
 }
 function aiInput(f, o) {
-  if (G.tut && G.tut.phase < 4) return tutAI(f, o);   // TUTORIAL : le double est scripté
+  if (G.tut && G.tut.phase !== 4) return tutAI(f, o);   // TUTORIAL : le double est scripté
   if (OPT.diff === 3) return {};   // entraînement, ou aveuglé par la fumée de Nyx   // entraînement : l'adversaire ne bouge pas
   const dk = [.3, 1, 1.7, 3][DL()], rnd = () => Math.random() / dk;   // difficulté : réactions plus ou moins fréquentes
   const a = f.ai, held = {};
@@ -4246,6 +4246,7 @@ const TUT_SP = {
   zephyr: [['A', 'GALE BLADE', st_('gust')], ['FWD + Y', 'HEAVEN CUT', st_('wallslash')], ['BACK + A', 'STORM PASSAGE', st_('sink')], ['UP + A', 'RISING TORNADO', st_('tornado')], ['JUMP, THEN A', 'SKY PLUNGE', f => f.state === 'hover' || f.state === 'plunge'], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
   grog: [['A', 'SEISMIC IMPACT', st_('quake')], ['BACK + A', 'IRON RAMPART', st_('rampart')], ['THEN A AGAIN', 'DOME BLAST', st_('rburst')], ['UP + A', 'CELESTIAL CRUSH', st_('crush')], ['JUMP, THEN A', 'GROUND POUND', st_('gpound')], ['DOWN + A', 'ROLLING ATTACK', st_('grogroll')]],
 };
+const TUT_COMBO = [['ppkk', 'Y, Y, B, B'], ['kkpp', 'B, B, Y, Y'], ['ppks', 'Y, Y, B, A'], ['kkps', 'B, B, Y, A']];
 const tutSpecials = d => TUT_SP[d.kit] || (d.twinFb ? TUT_SP.hiro : TUT_SP.axel);
 const tutLab = t => t.replace(/\b([YBAX])\b/g, (m0, b) => btnLabel(b));
 function tutStart() { G.tut = { phase: 1, step: 0, ok: 0, t: 0 }; G.mode = 'tutorial'; startMatch(G.p1, G.p1, 'dojo'); }
@@ -4254,8 +4255,8 @@ function tutStep() {   // appelé à chaque image du combat
   const T = G.tut; if (!T || !G.fighting) return;
   const [a, b] = G.f; T.t++;
   if (T.ok > 0) {
-    T.ok--; if (T.ok === 0 && T.next) { T.phase = T.next; T.step = 0; T.next = 0; }
-    if (T.phase === 2 && !T.next) { const it = tutSpecials(a.def)[T.step]; if (it && it[2](a)) { tutNext(); if (T.step >= tutSpecials(a.def).length) T.next = 3; } }   // enchaînement rapide (haut + A à nouveau...) : compté même pendant « GOOD! »
+    T.ok--; if (T.ok === 0 && T.next) { T.phase = T.next; T.step = 0; T.next = 0; a.lastFin = null; }
+    if (T.phase === 2 && !T.next) { const it = tutSpecials(a.def)[T.step]; if (it && it[2](a)) { tutNext(); if (T.step >= tutSpecials(a.def).length) T.next = 5; } }   // enchaînement rapide (haut + A à nouveau...) : compté même pendant « GOOD! »
     return;
   }
   if (T.phase === 1) {
@@ -4263,7 +4264,10 @@ function tutStep() {   // appelé à chaque image du combat
     if (edge(pctl, btn)) { tutNext(); if (T.step >= TUT_BTN.length) T.next = 2; }
   } else if (T.phase === 2) {
     const L = tutSpecials(a.def), it = L[T.step];
-    if (it && it[2](a)) { tutNext(); if (T.step >= L.length) T.next = 3; }
+    if (it && it[2](a)) { tutNext(); if (T.step >= L.length) T.next = 5; }
+  } else if (T.phase === 5) {   // les enchaînements à 4 coups
+    const it = TUT_COMBO[T.step];
+    if (it && a.lastFin === it[0]) { a.lastFin = null; tutNext(); if (T.step >= TUT_COMBO.length) T.next = 3; }
   } else if (T.phase === 3) {
     if (T.step === 0 && a.state === 'throw') { tutNext(); }   // contre (X) puis contre-attaque (Y / B)
     else if (T.step === 1 && T.clashSeen && !G.clash) { tutNext(); T.next = 4; }   // bras de fer terminé
@@ -4275,8 +4279,8 @@ function tutAI(f, o) {   // le double : immobile, puis il attaque (phase 3), pui
   const T = G.tut, a = f.ai, held = {};
   if (a.press) { held[a.press] = true; if (--a.pressFrames <= 0) a.press = null; }
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l';
-  if (G.fighting && T.phase === 2 && dist > 150 && NEUTRAL.includes(f.state)) held[fwd] = true;   // reste à portée pour les coups spéciaux
-  if (!G.fighting || T.phase < 3 || T.ok > 0) return held;
+  if (G.fighting && (T.phase === 2 || T.phase === 5) && dist > 150 && NEUTRAL.includes(f.state)) held[fwd] = true;   // reste à portée pour les coups spéciaux
+  if (!G.fighting || T.phase < 3 || T.phase === 5 || T.ok > 0) return held;
   if (!NEUTRAL.includes(f.state)) return held;
   if (T.step === 0) {   // s'approche et donne des coups de poing : au joueur de contrer
     if (dist > 50) held[fwd] = true;
@@ -4288,11 +4292,12 @@ function drawTut() {
   const T = G.tut; if (!T) return;
   let L1 = '', L2 = '', head = '';
   if (T.phase === 4) { if (!(T.showFight > 0)) return; T.showFight--; head = 'TUTORIAL COMPLETE'; L1 = 'NOW YOU KNOW ALL THE BASICS. FIGHT!'; L2 = 'PAUSE: CHANGE THE DIFFICULTY IN OPTIONS'; }
-  else if (T.ok > 0) { head = 'GOOD!'; L1 = T.next === 2 ? 'NEXT: SPECIAL MOVES' : T.next === 3 ? 'NEXT: THE COUNTER' : T.next === 4 ? 'WELL DONE!' : ''; }
+  else if (T.ok > 0) { head = 'GOOD!'; L1 = T.next === 2 ? 'NEXT: SPECIAL MOVES' : T.next === 5 ? 'NEXT: COMBOS' : T.next === 3 ? 'NEXT: THE COUNTER' : T.next === 4 ? 'WELL DONE!' : ''; }
   else if (T.phase === 1) { head = 'STEP 1: THE BUTTONS'; L1 = tutLab(TUT_BTN[T.step][1]); }
   else if (T.phase === 2) { const it = tutSpecials(G.f[0].def)[T.step]; head = 'STEP 2: SPECIAL MOVES'; L1 = it ? tutLab(it[0]) + ': ' + it[1] : ''; }
-  else if (T.phase === 3 && T.step === 0) { head = 'STEP 3: THE COUNTER'; L1 = tutLab('WHEN THE FOE ATTACKS, PRESS X TO COUNTER'); L2 = tutLab('THEN PRESS Y OR B TO STRIKE BACK'); }
-  else if (T.phase === 3) { head = 'STEP 3: THE COUNTER'; L1 = 'HIT THE FOE: HE WILL COUNTER YOU.'; L2 = tutLab('COUNTER HIM BACK FAST WITH X!'); }
+  else if (T.phase === 5) { const it = TUT_COMBO[T.step]; head = 'STEP 3: COMBOS'; L1 = it ? tutLab('PRESS ' + it[1] + ' QUICKLY') : ''; L2 = 'THE 4TH HIT DASHES FORWARD IN FIRE!'; }
+  else if (T.phase === 3 && T.step === 0) { head = 'STEP 4: THE COUNTER'; L1 = tutLab('WHEN THE FOE ATTACKS, PRESS X TO COUNTER'); L2 = tutLab('THEN PRESS Y OR B TO STRIKE BACK'); }
+  else if (T.phase === 3) { head = 'STEP 4: THE COUNTER'; L1 = 'HIT THE FOE: HE WILL COUNTER YOU.'; L2 = tutLab('COUNTER HIM BACK FAST WITH X!'); }
   if (T.clashWait) { head = 'CLASH!'; L1 = 'MASH ANY BUTTON AS FAST AS YOU CAN!'; L2 = (G.frame >> 4) % 2 ? 'PRESS A BUTTON TO START' : ''; }
   const bw = Math.min(W - 16, 340), bx = CX - bw / 2, by = 46, bh = L2 ? 40 : 30;
   R(bx, by, bw, bh, 'rgba(8,4,16,.82)'); R(bx, by, bw, 1, '#5a3a2a'); R(bx, by + bh - 1, bw, 1, '#5a3a2a');
@@ -4865,7 +4870,7 @@ function stepFight() {
   G.sparks = G.sparks.filter(s => s.t < 12);
 
   if (G.scene === 'fight') {
-    if (OPT.diff !== 3 && !(G.tut && G.tut.phase < 4) && ++G.tick >= 45) { G.tick = 0; G.timer = Math.max(0, G.timer - 1); }   // entraînement : temps infini
+    if (OPT.diff !== 3 && !(G.tut && G.tut.phase !== 4) && ++G.tick >= 45) { G.tick = 0; G.timer = Math.max(0, G.timer - 1); }   // entraînement : temps infini
     if (a.hp <= 0 || b.hp <= 0) {
       const loser = a.hp <= 0 ? a : b;
       loser.ko = true;
