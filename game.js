@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v191';
+const VERSION = 'v192';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -2105,6 +2105,7 @@ function updFighter(f, o) {
           if (f.rampT > 0) {   // électricité active + A : explosion du dôme (renvoie les boules de feu)
             f.rampT = 0; setState(f, 'rburst'); G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); G.boltX = f.x; G.boltY = f.y - 50; sfx('parry'); sfx('heavy');
             G.waves.push({ owner: f, x: f.x, dir: f.dir, t: 0, life: 22, small: true, ring: true, dome: true, done: true });
+            if (Math.abs(o.x - f.x) < 100 && hurtbox(o)) applyHit(f, o, RAMPART_HIT, (o.x + f.x) / 2, o.y - 50, f.x, true);   // le dôme repousse l'adversaire proche
             break;
           }
           if (shotOK(f)) { shotUse(f); setState(f, 'quake'); break; }
@@ -3865,10 +3866,7 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   if (att.def.fireUpper && att.state === 'uppercut' && !projectile) { data = Object.assign({}, data, { dmg: 19 }); def.burn = Math.max(def.burn || 0, 70); def.burnPal = att.def.fb; }   // poing en feu : plus de dégâts, brûlure
   // Rempart de Fer : absorbe totalement le coup puis repousse l'attaquant
   if ((def.state === 'rampart' && def.t >= 2) || (def.rampT > 0 && !def.air && !['fall', 'down', 'getup', 'held', 'throw'].includes(def.state))) {
-    G.freeze = 8; addSpark(sx, sy, 'parry'); sfx('parry'); sfx('heavy'); def.rampT = 0;
-    setState(def, 'rburst'); G.flashT = Math.max(G.flashT, 8); G.shake = Math.max(G.shake, 6); G.boltX = def.x; G.boltY = def.y - 50;
-    G.waves.push({ owner: def, x: def.x, dir: def.dir, t: 0, life: 22, small: true, ring: true, dome: true, done: true });   // dôme électrique
-    if (Math.abs(att.x - def.x) < 100) { att.hasHit = true; applyHit(def, att, RAMPART_HIT, (att.x + def.x) / 2, att.y - 50, def.x, true); }
+    G.freeze = 6; addSpark(sx, sy, 'parry'); sfx('block'); def.rampT = 0; att.hasHit = true;   // absorbe le coup, sans explosion (le dôme ne part qu'avec un 2e appui sur A)
     return;
   }
   const away = fromX < def.x ? 1 : -1;
@@ -4919,7 +4917,7 @@ const MOVES = [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
   { title: 'GROG SPECIALS', lines: [
-    ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ABSORBS A HIT, PUSHES BACK'], ['RAMPART > A', 'DOME BLAST, REFLECTS SHOTS'],
+    ['A', 'SEISMIC IMPACT'], ['', 'GROUND WAVE, JUMP TO DODGE'], ['BACK + A', 'IRON RAMPART'], ['', 'ELECTRIC ARMS, ABSORB ONE HIT'], ['RAMPART > A', 'DOME BLAST, REFLECTS SHOTS'],
     ['UP + A', 'CELESTIAL CRUSH'], ['', 'HUGE LEAP, FISTS-FIRST DIVE'], ['DOWN + A', 'ROLLING ATTACK'], ['', '3 FAST ROLLS ON THE GROUND'] ] },
   { title: 'COMBOS', lines: [
     ['', 'CHAIN HITS WHILE THE FOE IS STUNNED.'], ['', 'THE 4TH HIT SETS HIM ON FIRE!'], ['', ''],
