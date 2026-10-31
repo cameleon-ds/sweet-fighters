@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v207';
+const VERSION = 'v208';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4658,7 +4658,7 @@ function step() {
         G.tmenu = (G.tmenu || 0) + 1;
         const tc = Math.max(0, Math.min(TITLE_ITEMS.length - 1, (G.tcur || 0) + navStep()));
         if (tc !== (G.tcur || 0)) { G.tcur = tc; sfx('beep'); }
-        if (tap) { const i = Math.floor((tap.y - 143) / 10); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
+        if (tap) { const i = Math.floor((tap.y - 136) / 10); if (i >= 0 && i < TITLE_ITEMS.length) G.tcur = i; else break; }
         if (backPress(pctl)) { G.tstate = 0; sfx('beep'); }
         else if (okPress(pctl) || tap) {
           sfx('select');
@@ -5382,12 +5382,12 @@ function drawTitle() {
   } else {
     TITLE_ITEMS.forEach((m, i) => {
       const sel = G.tcur === i;
-      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 146 + i * 10, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
+      text((sel ? '> ' : '') + m + (sel ? ' <' : ''), CX, 139 + i * 10, 8, sel ? '#ffd23a' : 'rgba(255,255,255,.6)', 'center');
     });
   }
-  if (L > 30) {
-    text('POWERED BY SUPER ROCKET GAMES', CX, 197, 8, '#c8b8a0', 'center');
-    text('ALL RIGHTS RESERVED 2026', CX, 207, 8, '#9a8a70', 'center');
+  if (L > 30) {   // plus petit, détaché du menu
+    text('POWERED BY SUPER ROCKET GAMES', CX, 200, 5, '#c8b8a0', 'center');
+    text('ALL RIGHTS RESERVED 2026', CX, 207, 5, '#9a8a70', 'center');
   }
   text(VERSION, W - (isTouch ? 34 : 4), isTouch ? 8 : 4, 8, '#5a4a40', 'right');   // mobile : à l'écart des bords arrondis
 }
