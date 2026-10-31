@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v199';
+const VERSION = 'v200';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -537,7 +537,7 @@ const DEFS = [
     glove: ['#05050a', '#14141c', '#26263a', '#3af0ff'],
     shoe:  ['#08080e', '#22222e', '#3af0ff', '#1ab8e0'],               // bottes noires, semelle cyan
     fb: ['#ffffff', '#c8f8ff', '#3af0ff', '#c83aff'] },
-  { name: 'GROG', style: 'tshirt', head: HEAD_GROG2, headBack: HEAD_GROG2, vneck: true, torn: true, softNeck: true, size: 1.1, traps: true, minBelt: true, kit: 'grog',
+  { name: 'GROG', style: 'tshirt', head: HEAD_GROG2, headBack: HEAD_GROG2, bareChest: true, torn: true, softNeck: true, size: 1.1, traps: true, minBelt: true, kit: 'grog',
     speed: .72, tough: .82, power: 1.12,
     skin:  ['#2c3a30', '#5a6e5e', '#80968a', '#a8bcaa'],               // vert délavé
     eye:   '#ff2a1a',                                                   // pupille rouge dans l'œil noir
@@ -1078,7 +1078,7 @@ function drawFighter(f, x = f.x, y = f.y) {
     for (const [a0, a1] of [[add(sh, fwd, 7), add(wa, fwd, -6)], [add(sh, fwd, -6), add(wa, fwd, 6.5)]]) for (let t = 0; t <= 1; t += .06) { const q = mix(a0, a1, t); sR(q[0], q[1], 2, 1, SP[1]); }
   }
 
-  if (tshirt && !backView && !d.vneck && !d.bare && !d.skinTop) {
+  if (tshirt && !backView && !d.vneck && !d.bare && !d.skinTop && !d.bareChest) {
     // col rond
     const c1 = add(sh, fwd, -1.5), c2 = add(sh, fwd, 3.5), cb = add(at(.1), fwd, 1);
     sPoly([add(c1, fwd, -1), add(c2, fwd, 1), add(cb, [0, 1])], top[1]);
@@ -1105,6 +1105,16 @@ function drawFighter(f, x = f.x, y = f.y) {
   }
 
 
+  if (d.bareChest && !backView && !fullBack) {   // Grog torse nu : mêmes pectoraux que Hiro, mais entièrement visibles, et abdos
+    sPoly([add(at(.03), fwd, 1.5), add(at(.03), fwd, 6), add(at(.18), fwd, 6.8), add(at(.34), fwd, 5), add(at(.38), fwd, 1.5)], sk[3]);    // pectoral avant éclairé
+    sPoly([add(at(.03), fwd, .5), add(at(.03), fwd, -4.5), add(at(.17), fwd, -5.2), add(at(.32), fwd, -3.8), add(at(.36), fwd, .5)], sk[2]);  // pectoral arrière
+    for (let t = .04; t <= .38; t += .05) { const q = add(at(t), fwd, 1.1); sR(q[0], q[1], 1, 1, sk[1]); }   // sillon entre les pectoraux
+    for (let k = -4.5; k <= 6.5; k += .5) { const side = Math.max(0, Math.abs(k - 1) - 3), q = add(at(.4 - side * .025), fwd, k); sR(q[0], q[1], 1, 1, sk[1]); }   // ombre sous les pectoraux
+    const ph = add(at(.14), fwd, 4); sR(ph[0], ph[1], 2, 1, '#c8dccb');   // reflet
+    for (let t = .48; t <= .9; t += .06) { const q = add(at(t), fwd, 1.2); sR(q[0], q[1], 1, 1, sk[1]); }   // ligne blanche des abdos
+    for (const t of [.56, .68, .8]) { const a1 = add(at(t), fwd, -2), a2 = add(at(t), fwd, 4); sR(a1[0] - (dir < 0 ? 1 : 0), a1[1], 2, 1, sk[1]); sR(a2[0] - (dir < 0 ? 1 : 0), a2[1], 2, 1, sk[1]); }   // 3 rangées d'abdos
+    for (const t of [.5, .62, .74]) { const b1 = add(at(t), fwd, -.5), b2 = add(at(t), fwd, 2.5); sR(b1[0], b1[1], 1, 1, sk[3]); sR(b2[0], b2[1], 1, 1, sk[3]); }   // reflets des abdos
+  }
   if (d.uniform && !backView && !fullBack) {   // veste militaire croisée : boutons dorés, col montant, passepoil
     for (let t = .15; t <= .8; t += .16) for (const o of [0, 3.5]) { const q = add(at(t), fwd, o); sR(q[0], q[1], 1, 1, '#d0a848'); }
     for (let t = .05; t <= 1; t += .07) { const q = add(at(t), fwd, 1.8); sR(q[0], q[1], 1, 1, '#6a5a2a'); }
@@ -3693,7 +3703,7 @@ function updGrog() {
       addSpark(q.x, q.y || g.y - 50, 'parry'); sfx('parry'); G.flashT = Math.max(G.flashT, 4); G.freeze = Math.max(G.freeze || 0, 4);
       G.waves.push({ owner: g, x: g.x, dir: g.dir, t: 0, life: 12, small: true, ring: true, done: true });
     };
-    for (const q of G.fbs || []) mir(q, 'vx');
+    for (const q of G.fbs || []) if (!q.big) mir(q, 'vx');   // la grosse boule de feu chargée gagne contre le dôme
     for (const q of G.blades || []) mir(q, null);
     for (const q of G.sonics || []) mir(q, null);
     for (const q of G.voids || []) if (!q.charging) mir(q, 'vx');
