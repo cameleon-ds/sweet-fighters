@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v201';
+const VERSION = 'v202';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4253,6 +4253,22 @@ function navStep() { const u = nav('u'), d = nav('d'); return d ? 1 : u ? -1 : 0
 let MR_KEY = null, MR = [];
 const KIT_PAGE = { vesper: 'VESPER SPECIALS', vane: 'LORD VANE SPECIALS', kael: 'KAEL SPECIALS', nyx: 'NYX SPECIALS', zephyr: 'ZEPHYR SPECIALS', grog: 'GROG SPECIALS' };
 const mlTwo = () => G.paused && G.f && G.f[1] && !G.f[1].cpu;   // deux joueurs humains : choix PLAYER 1 / PLAYER 2
+// lignes affichées : la colonne des commandes (bleu) et celle des descriptions (blanc) passent sur 2 lignes si besoin, alignées à gauche
+let MD_KEY = null, MD = [];
+function moveDisp() {
+  const rows = moveRows(), x0 = Math.max(16, CX - 168), vc = Math.max(10, Math.floor((W - 14 - (x0 + 112)) / 8));
+  const lab = k => (isTouch && !padOn() ? k : k.replace('STICK ', '')).replace(/\b([YBAX])\b/g, (m0, b) => btnLabel(b));
+  const key = MR_KEY + '|' + vc + '|' + lab('Y B A X STICK');
+  if (key === MD_KEY) return MD;
+  MD_KEY = key; MD = [];
+  const wrap = (t, n) => { if (!t) return ['']; const out = []; let cur = ''; for (const w of t.split(' ')) { if (cur && cur.length + 1 + w.length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } out.push(cur); return out; };
+  for (const [k, v] of rows) {
+    if (k === '#' || (!k && !v)) { MD.push([k, v]); continue; }
+    const kl = wrap(k ? lab(k) : '', 13), vl = wrap(v, vc), n = Math.max(kl.length, vl.length);
+    for (let i = 0; i < n; i++) MD.push([kl[i] || '', vl[i] || '', true]);
+  }
+  return MD;
+}
 function moveRows() {   // en pause : coups du combattant actuel seulement ; écran titre : tous les coups
   const pz = G.paused && G.f && G.f.length === 2, pi = mlTwo() ? (G.mlP || 0) : 0;
   const key = pz ? 'p' + pi + G.f[pi].def.name : 'all';
@@ -4266,7 +4282,7 @@ function moveRows() {   // en pause : coups du combattant actuel seulement ; éc
 }
 function stepMoves() {
   if (mlTwo() && (edge(pctl, 'l') || edge(pctl, 'r'))) { G.mlP = 1 - (G.mlP || 0); G.mscroll = 0; sfx('beep'); }
-  const maxS = Math.max(0, moveRows().length * 14 - 128);
+  const maxS = Math.max(0, moveDisp().length * 14 - 128);
   if (pctl.held.d) G.mscroll = Math.min(maxS, (G.mscroll || 0) + 1.5);
   if (pctl.held.u) G.mscroll = Math.max(0, (G.mscroll || 0) - 1.5);
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
@@ -5078,15 +5094,15 @@ function drawMoves() {
   const x0 = Math.max(16, CX - 168), top = 30, bot = 162, sc = G.mscroll || 0;
   ctx.save(); ctx.beginPath(); ctx.rect(0, top, W, bot - top); ctx.clip();
   if (mlTwo()) [0, 1].forEach(i => text((i ? 'PLAYER 2' : 'PLAYER 1'), CX + (i ? 50 : -50), 20, 8, (G.mlP || 0) === i ? '#ffd23a' : '#7a6a5a', 'center'));
-  const MOVE_ROWS = moveRows();
-  MOVE_ROWS.forEach(([k, v], i) => {
+  const MOVE_ROWS = moveDisp();
+  MOVE_ROWS.forEach(([k, v, done], i) => {
     const y = top + 4 + i * 14 - sc;
     const fa = Math.max(0, Math.min(1, (y - top + 2) / 8, (bot - 8 - y) / 8));   // fondu en haut et en bas
     if (fa <= 0) return;
     ctx.globalAlpha = fa;
     if (k === '#') { R(x0, y + 10, 2 * CX - 2 * x0, 1, '#5a3a2a'); text(v, CX, y, 8, '#ffd23a', 'center'); return; }
-    if (k) text((isTouch && !padOn() ? k : k.replace('STICK ', '')).replace(/\b([YBAX])\b/g, (m0, b) => btnLabel(b)), x0, y, 8, '#7af0ff', 'left');   // touches du clavier / boutons de la manette
-    if (v) text(v, k ? x0 + 112 : CX, y, 8, '#ffffff', k ? 'left' : 'center');
+    if (k) text(k, x0, y, 8, '#7af0ff', 'left');   // colonne des commandes (touches du clavier / boutons de la manette)
+    if (v) text(v, x0 + 112, y, 8, '#ffffff', 'left');   // colonne des descriptions
   });
   ctx.globalAlpha = 1; ctx.restore();
   // ascenseur
