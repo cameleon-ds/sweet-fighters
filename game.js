@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v218';
+const VERSION = 'v219';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -5421,8 +5421,7 @@ function drawTitle() {
     });
   }
   if (L > 30) {   // plus petit, détaché du menu
-    text('POWERED BY SUPER ROCKET GAMES', CX, 200, 5, '#c8b8a0', 'center');
-    text('ALL RIGHTS RESERVED 2026', CX, 207, 5, '#9a8a70', 'center');
+    text('POWERED BY SUPER ROCKET GAMES - ALL RIGHTS RESERVED 2026', CX, 204, Math.min(8, Math.floor((W - 16) / 56)), '#d8c8b0', 'center');   // une seule ligne, lisible
   }
   text(VERSION, W - (isTouch ? 34 : 4), isTouch ? 8 : 4, 8, '#5a4a40', 'right');   // mobile : à l'écart des bords arrondis
 }
