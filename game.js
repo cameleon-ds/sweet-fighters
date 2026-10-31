@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v203';
+const VERSION = 'v205';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -1854,6 +1854,9 @@ const ATK = {
   tornado:  { act: [3, 26], box: [-24, -104, 30, -8], dmg: 13, knock: true, lift: 7.5, bstun: 16, push: 1.5, sfx: 'heavy' },
   gust:     { dur: 26, act: [7, 12], box: [10, -70, 46, -30], dmg: 6, stun: 14, bstun: 10, push: 1.6, sfx: 'hit' },
   gpound:   { act: [7, 99], box: [-18, -40, 18, 4], high: true, dmg: 15, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
+  vtripP:   { act: [1, 24], box: [14, -76, 46, -56], dmg: 4, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de poing très rapides (Y maintenu puis lâché)
+  vtripK:   { act: [1, 24], box: [18, -68, 60, -44], dmg: 5, stun: 16, bstun: 8, push: .5, sfx: 'hit' },   // Vane : 3 coups de pied très rapides (B maintenu puis lâché)
+  vdive:    { act: [2, 80], box: [8, -30, 40, 2], high: true, dmg: 11, stun: 20, bstun: 12, push: 2.2, sfx: 'hit' },   // Vane : coup de pied en diagonale vers le bas (saut + bas + A)
   hslide:   { act: [15, 60], box: [2, -100, 32, -30], dmg: 8, stun: 18, bstun: 10, push: 1.6, sfx: 'hit' },   // Hiro : glissade basse puis mini shoryuken (ne fait pas tomber)
   fjump:    { act: [5, 60], box: [8, -66, 48, -34], dmg: 11, stun: 34, bstun: 12, push: 1.4, sfx: 'heavy' },   // Axel : saut loin vers l'avant, poing en feu
   crushD:   { act: [0, 99], box: [-10, -46, 28, 4], high: true, dmg: 16, knock: true, stun: 22, bstun: 16, push: 3, sfx: 'heavy' },
@@ -1869,7 +1872,7 @@ const ATK = {
 };
 const FB_HIT = { dmg: 10, stun: 18, bstun: 14, push: 2.6, chip: 2, sfx: 'heavy' };
 const FB_BIG = { dmg: 22, knock: true, stun: 24, bstun: 20, push: 3.6, chip: 5, sfx: 'heavy' };
-const ATTACKING = ['hslide', 'fjump', 'grogroll', 'aflip', 'nyxspin', 'kbarrage', 'kspin', 'flipk', 'nslide', 'gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
+const ATTACKING = ['vtripP', 'vtripK', 'vdive', 'hslide', 'fjump', 'grogroll', 'aflip', 'nyxspin', 'kbarrage', 'kspin', 'flipk', 'nslide', 'gpound', 'tpstrike', 'meteor', 'meteorD', 'voidcast', 'plasmawall', 'sonic', 'flask', 'geyser', 'wallslash', 'plunge', 'tornado', 'gust', 'cyclone', 'crushD', 'quake', 'zenith', 'holo', 'punch', 'kick', 'fpunch', 'fkick', 'flame', 'gtatsu', 'cpunch', 'rupper', 'ckick', 'jpunch', 'jkick', 'tatsu', 'dive', 'uppercut', 'special'];
 const NEUTRAL = ['idle', 'walk', 'block', 'crouch', 'cblock'];
 
 /* ---------------- État du jeu ---------------- */
@@ -1893,7 +1896,7 @@ const chargeMax = f => { const T = f.def.twinFb ? 72 : f.def.fireUpper ? 90 : 12
 function setState(f, s) { if (f.chSnd && s !== f.state) vaneChargeStop(f); if (s !== 'pteleport' && s !== 'nyxtele') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } if (s !== 'jump') { f.rollT = 0; f.rollA0 = 0; f.airNoS = false; } f.fireDash = 0; f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
-const VANE_NORMALS = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'flame'];
+const VANE_NORMALS = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'flame', 'vtripP', 'vtripK'];
 function poseOf(f) {
   if (f.def.float && !f.ghostDraw && VANE_NORMALS.includes(f.state)) return 'vidle';   // Vane reste immobile : c'est son double qui frappe
   switch (f.state) {
@@ -1929,6 +1932,9 @@ function poseOf(f) {
     case 'grogroll': return f.t < 3 || f.t >= 39 ? 'crouch' : 'tuckG';
     case 'aflip': return 'jkick';
     case 'fjump': return f.t < 4 ? 'sho0' : 'fjump';
+    case 'vtripP': return f.t >= 24 ? 'punch0' : (f.t % 8) < 4 ? 'punch1' : 'punch0';
+    case 'vtripK': return f.t >= 24 ? 'kick0' : (f.t % 8) < 4 ? 'kick1' : 'kick0';
+    case 'vdive': return 'dive';
     case 'hslide': return f.t < 3 ? 'crouch' : f.t < 15 ? 'sho0' : 'rup2';
     case 'jkick': return f.t < 3 ? 'jump' : 'jkick';
     case 'punch': return f.t < 2 || f.t >= 8 ? 'punch0' : 'punch1';   // coup de poing très rapide
@@ -2003,9 +2009,9 @@ function threatened(f, o) {
 function shotOK(f) { if (G.frame - (f.shotLast || -999) > 90) f.shotN = 0; return G.frame >= (f.shotCd || 0) && (f.shotN || 0) < 3; }
 function shotUse(f) { f.shotN = (f.shotN || 0) + 1; f.shotLast = G.frame; if (f.shotN >= 3) { f.shotCd = G.frame + 24 + 60; f.shotN = 0; } }
 // détruit les projectiles adverses dans une zone (poings de Kael, pied de Vesper...) ; renvoie le nombre détruit
-function killShots(g, x0, x1, y0, y1) {
+function killShots(g, x0, x1, y0, y1, skipBig) {
   let n = 0;
-  const hit = (q, qy) => { if (q.owner === g || q.dead || q.alive === false || q.charging) return; if (q.x < x0 - 8 || q.x > x1 + 8 || qy < y0 - 8 || qy > y1 + 8) return;
+  const hit = (q, qy) => { if (q.owner === g || q.dead || q.alive === false || q.charging || (skipBig && (q.big || q.r != null))) return; if (q.x < x0 - 8 || q.x > x1 + 8 || qy < y0 - 8 || qy > y1 + 8) return;
     if ('alive' in q) q.alive = false; q.dead = true; if (q.owner && q.owner.fb === q) q.owner.fb = null; n++;
     (G.clashFx = G.clashFx || []).push({ x: q.x, y: qy, t: 0 }); };
   for (const q of G.fbs || []) hit(q, q.y);
@@ -2061,6 +2067,10 @@ function updFighter(f, o) {
   const c = f.ctl, h = c.held;
   const fwd = f.dir > 0 ? h.r : h.l, back = f.dir > 0 ? h.l : h.r;
   f.t++;
+  if (f.def.kit === 'vane') {   // Y ou B maintenu puis lâché (même en se déplaçant) : rafale de 3 coups
+    for (const b of ['p', 'k']) { const K2 = b + 'Hold'; if (h[b]) f[K2] = (f[K2] || 0) + 1; else { if ((f[K2] || 0) >= 18) { f.relB = b; f.relT = G.frame; } f[K2] = 0; } }
+    if (f.relB && G.frame - f.relT > 10) f.relB = null;
+  }
   if (f.restT > 0) {   // temps d'arrêt : seul le coup qui termine un enchaînement reste possible
     f.restT--;
     for (const b of ['p', 'k', 's']) if (c.buf[b] > 0 && !(o.state === 'hit' && FINISHERS.includes((f.combo || '') + b)) && !(G.frame - (f.iseqLast || -999) < 45 && FINISHERS.includes((f.iseq || '') + b))) { c.buf[b] = 0; if (c.q) c.q[b] = 0; }
@@ -2149,8 +2159,9 @@ function updFighter(f, o) {
         f.jumpQ = (f.jumpQ || 0) + 1;
         if (f.jumpQ >= 4) {
           f.jumpQ = 0;
-          setState(f, 'jump'); f.vy = -7.4; f.air = true; f.airAtk = false; f.roll = fwd ? 1 : back ? -1 : 0; sfx('jump');
-          f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir; break;
+          const vj = f.def.kit === 'vane';   // Lord Vane saute plus haut et plus loin que les autres
+          setState(f, 'jump'); f.vy = vj ? -8.6 : -7.4; f.air = true; f.airAtk = false; f.roll = fwd ? 1 : back ? -1 : 0; sfx('jump');
+          f.vx = (fwd ? 2.2 : back ? -2.2 : 0) * f.dir * (vj ? 1.4 : 1); break;
         }
       } else f.jumpQ = 0;
       // Accroupi : coups bas, garde basse avec bas + arrière
@@ -2162,6 +2173,7 @@ function updFighter(f, o) {
         if (f.state !== want) { setState(f, want); f.bstun = 0; }
         break;
       }
+      if (f.relB) { const b = f.relB; f.relB = null; setState(f, b === 'p' ? 'vtripP' : 'vtripK'); f.vx = 0; f.vtN = 0; break; }   // Vane : rafale de 3 coups
       // avant + Y : coup de poing du bras proche, plus long · avant + B : coup de pied de l'autre jambe, plus long
       if (fwd && f.def.sword && take(c, 'p')) { setState(f, 'wallslash'); f.vx = 0; sfx('whoosh'); break; }   // Zephyr : grand coup de sabre de la tête au sol
       if (take(c, 'p')) { setState(f, fwd ? 'fpunch' : 'punch'); f.vx = 0; sfx('whoosh'); markFire(f, o, 'p'); break; }
@@ -2238,6 +2250,9 @@ function updFighter(f, o) {
         if (take(c, 'p')) { setState(f, 'jpunch'); f.airAtk = true; sfx('whoosh'); }
         else if (take(c, 'k')) { setState(f, 'jkick'); f.airAtk = true; sfx('whoosh'); }
         else if (f.airNoS) { if (c.buf.s > 0) take(c, 's'); }   // roulade de retour : coups simples seulement
+        else if (f.def.kit === 'vane' && h.d && take(c, 's')) {   // en l'air + bas + A : coup de pied en diagonale vers le bas
+          setState(f, 'vdive'); f.airAtk = true; f.bounced = false; sfx('upper');
+        }
         else if (f.def.kit === 'vane' && take(c, 's')) {   // en l'air + A : grosse sphère du vide en diagonale vers le sol
           setState(f, 'airvoid'); f.airAtk = true;
         }
@@ -2429,6 +2444,16 @@ function updFighter(f, o) {
       reflectNear(f, 48, f.y - 54, 44); if (f.t % 7 === 1) sfx('whoosh');
       break;
     }
+    case 'vtripP': case 'vtripK':   // Vane : 3 coups très rapides, le 3e fait tomber
+      f.vx = 0;
+      if (f.t < 24 && f.t % 8 === 0) { f.hasHit = false; sfx('whoosh'); }
+      if (f.t >= 30) setState(f, 'idle');
+      break;
+    case 'vdive':   // Vane : coup de pied plongeant en diagonale, casse les boules de feu (pas les grosses)
+      if (f.t < 2) { f.vx *= .5; f.vy = Math.min(f.vy, 0) * .5; break; }
+      if (!f.hasHit) { f.vx = 5 * f.dir; f.vy = 5.4 - GRAV; killShots(f, f.x + f.dir * 26 - 18, f.x + f.dir * 26 + 18, f.y - 36, f.y + 6, true); }
+      else if (!f.bounced) { f.bounced = true; f.vx = -1.6 * f.dir; f.vy = -3.2; }
+      break;
     case 'hslide': {   // Hiro : glisse en s'abaissant (passe sous les boules de feu), puis petit saut uppercut
       if (f.t < 3) { f.vx = 0; break; }
       if (f.t < 15) f.vx = 6 * f.dir;
@@ -2553,6 +2578,7 @@ function updFighter(f, o) {
       f.y = GROUND; f.vy = 0; f.air = false;
       if (f.state === 'fall') { setState(f, 'down'); G.shake = Math.max(G.shake, 3); sfx('thud'); }
       else if (f.state === 'uppercut') { setState(f, 'land'); f.landT = 14; }
+      else if (f.state === 'vdive') { f.bounced = false; setState(f, 'land'); f.landT = 8; }
       else if (f.state === 'hslide') { f.hsT = G.frame; if (f.upQ) { f.upQ = false; setState(f, 'uppercut'); f.invuln = 11; f.apexT = null; } else { setState(f, 'land'); f.landT = 6; } }
       else if (f.state === 'fjump') { if (f.upQ) { f.upQ = false; setState(f, 'uppercut'); f.invuln = 11; f.apexT = null; f.t = 4; f.fireState = 'uppercut'; } else { setState(f, 'land'); f.landT = 8; } }
       else if (f.state === 'tatsu' || f.state === 'kspin' || f.state === 'aflip') { f.ftrail2 = null; setState(f, 'land'); f.landT = f.state === 'kspin' ? 6 : 10; }
@@ -2603,7 +2629,7 @@ function atkBox(f) {
   const a = ATK[f.state];
   if (!a || f.hasHit) return null;
   if (f.t < a.act[0] || f.t >= a.act[1]) return null;
-  if (['hslide', 'fjump', 'aflip', 'nyxspin', 'kspin', 'flipk', 'jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
+  if (['vdive', 'hslide', 'fjump', 'aflip', 'nyxspin', 'kspin', 'flipk', 'jpunch', 'jkick', 'uppercut', 'tatsu', 'zenith', 'dive', 'crushD', 'gpound', 'tornado', 'plunge', 'meteor', 'meteorD'].includes(f.state) && !f.air) return null;
   let [x0, y0, x1, y1] = a.box;
   if (f.def.float && VANE_NORMALS.includes(f.state)) { x0 += 26; x1 += 26; y0 -= floatOff(f); y1 -= floatOff(f); }   // c'est le double, plus loin devant, qui frappe
   return f.dir > 0 ? [f.x + x0, f.y + y0, f.x + x1, f.y + y1] : [f.x - x1, f.y + y0, f.x - x0, f.y + y1];
@@ -3707,7 +3733,7 @@ function updGrog() {
     for (const q of G.fbs || []) if (!q.big) mir(q, 'vx');   // la grosse boule de feu chargée gagne contre le dôme
     for (const q of G.blades || []) mir(q, null);
     for (const q of G.sonics || []) mir(q, null);
-    for (const q of G.voids || []) if (!q.charging) mir(q, 'vx');
+    // la grosse sphère de Lord Vane gagne contre le dôme : pas de renvoi
   }
   for (const w of G.waves || []) {
     const o = G.f.find(f => f !== w.owner);
@@ -3949,12 +3975,13 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
   }
   // 3 coups d'affilée max, puis petit temps d'arrêt (sauf pour finir un enchaînement de la liste)
   if (att.state === 'nslide' && att.def.kit !== 'nyx' && !projectile) data = Object.assign({}, data, { knock: false, stun: 16 });   // glissade : ne fait pas tomber (sauf Nyx)
-  if (!projectile && !['gtatsu', 'ckick', 'kbarrage', 'kspin', 'flipk', 'aflip', 'grogroll'].includes(att.state)) {
+  if (!projectile && !['vtripP', 'vtripK', 'gtatsu', 'ckick', 'kbarrage', 'kspin', 'flipk', 'aflip', 'grogroll'].includes(att.state)) {
     att.run = def.state === 'hit' && G.frame - (att.runLast || -999) < 50 ? (att.run || 0) + 1 : 1;
     att.runLast = G.frame;
     if (finisher) { att.run = 0; att.restT = 0; }
     else if (att.run >= 3) { att.restT = 30; att.run = 0; }
   }
+  if ((att.state === 'vtripP' || att.state === 'vtripK') && !projectile) { att.vtN = (att.vtN || 0) + 1; if (att.vtN >= 3) data = Object.assign({}, data, { knock: true, dmg: 8 }); }   // 3e coup : chute
   if (att.state === 'fjump' && !projectile) { att.fjHitT = G.frame; def.burn = Math.max(def.burn || 0, 40); def.burnPal = att.def.fb; }   // saut-poing : ne fait pas tomber, haut + A enchaîne le shoryuken
   if (att.state === 'kbarrage' && !projectile) {   // 5e poing de la rafale : fait tomber
     att.barN = (att.barN || 0) + 1;
@@ -4881,9 +4908,7 @@ function drawHUD() {
   R(CX - 21, 8, 42, 13, flash ? '#ffffff' : '#d8261c');
   text('KO', CX, 11, 8, flash ? '#d8261c' : '#ffe14a', 'center', '#5a0a06');
   // Chrono
-  if (OPT.diff === 3) {   // symbole infini dessiné en pixels
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(CX - 5, 18, 5, 4, 0, 0, Math.PI * 2); ctx.moveTo(CX + 10, 18); ctx.ellipse(CX + 5, 18, 5, 4, 0, 0, Math.PI * 2); ctx.stroke();
-  } else text(String(G.timer).padStart(2, '0'), CX, 26, 16, '#ffffff', 'center');
+  if (OPT.diff !== 3) text(String(G.timer).padStart(2, '0'), CX, 26, 16, '#ffffff', 'center');   // entraînement : pas de chrono ni de symbole
   // Noms + victoires
   text(a.def.name, bx, 24, 8, '#ffffff', 'left');
   text(b.def.name, W - bx, 24, 8, '#ffffff', 'right');
@@ -5072,7 +5097,7 @@ const MOVES = [
     ['UP + A', 'ZENITH BLADE'], ['', 'FLIP SLASH, LANDS BEHIND THE FOE'], ['JUMP + A', 'NEON DIVE'], ['', 'FAST DIAGONAL DIVE KICK'] ] },
   { title: 'LORD VANE SPECIALS', lines: [
     ['A', 'VOID FLARE'], ['', 'HUGE SLOW SPHERE, PARALYZES'], ['BACK + A', 'PHANTOM TELEPORT'], ['', 'APPEARS BEHIND, GUARD BREAK'],
-    ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'] ] },
+    ['UP + A', 'METEOR IMPACT'], ['', 'FLAMING FLIP, DIAGONAL DIVE'], ['AIR + A', 'VOID BOMB'], ['', 'BIG SPHERE, DIAGONAL DOWN'], ['AIR + DOWN + A', 'DIVE KICK, BREAKS SMALL SHOTS'], ['HOLD Y, RELEASE', '3 FAST PUNCHES, 3RD KNOCKS DOWN'], ['HOLD B, RELEASE', '3 FAST KICKS, 3RD KNOCKS DOWN'] ] },
   { title: 'KAEL SPECIALS', lines: [
     ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, CHARGES THE FISTS'], ['CHARGED > Y', 'THUNDER RUSH'], ['', '5 FAST PUNCHES, 5TH KNOCKS DOWN'],
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'], ['JUMP + A', 'VOLT SPIN'], ['', '360 SPIN KICK, REFLECTS SHOTS'] ] },
