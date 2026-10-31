@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v198';
+const VERSION = 'v199';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4606,7 +4606,9 @@ function stepFight() {
   for (const [att, def] of [[a, b], [b, a]]) {
     if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;
     if ((att.state === 'rupper' || att.state === 'cpunch') && (def.state === 'kspin' || def.state === 'nyxspin')) continue;   // bas + Y ne contre pas ces rotations
-    if (def.state === 'crushD') continue;
+    const hiroUp = x => x.def.twinFb && x.state === 'uppercut';
+    if (att.state === 'crushD' && hiroUp(def)) continue;   // le 2e shoryuken d'Hiro gagne contre la descente de Grog
+    if (def.state === 'crushD' && !hiroUp(att)) continue;
     if (NORMAL_ATK.includes(att.state) && (def.state === 'hslide' || (def.def.twinFb && def.state === 'uppercut'))) continue;   // Hiro : ses deux shoryukens gagnent contre les coups normaux   // descente diagonale de Grog : seules les boules de feu / projectiles peuvent la casser   // la roulade de Kael gagne contre bas + Y   // le saut-poing d'Axel gagne contre le shoryuken
     const ab = atkBox(att), hb = hurtbox(def) || (att.state === 'fjump' && def.state === 'uppercut' && !def.ko ? [def.x - 14, def.y - 84, def.x + 14, def.y] : null);
     if (overlap(ab, hb)) {
