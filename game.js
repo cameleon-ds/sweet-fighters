@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v193';
+const VERSION = 'v194';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -558,7 +558,7 @@ const DEFS = [
     shoe:  ['#0a1018', '#1a2836', '#6a4022', '#4a2c16'],               // bottes bleu nuit, semelles marron
     fb: ['#ffffff', '#d8fbff', '#7ae8f0', '#2a9aaa'] },
   { name: 'NYX', style: 'tshirt', vneck: true, head: HEAD_SORA, headBack: HEAD_SORA_BACK, witchHat: true, hairDown: true, female: true, slim: true, sleeveless: true, thinArms: true, noAbs: true, softNeck: true, flaps: true, shoes: true, kit: 'nyx',
-    skin:  ['#4a2a18', '#8a5a3c', '#b8805c', '#dcaa84'],
+    skin:  ['#7a3c1c', '#b8683a', '#e8a46a', '#ffd8a0'],   // peau claire comme Hiro
     eye:   '#3a2418',
     hair:  { a: '#2a1238', h: '#6a3a8e', H: '#9a68c4', L: '#c8a2ec' },   // longs cheveux mauves
     top:   ['#14040a', '#360a1c', '#5a1630', '#86304a'],               // corset bordeaux
@@ -1803,7 +1803,7 @@ function drawQRs() {
 
 const makeCtl = () => ({ held: {}, prev: {}, buf: {} });
 function confuse(held, f) {   // brume de Nyx : gauche/droite et haut/bas inversés (les coups spéciaux restent possibles)
-  if (!f || !(f.confT > 0) || G.scene !== 'fight' || G.paused || held.s) return held;   // le menu pause n'est jamais inversé
+  if (!f || !(f.confT > 0) || f.noSpecT > 0 || G.scene !== 'fight' || G.paused || held.s) return held;   // le menu pause n'est jamais inversé
   const o = Object.assign({}, held), sw = (a, b) => { const t = o[a]; o[a] = o[b]; o[b] = t; };
   sw('l', 'r'); sw('u', 'd'); return o;
 }
@@ -1851,7 +1851,7 @@ const ATK = {
   kbarrage: { act: [1, 30], box: [12, -80, 50, -54], dmg: 4, stun: 16, bstun: 8, push: .35, sfx: 'hit' },             // Kael : rafale de 5 poings électriques
   kspin:    { act: [2, 90], box: [-44, -74, 46, -36], dmg: 11, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Kael : coup de pied rotatif 360° aérien
   flipk:    { act: [5, 40], box: [-12, -84, 42, -14], dmg: 6, stun: 12, bstun: 12, push: 1.1, sfx: 'hit' },             // Hiro / Axel : salto avant coup de pied
-  nyxspin:  { act: [2, 18], box: [-40, -78, 42, -30], dmg: 10, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Nyx : coup de pied 360° arrière en plein vol
+  nyxspin:  { act: [2, 400], box: [-40, -78, 42, -30], dmg: 10, knock: true, high: true, bstun: 14, push: 2.6, sfx: 'heavy', sym: true },   // Nyx : coup de pied 360° arrière en plein vol
   nslide:   { dur: 32, act: [3, 22], box: [8, -18, 46, 0], dmg: 8, knock: true, low: true, bstun: 12, push: 2.4, sfx: 'hit' },
   grogroll: { act: [3, 39], box: [-6, -34, 34, 0], dmg: 5, stun: 14, low: true, bstun: 10, push: .6, sfx: 'hit' },        // Grog : roulades au sol x3
   aflip:    { act: [1, 40], box: [-14, -82, 42, -12], dmg: 5, stun: 14, high: true, bstun: 10, push: 1.2, sfx: 'hit' },    // Hiro / Axel en l'air : 3 saltos coup de pied   // Nyx : glissade au sol
@@ -1879,7 +1879,7 @@ function makeFighter(def, id, x, dir, cpu) {
 }
 
 const chargeMax = f => f.hp <= 80 ? 60 : 120;
-function setState(f, s) { if (f.chSnd && s !== f.state) vaneChargeStop(f); if (s !== 'pteleport') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } if (s !== 'jump') { f.rollT = 0; f.rollA0 = 0; f.airNoS = false; } f.fireDash = 0; f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
+function setState(f, s) { if (f.chSnd && s !== f.state) vaneChargeStop(f); if (s !== 'pteleport' && s !== 'nyxtele') f.fadeK = 0; if (s !== 'sink') f.sinkK = 0; if (s === 'hit' || s === 'fall') f.wallT = 0; if (f.dizzy && s !== 'stunned') { f.dizzy = false; f.dizzyEnd = G.frame; } if (s !== 'jump') { f.rollT = 0; f.rollA0 = 0; f.airNoS = false; } f.fireDash = 0; f.state = s; f.t = 0; f.hasHit = false; f.rotAng = null; }
 function face(f, o) { f.dir = o.x >= f.x ? 1 : -1; }
 
 const VANE_NORMALS = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'flame'];
@@ -1951,6 +1951,7 @@ function poseOf(f) {
     case 'flashstep': return 'block';
     case 'plasmawall': return f.t < 6 ? 'crouch' : f.t < 34 ? 'win' : 'upper0';
     case 'smokeback': return f.t < 4 ? 'special0' : 'hit';
+    case 'nyxtele': return 'idle0';
     case 'geyser': return f.t < 8 ? 'upper1' : 'gq1';
     case 'wallslash': return f.t < 8 ? 'upper1' : f.t < 11 ? 'fpunch1' : f.t < 28 ? 'cpunch' : 'crouch';
     case 'plunge': return 'sho0';
@@ -2006,6 +2007,9 @@ function killShots(g, x0, x1, y0, y1) {
   return n;
 }
 // Nyx en glissade : les projectiles passent au-dessus
+// états où le combattant n'est pas en train de faire un coup spécial
+const CALM_ST = ['idle', 'walk', 'block', 'crouch', 'cblock', 'punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'rupper', 'jpunch', 'jkick', 'jump', 'land', 'hit', 'fall', 'down', 'getup', 'held', 'throw', 'parry', 'stunned', 'win'];
+const NORMAL_ATK = ['punch', 'kick', 'fpunch', 'fkick', 'cpunch', 'ckick', 'rupper', 'jpunch', 'jkick'];
 const underShot = o => (o.state === 'fjump' && o.t >= 4) || (o.state === 'nslide' && o.t >= 2 && o.t < 26) || (o.state === 'grogroll' && o.t >= 3 && o.t < 39);
 // Kael (coup de pied rotatif) : renvoie boules de feu, clones, fioles et objets du décor lancés sur lui
 function reflectNear(g, R, yc, yr) {
@@ -2079,15 +2083,15 @@ function updFighter(f, o) {
           break;
         }
         if (f.def.kit === 'kael') {   // Kael : Uppercut Plasma / Esquive Éclair / Onde Sonique
-          if (h.u) { setState(f, 'plasmawall'); f.vx = 0; break; }
+          if (h.u) { if (G.frame >= (f.kCd || 0)) { setState(f, 'plasmawall'); f.vx = 0; f.kCd = G.frame + 40 + 15; } break; }   // 1/4 s d'attente entre deux
           if (back) { setState(f, 'flashstep'); f.invuln = 12; sfx('tele'); break; }
-          if (shotOK(f)) { shotUse(f); setState(f, 'sonic'); f.vx = 0; break; }
+          if (shotOK(f) && G.frame >= (f.kCd || 0)) { shotUse(f); setState(f, 'sonic'); f.vx = 0; f.kCd = G.frame + 26 + 15; break; }
           break;
         }
         if (f.def.kit === 'nyx') {   // Nyx : Geyser Alchimique / Écran de Fumée Toxique / Fiole Magma
           f.vx = 0;
           if (h.u) { setState(f, 'geyser'); break; }
-          if (back) { setState(f, 'smokeback'); break; }
+          if (back) { if (G.smokes.some(c => c.owner === f && !c.dead)) { setState(f, 'nyxtele'); f.invuln = 26; sfx('tele'); } else setState(f, 'smokeback'); break; }   // une seule fumée ; 2e fois : téléportation de l'autre côté
           if (shotOK(f)) { shotUse(f); setState(f, 'flask'); break; }
           break;
         }
@@ -2443,11 +2447,11 @@ function updFighter(f, o) {
       if (f.flipFin && f.rotAng != null) { const dx = f.dir * 28 * K * UP, dy = 10 * K * UP, cy = f.y - 30 * K * UP, a2 = f.rotAng, cs = Math.cos(a2), sn = Math.sin(a2); (f.ftrail2 = f.ftrail2 || []).push({ x: f.x + dx * cs - dy * sn, y: cy + dx * sn + dy * cs }); if (f.ftrail2.length > 14) f.ftrail2.shift(); }   // pied en feu
       break;
     }
-    case 'nyxspin':   // rotation sur elle-même vers l'arrière (coup de pied), puis redescend en sautant vers l'arrière
-      f.vx = h.r ? 2.4 : h.l ? -2.4 : 0; f.vy = -GRAV + (h.u ? -2 : h.d ? 2 : 0);   // dirigeable dans toutes les directions
-      f.rotAng = f.dir * Math.min(1, f.t / 16) * Math.PI * 2;   // rotation comme son saut en avant
-      if (f.t === 8) sfx('whoosh');
-      if (f.t >= 18) { setState(f, 'jump'); f.airAtk = true; f.roll = -1; f.t = 3; f.vx = -2.4 * f.dir; f.vy = -3.2; sfx('jump'); }
+    case 'nyxspin':   // rotation dirigeable jusqu'au sol, renvoie toutes les boules de feu
+      f.vx = h.r ? 2.6 : h.l ? -2.6 : 0; f.vy = -GRAV + 1.6 + (h.u ? -1.4 : h.d ? 1.6 : 0);
+      f.rotAng = f.dir * f.t * (Math.PI * 2 / 16);
+      reflectNear(f, 48, f.y - 50, 44);
+      if (f.t % 8 === 0) sfx('whoosh');
       break;
     case 'nslide':   // Nyx : glisse vers l'avant au ras du sol
       f.vx = f.t < 3 ? 0 : f.t < 22 ? 5.2 * f.dir : f.vx * .7;
@@ -2464,12 +2468,12 @@ function updFighter(f, o) {
       if (f.t >= 24) setState(f, 'idle');
       break;
     case 'nyxglide': {   // Nyx plane : flotte, se déplace dans les 4 directions (même hors de l'écran en haut), lâche une fiole à la fin
-      if (take(c, 'p') || take(c, 'k')) { setState(f, 'nyxspin'); f.vx = 0; sfx('whoosh'); break; }   // Y ou B en planant : coup de pied tournoyant 360° vers l'arrière
+      if (take(c, 's') || take(c, 'p') || take(c, 'k')) { setState(f, 'nyxspin'); f.vx = 0; sfx('whoosh'); break; }   // A (ou Y / B) à nouveau : rotation jusqu'au sol   // Y ou B en planant : coup de pied tournoyant 360° vers l'arrière
       if (!h.s) f.glideHold = false;
       const lim = f.glideHold ? 120 : 60;   // A maintenu : jusqu'à 2 s ; simple appui : 1 s
       const lift = f.y > GROUND - 112 ? -Math.min(2.2, (f.y - (GROUND - 112)) * .12) : 0;   // monte assez haut pour passer au-dessus d'un adversaire ou d'une boule de feu
-      f.vy = -GRAV + Math.sin(f.t * .18) * .35 + (h.u ? -2.2 : h.d ? 2.2 : lift);
-      f.vx = h.r ? 2.2 : h.l ? -2.2 : f.vx * .8;
+      f.vy = -GRAV + Math.sin(f.t * .18) * .35 + (h.u ? -3.2 : h.d ? 3.2 : lift);
+      f.vx = h.r ? 3.4 : h.l ? -3.4 : f.vx * .8;   // plane plus vite
       if (f.t >= lim) {   // fin du vol plané : lâche une fiole et retombe
         G.flasks.push({ owner: f, x: f.x + f.dir * 8, y: f.y - 40, vx: f.dir * 1.4, vy: .5, t: 0 }); sfx('whoosh');
         setState(f, 'jump'); f.airAtk = true; f.vy = 0;
@@ -2479,8 +2483,16 @@ function updFighter(f, o) {
     case 'airflask':   // en l'air : fiole lancée tout droit en diagonale vers le sol
       if (f.t === 4) { G.flasks.push({ owner: f, x: f.x + f.dir * 16, y: f.y - 50, vx: f.dir * 3.8, vy: 4.2, t: 0, straight: true }); }
       break;
+    case 'nyxtele': {   // s'évapore en fumée, réapparaît loin de l'autre côté de l'adversaire
+      f.vx = 0;
+      if (f.t < 10) { f.fadeK = f.t / 10; if (f.t % 2 === 0) nyxPuff(f); }
+      if (f.t === 10) { const side = Math.sign(o.x - f.x) || f.dir, L0 = (G.camL || 0) + 24, L1 = (G.camL || 0) + W - 24; f.x = Math.max(L0, Math.min(L1, o.x + side * 120)); f.dir = Math.sign(o.x - f.x) || -side; for (let k = 0; k < 4; k++) nyxPuff(f); }
+      if (f.t >= 10) { f.fadeK = Math.max(0, 1 - (f.t - 10) / 10); if (f.t % 2 === 0 && f.t < 20) nyxPuff(f); }
+      if (f.t >= 22) { f.fadeK = 0; setState(f, 'idle'); }
+      break;
+    }
     case 'smokeback':   // lâche un nuage toxique et recule
-      if (f.t === 3) { G.smokes = G.smokes.filter(c => c.owner !== f); G.smokes.push({ owner: f, x: f.x + f.dir * 30, dir: f.dir, t: 0 }); sfx('fb'); }
+      if (f.t === 3) { G.smokes = G.smokes.filter(c => c.owner !== f); G.smokes.push({ owner: f, x: f.x + f.dir * 40, dir: f.dir, t: 0 }); sfx('fb'); }
       f.vx = f.t >= 3 && f.t < 18 ? -f.dir * 3.2 : 0;
       if (f.t >= 26) setState(f, 'idle');
       break;
@@ -3361,7 +3373,10 @@ function addPuddle(owner, x, done) {
   G.puddles.push({ owner, x, t: 0, last: -99, done: !!done }); sfx('fb');
 }
 function nyxIgnite(o) { o.nyxBurnT = 180; o.burn = Math.max(o.burn || 0, 180); o.burnPal = NYX_FIRE; }   // enflammé 3 s : perd un peu d'énergie, bouge normalement
+function nyxPuff(f) { (G.tpuffs = G.tpuffs || []).push({ x: f.x + (Math.random() - .5) * 26, y: f.y - 10 - Math.random() * 70, vx: (Math.random() - .5) * .8, vy: -.4 - Math.random() * .6, r: 5 + Math.random() * 6, t: 0, c: ['170,140,220', '130,190,120', '190,170,230'][Math.random() * 3 | 0] }); }
 function updNyx() {
+  for (const q of G.tpuffs || []) { q.t++; q.x += q.vx; q.y += q.vy; q.r += .35; }
+  if (G.tpuffs) G.tpuffs = G.tpuffs.filter(q => q.t < 28);
   for (const q of G.flasks || []) {
     const o = G.f.find(f => f !== q.owner);
     q.t++; q.x += q.vx; q.y += q.vy; if (!q.straight) q.vy += .22;   // en cloche (au sol) ou en ligne droite (en l'air)
@@ -3393,8 +3408,15 @@ function updNyx() {
   }
   for (const c of G.smokes || []) {   // nuage toxique : aveugle l'adversaire et arrête ses projectiles
     if (c.dead) continue;
-    c.t++; if (c.t < 90) c.x += c.dir * .5; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);
-    if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) { if (!(o.confT > 0)) { addPopup(o.x, o.y - 100, 'CONFUSED!', '#c8a0ff'); sfx('parry'); } o.confT = 180; }   // brume : inverse directions et boutons
+    c.t++; if (c.t < 90) c.x += c.dir * 1.3; const o = G.f.find(f => f !== c.owner), R = 38 + Math.min(18, c.t * .7);   // la fumée avance plus loin
+    if (o && Math.abs(o.x - c.x) < R && o.y > GROUND - 90) {   // pas de dégât : coupe le coup spécial, 1 s au ralenti sans spécial, puis confusion
+      if (!(o.confT > 0)) {
+        addPopup(o.x, o.y - 100, 'CONFUSED!', '#c8a0ff'); sfx('parry');
+        o.slowT = 60; o.noSpecT = 60; o.confT = 240;
+      }
+      if (!CALM_ST.includes(o.state)) { if (o.air) { setState(o, 'jump'); o.airAtk = true; } else setState(o, 'idle'); o.vx = 0; }   // dans la fumée : tout coup spécial s'arrête
+      o.confT = Math.max(o.confT, 180);
+    }   // brume : inverse directions et boutons
     // fumée contre boule de feu / clone / projectile d'énergie : les deux s'annulent
     const hitSmoke = (q, x, y) => { c.dead = true; (G.clashFx = G.clashFx || []).push({ x, y, t: 0 }); G.flashT = Math.max(G.flashT, 3); G.shake = Math.max(G.shake, 4); sfx('parry'); };
     for (const fb of G.fbs || []) if (!c.dead && fb.alive && fb.owner !== c.owner && Math.abs(fb.x - c.x) < R) { fb.alive = false; if (fb.owner.fb === fb) fb.owner.fb = null; hitSmoke(fb, fb.x, fb.y); }
@@ -3417,6 +3439,10 @@ function updNyx() {
   if (G.geysers) G.geysers = G.geysers.filter(g => g.t < 34);
 }
 function drawNyxFx() {
+  for (const q of G.tpuffs || []) {   // petite fumée de téléportation (couleurs de la fumée de confusion)
+    const a = .55 * (1 - q.t / 28), g = ctx.createRadialGradient(q.x, q.y, 1, q.x, q.y, q.r);
+    g.addColorStop(0, `rgba(${q.c},${a})`); g.addColorStop(1, `rgba(${q.c},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2); ctx.fill();
+  }
   for (const p of G.puddles || []) {   // flaque de feu chimique au sol
     const a = Math.min(1, (300 - p.t) / 40);
     ctx.save(); ctx.globalAlpha = a; ctx.globalCompositeOperation = 'lighter';
@@ -3609,10 +3635,11 @@ function clashProjectiles() {
   for (const q of G.sonics || []) if (!q.dead) L.push([q, q.y, 16]);
   for (const q of G.voids || []) if (!q.dead && !q.charging) L.push([q, q.y, q.r || 14]);
   for (const q of G.flasks || []) if (!q.dead) L.push([q, q.y, 13]);   // fiole de Nyx : s'annule avec boules de feu, clones, sphères...
-  for (const q of G.holos || []) if (!q.dead) L.push([q, q.y - 50, 16]);   // clone énergétique de Vesper = projectile
-  for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14]);
+  for (const q of G.holos || []) if (!q.dead) L.push([q, q.y - 50, 16, 'h']);   // clone énergétique de Vesper = projectile
+  for (const q of G.waves || []) if (!q.dead && !q.ring && !q.small) L.push([q, GROUND - 16, 14, 'w']);   // onde au sol de Grog : passe sous les boules de feu, s'annule avec un clone
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
-    const [a, ay, ar] = L[i], [b, by, br] = L[j];
+    const [a, ay, ar, ka] = L[i], [b, by, br, kb] = L[j];
+    if ((ka === 'w') !== (kb === 'w') && (ka === 'w' ? kb : ka) !== 'h') continue;
     if (!a.owner || !b.owner || a.owner === b.owner || a.dead || b.dead || a.alive === false || b.alive === false) continue;
     if (Math.abs(a.x - b.x) < ar + br && Math.abs(ay - by) < ar + br + 16) {
       for (const q of [a, b]) { if ('alive' in q) q.alive = false; q.dead = true; if (q.owner.fb === q) q.owner.fb = null; }
@@ -3864,10 +3891,10 @@ function applyHit(att, def, data, sx, sy, fromX, projectile) {
     }
   }
   if (att.def.fireUpper && att.state === 'uppercut' && !projectile) { data = Object.assign({}, data, { dmg: 19 }); def.burn = Math.max(def.burn || 0, 70); def.burnPal = att.def.fb; }   // poing en feu : plus de dégâts, brûlure
-  // Rempart de Fer : absorbe totalement le coup puis repousse l'attaquant
+  // Rempart de Fer : un coup normal est absorbé (l'électricité s'arrête) ; un coup spécial touche Grog normalement
   if ((def.state === 'rampart' && def.t >= 2) || (def.rampT > 0 && !def.air && !['fall', 'down', 'getup', 'held', 'throw'].includes(def.state))) {
-    G.freeze = 6; addSpark(sx, sy, 'parry'); sfx('block'); def.rampT = 0; att.hasHit = true;   // absorbe le coup, sans explosion (le dôme ne part qu'avec un 2e appui sur A)
-    return;
+    if (!projectile && NORMAL_ATK.includes(att.state)) { G.freeze = 6; addSpark(sx, sy, 'parry'); sfx('block'); def.rampT = 0; att.hasHit = true; return; }
+    def.rampT = 0;
   }
   const away = fromX < def.x ? 1 : -1;
   if (isBlocking(def, fromX, data)) {
@@ -4119,10 +4146,23 @@ function nav(b) {
   return n === 1 || (n > 30 && (n - 30) % 15 === 0);
 }
 function navStep() { const u = nav('u'), d = nav('d'); return d ? 1 : u ? -1 : 0; }
-const MOVE_ROWS = [];
+let MR_KEY = null, MR = [];
+const KIT_PAGE = { vesper: 'VESPER SPECIALS', vane: 'LORD VANE SPECIALS', kael: 'KAEL SPECIALS', nyx: 'NYX SPECIALS', zephyr: 'ZEPHYR SPECIALS', grog: 'GROG SPECIALS' };
+const mlTwo = () => G.paused && G.f && G.f[1] && !G.f[1].cpu;   // deux joueurs humains : choix PLAYER 1 / PLAYER 2
+function moveRows() {   // en pause : coups du combattant actuel seulement ; écran titre : tous les coups
+  const pz = G.paused && G.f && G.f.length === 2, pi = mlTwo() ? (G.mlP || 0) : 0;
+  const key = pz ? 'p' + pi + G.f[pi].def.name : 'all';
+  if (key !== MR_KEY) {
+    MR_KEY = key; MR = [];
+    let pages = MOVES;
+    if (pz) { const d = G.f[pi].def, t = KIT_PAGE[d.kit] || 'SPECIALS & COUNTER'; pages = MOVES.filter(pg => pg.title === 'BASICS' || pg.title === t || pg.title === 'COMBOS').map(pg => pg.title === t ? { title: d.name + ' SPECIALS', lines: pg.lines } : pg); }
+    pages.forEach((pg, i) => { if (i) MR.push(['', '']); MR.push(['#', pg.title]); pg.lines.forEach(l => MR.push(l)); });
+  }
+  return MR;
+}
 function stepMoves() {
-  if (!MOVE_ROWS.length) MOVES.forEach((pg, i) => { if (i) MOVE_ROWS.push(['', '']); MOVE_ROWS.push(['#', pg.title]); pg.lines.forEach(l => MOVE_ROWS.push(l)); });
-  const maxS = Math.max(0, MOVE_ROWS.length * 14 - 128);
+  if (mlTwo() && (edge(pctl, 'l') || edge(pctl, 'r'))) { G.mlP = 1 - (G.mlP || 0); G.mscroll = 0; sfx('beep'); }
+  const maxS = Math.max(0, moveRows().length * 14 - 128);
   if (pctl.held.d) G.mscroll = Math.min(maxS, (G.mscroll || 0) + 1.5);
   if (pctl.held.u) G.mscroll = Math.max(0, (G.mscroll || 0) - 1.5);
   if (backPress(pctl)) { G.showMoves = false; sfx('beep'); }
@@ -4201,7 +4241,7 @@ function stepPause() {
   if (edge(pctl, 's')) {   // A = valider le choix
     sfx('select');
     if (G.pcur === 0) G.paused = false;
-    else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; }
+    else if (G.pcur === 1) { G.showMoves = true; G.mscroll = 0; G.mlP = 0; }
     else if (G.pcur === 2) { G.showOpts = true; G.ocur = 0; }
     else if (G.pcur === 3) { G.paused = false; G.scene = 'select'; G.t = 0; }
     else G.pconf = 1;   // BACK TO TITLE : confirmation (NO par défaut)
@@ -4504,6 +4544,7 @@ function stepFight() {
     if (f.slowT > 35 && o.counterT > 0 && G.fighting && take(f.ctl, 'x')) { startClash(f, o); return; }
   }
   [[a, b], [b, a]].forEach(([f, o]) => {
+    if (f.noSpecT > 0) { f.noSpecT--; if (f.ctl.buf.s > 0) take(f.ctl, 's'); }   // sortie de la fumée : pas de coup spécial pendant 1 s
     if (f.slowT > 0) { f.slowT--; if (G.frame % 3) return; }
     updFighter(f, o);
   });
@@ -4541,7 +4582,7 @@ function stepFight() {
   // Coups au corps à corps
   for (const [att, def] of [[a, b], [b, a]]) {
     if (att.state === 'uppercut' && def.state === 'fjump' && def.t >= 4) continue;
-    if ((att.state === 'rupper' || att.state === 'cpunch') && def.state === 'kspin') continue;
+    if ((att.state === 'rupper' || att.state === 'cpunch') && (def.state === 'kspin' || def.state === 'nyxspin')) continue;   // bas + Y ne contre pas ces rotations
     if (def.state === 'crushD') continue;   // descente diagonale de Grog : seules les boules de feu / projectiles peuvent la casser   // la roulade de Kael gagne contre bas + Y   // le saut-poing d'Axel gagne contre le shoryuken
     const ab = atkBox(att), hb = hurtbox(def) || (att.state === 'fjump' && def.state === 'uppercut' && !def.ko ? [def.x - 14, def.y - 84, def.x + 14, def.y] : null);
     if (overlap(ab, hb)) {
@@ -4912,8 +4953,8 @@ const MOVES = [
     ['A / FWD + A', 'SONIC WAVE'], ['', 'LONG ELECTRIC WAVE, PUSHES BACK'], ['BACK + A', 'FLASH STEP'], ['', 'DODGES BACK, CHARGES THE FISTS'], ['CHARGED > Y', 'THUNDER RUSH'], ['', '5 FAST PUNCHES, 5TH KNOCKS DOWN'],
     ['UP + A', 'PLASMA WALL'], ['', 'ELECTRIC WALL, GROUND TO SKY'], ['JUMP + A', 'VOLT SPIN'], ['', '360 SPIN KICK, REFLECTS SHOTS'] ] },
   { title: 'NYX SPECIALS', lines: [
-    ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', '2 S MIST, REVERSES MOVES, STOPS SHOTS'],
-    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['DOWN + A', 'SHADOW SLIDE'], ['', 'SLIDES UNDER SHOTS, TRIPS THE FOE'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A: GLIDE 2 S, DROPS A FLASK'], ['GLIDE > Y / B', 'BACK SPIN KICK, BACKFLIP DOWN'] ] },
+    ['A', 'MAGMA FLASK'], ['', 'FLASK + PINK FIRE (3 S BURN)'], ['BACK + A', 'TOXIC MIST'], ['', 'SLOWS, THEN CONFUSES, STOPS SHOTS'], ['MIST OUT > BACK + A', 'SMOKE TELEPORT'],
+    ['UP + A', 'ALCHEMIC GEYSER'], ['', 'DIAGONAL PURPLE FLAMES'], ['DOWN + A', 'SHADOW SLIDE'], ['', 'SLIDES UNDER SHOTS, TRIPS THE FOE'], ['JUMP + A', 'WITCH GLIDE'], ['', 'HOLD A: GLIDE 2 S, DROPS A FLASK'], ['GLIDE > A / Y / B', 'SPIN TO THE GROUND, REFLECTS SHOTS'] ] },
   { title: 'ZEPHYR SPECIALS', lines: [
     ['FWD + Y', 'HEAVEN CUT'], ['', 'HEAVY SLASH, HEAD TO GROUND'], ['A', 'GALE BLADE'], ['', 'SWORD SLASH, AIR CRESCENT'], ['BACK + A', 'STORM PASSAGE'], ['', 'SINKS, REAPPEARS BEHIND THE FOE'],
     ['UP + A', 'RISING TORNADO'], ['', 'SPINNING SWORD UPPERCUT'], ['JUMP + A', 'SKY PLUNGE'], ['', 'HOVERS, STABS DOWN, SHOCKWAVE'] ] },
@@ -4929,6 +4970,8 @@ function drawMoves() {
   text('MOVE LIST', CX, 10, 8, '#ff7a3a', 'center');
   const x0 = Math.max(16, CX - 168), top = 30, bot = 162, sc = G.mscroll || 0;
   ctx.save(); ctx.beginPath(); ctx.rect(0, top, W, bot - top); ctx.clip();
+  if (mlTwo()) [0, 1].forEach(i => text((i ? 'PLAYER 2' : 'PLAYER 1'), CX + (i ? 50 : -50), 20, 8, (G.mlP || 0) === i ? '#ffd23a' : '#7a6a5a', 'center'));
+  const MOVE_ROWS = moveRows();
   MOVE_ROWS.forEach(([k, v], i) => {
     const y = top + 4 + i * 14 - sc;
     const fa = Math.max(0, Math.min(1, (y - top + 2) / 8, (bot - 8 - y) / 8));   // fondu en haut et en bas
