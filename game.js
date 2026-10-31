@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v208';
+const VERSION = 'v210';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -749,6 +749,13 @@ function shoeP(q, dir, dark, P) {
   sR(x0, y - 1, 7, 1, dark ? '#a8a8a0' : '#e8e8e0');          // semelle blanche
   sR(x0 + 1, y - 3, 1, 1, '#d8d8d0');                          // œillet
 }
+function shoeDown(q, dir, dark) {   // basket pointe vers le bas (Axel en plein shoryuken)
+  const x0 = Math.round(q[0]) - 2, y = Math.round(q[1]) - 4;
+  sR(x0, y, 4, 4, dark ? '#0a0a0e' : '#16161c');                            // tige
+  sR(x0 + (dir > 0 ? 1 : 2), y, 1, 3, dark ? '#1c1c24' : '#34343e');        // reflet
+  sR(x0, y + 4, 4, 3, dark ? '#b8b8b0' : '#f4f4ee');                         // bout blanc vers le bas
+  sR(x0 + (dir > 0 ? 3 : 0), y + 1, 1, 6, dark ? '#a8a8a0' : '#e8e8e0');    // semelle sur le côté
+}
 function footP(q, dir, skin) {
   const x0 = Math.round(q[0]) - (dir > 0 ? 1 : 3), y = Math.round(q[1]);
   sR(x0 + (dir > 0 ? 0 : 2), y - 3, 3, 1, skin[1]);          // cheville
@@ -936,7 +943,8 @@ function drawFighter(f, x = f.x, y = f.y) {
       const x0 = Math.round(ft[0]) - (dir > 0 ? 3 : 5);
       sR(x0, Math.round(ft[1]) - 4, 8, 3, near ? B[1] : B[0]); sR(x0 + (dir > 0 ? 4 : 0), Math.round(ft[1]) - 4, 4, 1, near ? B[2] : B[1]);
       sR(x0, Math.round(ft[1]) - 1, 8, 1, '#08080a');
-    } else if (d.shoes) shoeP(ft, dir, !near, d.shoe); else footP(ft, dir, S);
+    } else if (d.shoes && d.fireUpper && f.air && (f.state === 'fjump' || f.state === 'uppercut')) shoeDown(ft, dir, !near);   // pieds tendus vers le bas
+    else if (d.shoes) shoeP(ft, dir, !near, d.shoe); else footP(ft, dir, S);
     if (d.jeans && near) { const kp = mix(p, k, .75); sR(kp[0] - 1, kp[1], 2, 2, Lg[3]); }   // délavé au genou
   };
 
@@ -4222,7 +4230,7 @@ const TUT_BTN = [['p', 'PRESS Y TO PUNCH'], ['k', 'PRESS B TO KICK'], ['s', 'PRE
 const st_ = n => f => f.state === n;
 const TUT_SP = {
   hiro: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'LOW SLIDE + MINI UPPER', st_('hslide')], ['UP + A AGAIN', 'SHORYUKEN', st_('uppercut')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
-  axel: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'FIRE LEAP', st_('fjump')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
+  axel: [['A', 'FIREBALL', f => f.state === 'special' && f.fired], ['HOLD A', 'MAX FIREBALL', f => f.charged], ['UP + A', 'FIRE LEAP', st_('fjump')], ['LEAP HITS > UP + A', 'FIRE SHORYUKEN', st_('uppercut')], ['BACK + A', 'FLIP KICK', st_('flipk')], ['DOWN + A', 'SLIDE KICK', st_('nslide')], ['JUMP, THEN A', 'AIR FLIP KICKS', st_('aflip')]],
   vesper: [['A', 'HOLO FLASH', st_('holo')], ['BACK + A', 'SHADOW STEP', st_('shadow')], ['UP + A', 'ZENITH BLADE', st_('zenith')], ['JUMP, THEN A', 'NEON DIVE', st_('dive')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
   vane: [['A', 'VOID FLARE', st_('voidcast')], ['BACK + A', 'PHANTOM TELEPORT', st_('pteleport')], ['UP + A', 'METEOR IMPACT', st_('meteor')], ['JUMP, THEN A', 'VOID BOMB', st_('airvoid')], ['JUMP, THEN DOWN + A', 'DIVE KICK', st_('vdive')], ['HOLD Y, THEN RELEASE', '5 FAST PUNCHES', st_('vtripP')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
   kael: [['A', 'SONIC WAVE', st_('sonic')], ['BACK + A', 'FLASH STEP', st_('flashstep')], ['THEN Y', 'THUNDER RUSH', st_('kbarrage')], ['UP + A', 'PLASMA WALL', st_('plasmawall')], ['JUMP, THEN A', 'VOLT SPIN', st_('kspin')], ['DOWN + A', 'SLIDE KICK', st_('nslide')]],
@@ -4258,8 +4266,9 @@ function tutStep() {   // appelé à chaque image du combat
 function tutAI(f, o) {   // le double : immobile, puis il attaque (phase 3), puis il contre (phase 3, étape 2)
   const T = G.tut, a = f.ai, held = {};
   if (a.press) { held[a.press] = true; if (--a.pressFrames <= 0) a.press = null; }
-  if (!G.fighting || T.phase < 3 || T.ok > 0) return held;
   const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'r' : 'l';
+  if (G.fighting && T.phase === 2 && dist > 150 && NEUTRAL.includes(f.state)) held[fwd] = true;   // reste à portée pour les coups spéciaux
+  if (!G.fighting || T.phase < 3 || T.ok > 0) return held;
   if (!NEUTRAL.includes(f.state)) return held;
   if (T.step === 0) {   // s'approche et donne des coups de poing : au joueur de contrer
     if (dist > 50) held[fwd] = true;
