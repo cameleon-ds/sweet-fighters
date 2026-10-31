@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 (() => {
-const VERSION = 'v216';
+const VERSION = 'v217';
 
 let W = 384; const H = 216, GROUND = 190, GRAV = 0.34;
 let CX = 192; // centre horizontal
@@ -4328,6 +4328,7 @@ function drawTut() {
 /* ---------------- ARCADE MODE ---------------- */
 // Tous les personnages dans l'ordre (y compris son double), Lord Vane en dernier
 function arcadeStart() {
+  if (OPT.diff === 3) { OPT.diff = 1; saveOpt(); }   // pas d'entraînement en ARCADE
   const L = DEFS.map((d, i) => i).filter(i => DEFS[i].kit !== 'vane'); L.push(DEFS.findIndex(d => d.kit === 'vane'));
   G.arc = { list: L, i: 0 }; arcadeFight();
 }
@@ -4475,7 +4476,7 @@ function stepOptions() {
   }
   if (L === 3 && ok) { OPT.blood = !OPT.blood; saveOpt(); sfx('select'); }
   if (L === 2 && (l || r || ok)) {
-    { const k = DIFF_ORDER.indexOf(OPT.diff), n = DIFF_ORDER.length; OPT.diff = DIFF_ORDER[(k + (l ? n - 1 : 1)) % n]; }   // en boucle : EASY, NORMAL, HARD, EXTREME, TRAINING
+    { const ord = G.mode === 'arcade' && G.arc ? DIFF_ORDER.filter(v => v !== 3) : DIFF_ORDER, k = Math.max(0, ord.indexOf(OPT.diff)), n = ord.length; OPT.diff = ord[(k + (l ? n - 1 : 1)) % n]; }   // ARCADE : pas de TRAINING   // en boucle : EASY, NORMAL, HARD, EXTREME, TRAINING
     saveOpt(); sfx('select');
   }
   if (L === 0 && ok) { OPT.zoom = !OPT.zoom; saveOpt(); sfx('select'); }
